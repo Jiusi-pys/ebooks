@@ -23,6 +23,7 @@ import type { Library } from "@/hooks/useLibrary";
 import { formatDate } from "@/lib/covers";
 import { emitEvent } from "@/lib/events";
 import { friendlyAiError } from "@/lib/aiError";
+import { useAiConfig } from "@/lib/aiConfig";
 import {
   appendChild,
   appendSibling,
@@ -85,6 +86,7 @@ export function MindView({ lib }: { lib: Library }) {
   };
   const inspectorRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
+  const [aiConfig] = useAiConfig();
 
   const maps = lib.mindMaps;
   const current = maps.find(m => m.id === selectedMapId) ?? maps[0] ?? null;
@@ -219,6 +221,7 @@ export function MindView({ lib }: { lib: Library }) {
     setError("");
     try {
       const resp = await utils.client.ai.mindmap.mutate({
+        config: aiConfig,
         bookTitle: currentBook.title,
         chapterTitle: chapter.title,
         text: chapter.paragraphs.join("\n").slice(0, 50000),

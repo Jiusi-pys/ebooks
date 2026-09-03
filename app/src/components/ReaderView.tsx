@@ -4,9 +4,9 @@ import {
   BookOpenText,
   ChevronLeft,
   ChevronRight,
-  Columns2,
   Copy,
   List,
+  ListPlus,
   MessageSquarePlus,
   Quote,
   Sparkles,
@@ -19,7 +19,13 @@ import {
 } from "lucide-react";
 import { newReviewState } from "@/lib/srs";
 import type { Library } from "@/hooks/useLibrary";
-import type { Book, Highlight, HighlightStyle, TypeSettings } from "@/types";
+import type {
+  Book,
+  Highlight,
+  HighlightStyle,
+  OutlineItem,
+  TypeSettings,
+} from "@/types";
 import {
   fontStack,
   loadTypeSettings,
@@ -52,6 +58,9 @@ import {
   type SplitDirection,
 } from "@/lib/splitLayout";
 import { appendChild, createMindFromBook, newNode } from "@/lib/mind";
+import { getSplitBooks } from "@/lib/splitScope";
+import { addOutlineTarget, getBookOutline, outlineTitle } from "@/lib/outline";
+import { OutlinePanel } from "./reader/OutlinePanel";
 
 interface SelInfo {
   paraIndex: number;
@@ -126,6 +135,10 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
   const aiTarget = aiTargetId
     ? (lib.highlights.find(h => h.id === aiTargetId) ?? null)
     : null;
+  const activeStudySet = lib.route.studySetId
+    ? lib.studySets.find(set => set.id === lib.route.studySetId)
+    : undefined;
+  const splitBooks = getSplitBooks(lib.books, book, activeStudySet);
 
   useEffect(() => saveTypeSettings(type), [type]);
 
@@ -154,6 +167,18 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lib.route.highlightId, chapter?.id]);
+
+  // 自定义目录：可精确跳到章节内的正文段落。
+  useEffect(() => {
+    const paraIndex = lib.route.outlineParaIndex;
+    if (paraIndex === undefined || !chapterId) return;
+    requestAnimationFrame(() => {
+      const el = wrapRef.current?.querySelector(`[data-pi="${paraIndex}"]`);
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      el?.classList.add("anchor-flash");
+      window.setTimeout(() => el?.classList.remove("anchor-flash"), 2400);
+    });
+  }, [lib.route.outlineParaIndex, lib.route.outlineNavigationKey, chapterId]);
 
   // 原版模式：「回到原文」→ 按书摘文字定位 PDF 页
   useEffect(() => {
@@ -332,6 +357,47 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
       }
     },
     [createFromSelection, showToast]
+  );
+
+  const saveOutlineTarget = useCallback(
+    async (target: { chapterId: string; paraIndex: number; title: string }) => {
+      const outline = addOutlineTarget(getBookOutline(book), {
+        id: `outline:${crypto.randomUUID()}`,
+        title: outlineTitle(target.title),
+        chapterId: target.chapterId,
+        paraIndex: target.paraIndex,
+      });
+      await lib.updateBookOutline(book.id, outline);
+      showToast("已加入导航目录");
+    },
+    [book, lib, showToast]
+  );
+
+  const addSelectionToOutline = useCallback(async () => {
+    if (!sel || !chapter) return;
+    await saveOutlineTarget({
+      chapterId: chapter.id,
+      paraIndex: sel.paraIndex,
+      title: sel.text,
+    });
+    clearSelection();
+  }, [sel, chapter, saveOutlineTarget]);
+
+  const addHighlightToOutline = useCallback(
+    async (highlight: Highlight) => {
+      const sourceChapter = book.chapters.find(
+        item => item.id === highlight.chapterId
+      );
+      if (!sourceChapter) return;
+      const location = locateHighlight(sourceChapter, highlight);
+      await saveOutlineTarget({
+        chapterId: highlight.chapterId,
+        paraIndex: location?.paraIndex ?? highlight.paraIndex ?? 0,
+        title: highlight.name || highlight.text,
+      });
+      setHlPopup(null);
+    },
+    [book.chapters, saveOutlineTarget]
   );
 
   const openTranslation = useCallback(() => {
@@ -568,7 +634,28 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
 
   const gotoChapter = (idx: number) => {
     const c = book.chapters[idx];
-    if (c) lib.navigate({ view: "reader", bookId: book.id, chapterId: c.id });
+    if (c)
+      lib.navigate({
+        view: "reader",
+        bookId: book.id,
+        chapterId: c.id,
+        studySetId: activeStudySet?.id,
+      });
+  };
+
+  const gotoOutline = (item: OutlineItem) => {
+    if (!item.chapterId) return;
+    if (item.chapterId === chapter.id && item.paraIndex === undefined) {
+      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    lib.navigate({
+      view: "reader",
+      bookId: book.id,
+      chapterId: item.chapterId,
+      studySetId: activeStudySet?.id,
+      outlineParaIndex: item.paraIndex,
+      outlineNavigationKey: Date.now(),
+    });
   };
 
   /** PDF：切换 重排 / 原版 阅读方式 */
@@ -616,47 +703,27 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     >
       {/* 章节目录（原版模式下由 PDF 大纲代替） */}
       {showToc && posture === "read" && !isOriginal && (
-        <div
-          className="flex w-56 shrink-0 flex-col border-r"
-          style={{ background: theme.panel, borderColor: theme.border }}
-        >
-          <div
-            className="font-meta border-b px-4 py-3 text-[10px] uppercase tracking-[0.16em]"
-            style={{ borderColor: theme.border, color: theme.muted }}
-          >
-            目录 · {book.chapters.length} 章
-          </div>
-          <div className="flex-1 overflow-y-auto py-2">
-            {book.chapters.map((c, i) => (
-              <button
-                key={c.id}
-                onClick={() => gotoChapter(i)}
-                className={`block w-full truncate px-4 py-[7px] text-left text-[13px] transition-colors ${
-                  c.id === chapter.id ? "font-medium" : ""
-                }`}
-                style={{
-                  color: c.id === chapter.id ? theme.text : theme.muted,
-                  background: c.id === chapter.id ? theme.selection : undefined,
-                }}
-              >
-                <span className="font-meta mr-2 text-[10px] opacity-60">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                {c.title}
-              </button>
-            ))}
-          </div>
-        </div>
+        <OutlinePanel
+          book={book}
+          activeChapterId={chapter.id}
+          theme={theme}
+          onNavigate={gotoOutline}
+          onChange={outline => void lib.updateBookOutline(book.id, outline)}
+        />
       )}
 
       {/* 可递归拆分的阅读工作区 */}
       <div className="min-h-0 min-w-0 flex-1">
         <SplitWorkspace
           node={visibleSplitLayout}
-          books={lib.books}
+          books={splitBooks}
           theme={theme}
           type={type}
-          canSplit={paneCount < 3}
+          canSplit={paneCount < 4}
+          scopeLabel={
+            activeStudySet ? `学习集：${activeStudySet.name}` : "全书架"
+          }
+          showMainSplitControls={!showCite && !showType}
           onSplit={splitPane}
           onChange={(paneId, target) =>
             setSplitLayout(current =>
@@ -674,11 +741,17 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                 style={{ borderColor: theme.border }}
               >
                 <button
-                  onClick={() => lib.navigate({ view: "library" })}
+                  onClick={() =>
+                    lib.navigate(
+                      activeStudySet
+                        ? { view: "studyset", studySetId: activeStudySet.id }
+                        : { view: "library" }
+                    )
+                  }
                   className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] hover:opacity-70"
                   style={{ color: theme.muted }}
                 >
-                  <ArrowLeft size={15} /> 书架
+                  <ArrowLeft size={15} /> {activeStudySet ? "学习集" : "书架"}
                 </button>
                 {!isOriginal && (
                   <button
@@ -706,43 +779,6 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                     {isOriginal ? "原版" : "重排"}
                   </button>
                 )}
-                {/* 分屏方向：按钮对应 tmux 的横向与纵向拆分。 */}
-                <div
-                  className="flex overflow-hidden rounded-full border"
-                  style={{
-                    borderColor: paneCount > 1 ? undefined : theme.border,
-                  }}
-                >
-                  <button
-                    onClick={() => splitPane("main", "horizontal")}
-                    disabled={paneCount >= 3}
-                    className={`flex items-center gap-1 px-2.5 py-1 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
-                      paneCount > 1 ? "text-primary" : ""
-                    }`}
-                    style={{ color: paneCount > 1 ? undefined : theme.muted }}
-                    title={
-                      paneCount >= 3 ? "最多支持 3 个窗格" : "向右拆分主阅读区"
-                    }
-                  >
-                    <Columns2 size={12} /> 左右
-                  </button>
-                  <button
-                    onClick={() => splitPane("main", "vertical")}
-                    disabled={paneCount >= 3}
-                    className={`flex items-center gap-1 border-l px-2.5 py-1 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
-                      paneCount > 1 ? "text-primary" : ""
-                    }`}
-                    style={{
-                      borderColor: theme.border,
-                      color: paneCount > 1 ? undefined : theme.muted,
-                    }}
-                    title={
-                      paneCount >= 3 ? "最多支持 3 个窗格" : "向下拆分主阅读区"
-                    }
-                  >
-                    <Columns2 className="rotate-90" size={12} /> 上下
-                  </button>
-                </div>
                 <div
                   className="flex overflow-hidden rounded-full border"
                   style={{ borderColor: theme.border }}
@@ -1026,6 +1062,7 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                       onComment={addComment}
                       onOpenCiteBrowser={() => setShowCite(true)}
                       onTranslate={openTranslation}
+                      onAddToOutline={() => void addSelectionToOutline()}
                       onAskAi={() => askAiOn()}
                       onClose={() => setSel(null)}
                     />
@@ -1104,6 +1141,7 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                         });
                       }}
                       onAddToMindMap={() => void addToMindMap(popupHl)}
+                      onAddToOutline={() => void addHighlightToOutline(popupHl)}
                       onCitePassage={citePassage}
                       onAskAi={() => askAiOn(popupHl)}
                       onDelete={() => {
@@ -1450,6 +1488,7 @@ function HighlightPopup({
   onEditCloze,
   onToggleReview,
   onAddToMindMap,
+  onAddToOutline,
   onCitePassage,
   onAskAi,
   onDelete,
@@ -1467,6 +1506,7 @@ function HighlightPopup({
   onEditCloze: (cloze: string[]) => void;
   onToggleReview: () => void;
   onAddToMindMap: () => void;
+  onAddToOutline: () => void;
   onCitePassage: (t: CitationTarget, noteId: string | "new") => void;
   onAskAi: () => void;
   onDelete: () => void;
@@ -1692,6 +1732,12 @@ function HighlightPopup({
             className="flex flex-1 items-center justify-center gap-1 rounded py-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
           >
             <GitBranch size={12} /> 脑图
+          </button>
+          <button
+            onClick={onAddToOutline}
+            className="flex flex-1 items-center justify-center gap-1 rounded py-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <ListPlus size={12} /> 目录
           </button>
           <button
             onClick={() => setCiting(true)}

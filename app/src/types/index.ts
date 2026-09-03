@@ -5,6 +5,17 @@ export interface Chapter {
   paragraphs: string[];
 }
 
+/** 可编辑导航目录。扁平顺序配合 depth 表达层级，章节与正文锚点均可独立编排。 */
+export interface OutlineItem {
+  id: string;
+  title: string;
+  /** 缺省时为不跳转的分组标题。 */
+  chapterId?: string;
+  /** 精确跳转到重排正文的段落；缺省时跳到章节顶部。 */
+  paraIndex?: number;
+  depth: number;
+}
+
 export interface Book {
   id: string;
   title: string;
@@ -29,6 +40,8 @@ export interface Book {
   readerMode?: "reflow" | "original";
   /** 原版 PDF 页数 */
   pageCount?: number;
+  /** 用户自定义导航目录；缺省时由 chapters 自动生成。 */
+  outline?: OutlineItem[];
 }
 
 /** 书架分类文件夹 */
@@ -36,6 +49,16 @@ export interface Folder {
   id: string;
   name: string;
   createdAt: number;
+}
+
+/** 独立的逻辑学习集合；与书架文件夹无关，同一本书可属于多个学习集。 */
+export interface StudySet {
+  id: string;
+  name: string;
+  description?: string;
+  bookIds: string[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Note {
@@ -60,6 +83,17 @@ export interface AiQA {
   q: string;
   a: string;
   ts: number;
+}
+
+export type AiProviderId = "codex" | "deepseek";
+export type AiEffort = "none" | "low" | "medium" | "high" | "xhigh" | "max";
+
+/** 浏览器端选择的全局 AI 后端；apiKey 只保存在当前浏览器会话。 */
+export interface AiConfig {
+  provider: AiProviderId;
+  model: string;
+  effort: AiEffort;
+  apiKey?: string;
 }
 
 /** 间隔重复状态（简化 FSRS/SM-2）：加入复习后存在 */
@@ -145,7 +179,6 @@ export type ViewName =
   | "note"
   | "graph"
   | "highlights"
-  | "compare"
   | "mind"
   | "review"
   | "studyset";
@@ -155,12 +188,16 @@ export interface Route {
   bookId?: string;
   chapterId?: string;
   noteId?: string;
-  /** 学习集（文件夹）id */
+  /** 独立学习集 id */
   studySetId?: string;
   /** 跳转后需要滚动定位并闪烁的书摘 */
   highlightId?: string;
   /** 原版 PDF 模式下用于定位的锚点文字（书摘 text） */
   anchorText?: string;
+  /** 自定义目录的段落级跳转目标。 */
+  outlineParaIndex?: number;
+  /** 允许连续点击同一目录项时也重新执行定位。 */
+  outlineNavigationKey?: number;
 }
 
 /* ---------- 阅读排版设置 ---------- */

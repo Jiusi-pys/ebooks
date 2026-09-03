@@ -3,7 +3,26 @@ import { eq } from "drizzle-orm";
 import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { bookDigests } from "@db/schema";
-import { askCodex, CODEX_MODEL, CODEX_REASONING_EFFORT } from "./lib/codex";
+import {
+  askModel,
+  CODEX_EFFORTS,
+  CODEX_MODELS,
+  DEEPSEEK_EFFORTS,
+  DEEPSEEK_MODELS,
+  getAiStatus,
+} from "./lib/ai-provider";
+import { env } from "./lib/env";
+
+interface CachedDigest {
+  contentHash: string;
+  title: string;
+  author: string;
+  structure: string;
+  overview: string | null;
+}
+
+/** 本地无 MySQL 时仍允许 Codex 功能运行；缓存保留到服务重启。 */
+const memoryDigests = new Map<string, CachedDigest>();
 
 const targetLanguageSchema = z.enum([
   "中文",
@@ -12,6 +31,33 @@ const targetLanguageSchema = z.enum([
   "Français",
   "Deutsch",
 ]);
+
+const aiConfigSchema = z
+  .object({
+    provider: z.enum(["codex", "deepseek"]),
+    model: z.string().min(1).max(80),
+    effort: z.enum(["none", "low", "medium", "high", "xhigh", "max"]),
+    apiKey: z.string().max(512).optional(),
+  })
+  .superRefine((config, ctx) => {
+    const models = config.provider === "codex" ? CODEX_MODELS : DEEPSEEK_MODELS;
+    const efforts =
+      config.provider === "codex" ? CODEX_EFFORTS : DEEPSEEK_EFFORTS;
+    if (!(models as readonly string[]).includes(config.model)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["model"],
+        message: "该 Provider 不支持此模型",
+      });
+    }
+    if (!(efforts as readonly string[]).includes(config.effort)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["effort"],
+        message: "该 Provider 不支持此思考强度",
+      });
+    }
+  });
 
 export interface MindTopic {
   title: string;
@@ -108,19 +154,30 @@ export function parseStudyCard(raw: string, source: string): StudyCardDraft {
 }
 
 export const aiRouter = createRouter({
-  status: publicQuery.query(async () => {
-    const { getCodexAuthStatus } = await import("./lib/codex");
-    return {
-      model: CODEX_MODEL,
-      reasoningEffort: CODEX_REASONING_EFFORT,
-      auth: await getCodexAuthStatus(),
-    };
-  }),
+  status: publicQuery
+    .input(aiConfigSchema.optional())
+    .query(async ({ input }) => getAiStatus(input)),
+
+  testConnection: publicQuery
+    .input(z.object({ config: aiConfigSchema }))
+    .mutation(async ({ input }) => {
+      const content = await askModel(
+        [
+          {
+            role: "user",
+            content: "这是连接测试。请只回复 OK，不要输出其他内容。",
+          },
+        ],
+        input.config
+      );
+      return { ok: true, content };
+    }),
 
   /** 通用对话补全 */
   chat: publicQuery
     .input(
       z.object({
+        config: aiConfigSchema,
         messages: z
           .array(
             z.object({
@@ -133,7 +190,7 @@ export const aiRouter = createRouter({
       })
     )
     .mutation(async ({ input }) => {
-      const content = await askCodex(input.messages);
+      const content = await askModel(input.messages, input.config);
       return { content };
     }),
 
@@ -141,6 +198,7 @@ export const aiRouter = createRouter({
   translate: publicQuery
     .input(
       z.object({
+        config: aiConfigSchema,
         text: z.string().min(1).max(120000),
         targetLang: targetLanguageSchema.default("中文"),
         sourceLang: z.string().max(40).default(""),
@@ -153,15 +211,18 @@ export const aiRouter = createRouter({
           ? "严格保持输入段落的顺序；相邻译文段落之间用一个空行分隔。不要编号、不要合并或拆分段落。"
           : "保持原文的语气、专名和必要的段落结构。";
       const source = input.sourceLang ? `原文语言：${input.sourceLang}\n` : "";
-      const translation = await askCodex([
-        {
-          role: "system",
-          content:
-            `你是专业的文学与学术翻译。把用户给出的文字翻译成${input.targetLang}。${boundaryRule}` +
-            "只输出译文本身，不输出解释、评论、前言或 Markdown 代码块。",
-        },
-        { role: "user", content: `${source}待翻译文本：\n${input.text}` },
-      ]);
+      const translation = await askModel(
+        [
+          {
+            role: "system",
+            content:
+              `你是专业的文学与学术翻译。把用户给出的文字翻译成${input.targetLang}。${boundaryRule}` +
+              "只输出译文本身，不输出解释、评论、前言或 Markdown 代码块。",
+          },
+          { role: "user", content: `${source}待翻译文本：\n${input.text}` },
+        ],
+        input.config
+      );
       return { translation, targetLang: input.targetLang };
     }),
 
@@ -169,6 +230,7 @@ export const aiRouter = createRouter({
   mindmap: publicQuery
     .input(
       z.object({
+        config: aiConfigSchema,
         bookTitle: z.string().min(1).max(255),
         chapterTitle: z.string().min(1).max(255),
         text: z.string().min(1).max(80000),
@@ -176,19 +238,22 @@ export const aiRouter = createRouter({
       })
     )
     .mutation(async ({ input }) => {
-      const raw = await askCodex([
-        {
-          role: "system",
-          content:
-            "你是阅读结构分析助手。从章节内容中提炼适合脑图的主题树。" +
-            '只输出 JSON，形如 {"topics":[{"title":"主题","children":[{"title":"要点","children":[]}]}]}。' +
-            "标题必须短（不超过24字）、具体、彼此不重复；最多三层。",
-        },
-        {
-          role: "user",
-          content: `书籍：《${input.bookTitle}》\n章节：${input.chapterTitle}\n请提炼 ${input.maxTopics} 个以内的一级主题。\n\n章节正文：\n${input.text}`,
-        },
-      ]);
+      const raw = await askModel(
+        [
+          {
+            role: "system",
+            content:
+              "你是阅读结构分析助手。从章节内容中提炼适合脑图的主题树。" +
+              '只输出 JSON，形如 {"topics":[{"title":"主题","children":[{"title":"要点","children":[]}]}]}。' +
+              "标题必须短（不超过24字）、具体、彼此不重复；最多三层。",
+          },
+          {
+            role: "user",
+            content: `书籍：《${input.bookTitle}》\n章节：${input.chapterTitle}\n请提炼 ${input.maxTopics} 个以内的一级主题。\n\n章节正文：\n${input.text}`,
+          },
+        ],
+        input.config
+      );
       return { topics: parseMindTopics(raw, input.maxTopics) };
     }),
 
@@ -196,6 +261,7 @@ export const aiRouter = createRouter({
   studyCard: publicQuery
     .input(
       z.object({
+        config: aiConfigSchema,
         bookTitle: z.string().min(1).max(255),
         chapterTitle: z.string().min(1).max(255),
         text: z.string().min(2).max(20000),
@@ -203,19 +269,22 @@ export const aiRouter = createRouter({
       })
     )
     .mutation(async ({ input }) => {
-      const raw = await askCodex([
-        {
-          role: "system",
-          content:
-            "你是深度阅读制卡助手。把原文转成一张可复习的原子知识卡。" +
-            '只输出 JSON：{"title":"概念或问题","note":"简洁解释","cloze":["原文中适合遮挡的连续短语"],"tags":["标签"]}。' +
-            "cloze 每项必须逐字出现在原文中；不要编造事实；最多 5 个挖空和 5 个标签。",
-        },
-        {
-          role: "user",
-          content: `书籍：《${input.bookTitle}》\n章节：${input.chapterTitle}\n\n原文：\n${input.text}\n\n附近上下文：\n${input.context}`,
-        },
-      ]);
+      const raw = await askModel(
+        [
+          {
+            role: "system",
+            content:
+              "你是深度阅读制卡助手。把原文转成一张可复习的原子知识卡。" +
+              '只输出 JSON：{"title":"概念或问题","note":"简洁解释","cloze":["原文中适合遮挡的连续短语"],"tags":["标签"]}。' +
+              "cloze 每项必须逐字出现在原文中；不要编造事实；最多 5 个挖空和 5 个标签。",
+          },
+          {
+            role: "user",
+            content: `书籍：《${input.bookTitle}》\n章节：${input.chapterTitle}\n\n原文：\n${input.text}\n\n附近上下文：\n${input.context}`,
+          },
+        ],
+        input.config
+      );
       return parseStudyCard(raw, input.text);
     }),
 
@@ -223,12 +292,17 @@ export const aiRouter = createRouter({
   getDigest: publicQuery
     .input(z.object({ contentHash: z.string().length(64) }))
     .query(async ({ input }) => {
-      const rows = await getDb()
-        .select()
-        .from(bookDigests)
-        .where(eq(bookDigests.contentHash, input.contentHash))
-        .limit(1);
-      return rows[0] ?? null;
+      if (!env.databaseUrl) return memoryDigests.get(input.contentHash) ?? null;
+      try {
+        const rows = await getDb()
+          .select()
+          .from(bookDigests)
+          .where(eq(bookDigests.contentHash, input.contentHash))
+          .limit(1);
+        return rows[0] ?? memoryDigests.get(input.contentHash) ?? null;
+      } catch {
+        return memoryDigests.get(input.contentHash) ?? null;
+      }
     }),
 
   /** 保存全书结构 + AI 导读 */
@@ -243,17 +317,29 @@ export const aiRouter = createRouter({
       })
     )
     .mutation(async ({ input }) => {
-      await getDb()
-        .insert(bookDigests)
-        .values(input)
-        .onDuplicateKeyUpdate({
-          set: {
-            structure: input.structure,
-            overview: input.overview,
-            title: input.title,
-            author: input.author,
-          },
-        });
-      return { ok: true };
+      memoryDigests.set(input.contentHash, {
+        contentHash: input.contentHash,
+        title: input.title,
+        author: input.author,
+        structure: input.structure,
+        overview: input.overview || null,
+      });
+      if (!env.databaseUrl) return { ok: true, storage: "memory" as const };
+      try {
+        await getDb()
+          .insert(bookDigests)
+          .values(input)
+          .onDuplicateKeyUpdate({
+            set: {
+              structure: input.structure,
+              overview: input.overview,
+              title: input.title,
+              author: input.author,
+            },
+          });
+        return { ok: true, storage: "database" as const };
+      } catch {
+        return { ok: true, storage: "memory" as const };
+      }
     }),
 });

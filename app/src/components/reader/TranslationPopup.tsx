@@ -3,6 +3,7 @@ import { Check, Languages, Loader2, X } from "lucide-react";
 import type { ReaderTheme } from "@/types";
 import { trpc } from "@/providers/trpc";
 import { friendlyAiError } from "@/lib/aiError";
+import { useAiConfig } from "@/lib/aiConfig";
 
 export type TranslationLang =
   "中文" | "English" | "日本語" | "Français" | "Deutsch";
@@ -40,6 +41,7 @@ export function TranslationPopup({
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const utils = trpc.useUtils();
+  const [aiConfig] = useAiConfig();
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,6 +61,7 @@ export function TranslationPopup({
       setSaved(false);
       try {
         const resp = await utils.client.ai.translate.mutate({
+          config: aiConfig,
           text: sourceText,
           targetLang: target,
           mode: "passage",
@@ -71,7 +74,7 @@ export function TranslationPopup({
         setLoading(false);
       }
     },
-    [sourceText, utils]
+    [sourceText, utils, aiConfig]
   );
 
   useEffect(() => {

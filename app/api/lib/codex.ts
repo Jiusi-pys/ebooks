@@ -84,7 +84,10 @@ export async function getCodexAuthStatus() {
   }
 }
 
-export async function askCodex(messages: ChatMessage[]): Promise<string> {
+export async function askCodex(
+  messages: ChatMessage[],
+  options: { model?: string; effort?: string } = {}
+): Promise<string> {
   const prompt = buildCodexPrompt(messages);
   if (prompt.length > 180_000)
     throw new Error("Codex 输入过长，请缩小阅读范围");
@@ -104,9 +107,9 @@ export async function askCodex(messages: ChatMessage[]): Promise<string> {
         "--color",
         "never",
         "--model",
-        CODEX_MODEL,
+        options.model ?? CODEX_MODEL,
         "--config",
-        `model_reasoning_effort=${JSON.stringify(CODEX_REASONING_EFFORT)}`,
+        `model_reasoning_effort=${JSON.stringify(options.effort ?? CODEX_REASONING_EFFORT)}`,
         "--cd",
         runDir,
         "--output-last-message",

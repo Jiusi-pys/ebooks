@@ -4,6 +4,7 @@ import {
   BrainCircuit,
   Loader2,
   Send,
+  Settings2,
   Sparkles,
   WandSparkles,
   X,
@@ -11,6 +12,8 @@ import {
 import type { Book, Chapter, Highlight, ReaderTheme } from "@/types";
 import { trpc } from "@/providers/trpc";
 import { contentHashOfBook, scanBookStructure } from "@/lib/reading";
+import { AI_PROVIDERS, useAiConfig } from "@/lib/aiConfig";
+import { AiSettingsPanel } from "./AiSettingsPanel";
 
 interface Props {
   book: Book;
@@ -57,11 +60,15 @@ export function AiDrawer({
   } | null>(null);
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [aiConfig, setAiConfig] = useAiConfig();
   const utils = trpc.useUtils();
 
   /* 把后端原始错误转成读者可读的提示 */
   const friendlyError = (e: unknown) => {
     const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("DeepSeek API Key 未配置"))
+      return "请在 AI 后台设置中填写 DeepSeek API Key。";
     if (msg.includes("api_key_path_forbidden") || msg.includes("(403)"))
       return "Codex CLI 尚未使用 ChatGPT 登录，请先在本机运行 codex login。";
     if (msg.includes("(401)"))
@@ -74,7 +81,7 @@ export function AiDrawer({
 
   const qaList = useMemo(() => target.aiQa ?? [], [target.aiQa]);
 
-  /* 首次提问：扫描全书 → 结构入库 → 生成导读（已有缓存则直接复用） */
+  /* 首次提问：扫描全书 → 缓存结构 → 生成导读（已有缓存则直接复用） */
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -94,10 +101,13 @@ export function AiDrawer({
         }
         setDigestLine("首次提问：正在通读全书，提炼结构…");
         const structure = JSON.stringify(scanBookStructure(book), null, 1);
-        setDigestLine("正在请 Codex 为全书写导读…");
+        setDigestLine(
+          `正在请 ${AI_PROVIDERS[aiConfig.provider].label} 为全书写导读…`
+        );
         let overview = "";
         try {
           const resp = await utils.client.ai.chat.mutate({
+            config: aiConfig,
             messages: [
               {
                 role: "system",
@@ -109,7 +119,7 @@ export function AiDrawer({
           });
           overview = resp.content;
         } catch {
-          // 导读生成失败不阻塞：结构仍会入库，问答仍带全书结构上下文
+          // 导读生成失败不阻塞：结构仍会缓存，问答仍带全书结构上下文
         }
         if (cancelled) return;
         await utils.client.ai.saveDigest.mutate({
@@ -132,7 +142,7 @@ export function AiDrawer({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book.id]);
+  }, [book.id, aiConfig.provider, aiConfig.model, aiConfig.effort]);
 
   useEffect(() => {
     listRef.current?.scrollTo({
@@ -149,7 +159,7 @@ export function AiDrawer({
     setPhase("asking");
     try {
       const system = [
-        `你是《${book.title}》的 Codex 伴读助手。请结合全书信息与当前章节内容，用中文简洁准确地回答读者对划线文段的疑问。`,
+        `你是《${book.title}》的 AI 伴读助手。请结合全书信息与当前章节内容，用中文简洁准确地回答读者对划线文段的疑问。`,
         digest?.overview ? `【全书导读】\n${digest.overview}` : "",
         digest?.structure
           ? `【全书结构】\n${digest.structure.slice(0, 3000)}`
@@ -160,6 +170,7 @@ export function AiDrawer({
         .join("\n\n");
       const user = `读者划线的文段：\n「${target.text}」\n\n读者的问题：${q}`;
       const { content } = await utils.client.ai.chat.mutate({
+        config: aiConfig,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -171,7 +182,17 @@ export function AiDrawer({
     } finally {
       setPhase("ready");
     }
-  }, [input, phase, book.title, chapter, target.text, digest, utils, onSaveQa]);
+  }, [
+    input,
+    phase,
+    book.title,
+    chapter,
+    target.text,
+    digest,
+    utils,
+    onSaveQa,
+    aiConfig,
+  ]);
 
   const makeStudyCard = useCallback(async () => {
     if (phase !== "ready") return;
@@ -179,6 +200,7 @@ export function AiDrawer({
     setPhase("asking");
     try {
       const card = await utils.client.ai.studyCard.mutate({
+        config: aiConfig,
         bookTitle: book.title,
         chapterTitle: chapter.title,
         text: target.text,
@@ -190,11 +212,19 @@ export function AiDrawer({
     } finally {
       setPhase("ready");
     }
-  }, [phase, utils, book.title, chapter, target.text, onApplyStudyCard]);
+  }, [
+    phase,
+    utils,
+    book.title,
+    chapter,
+    target.text,
+    onApplyStudyCard,
+    aiConfig,
+  ]);
 
   return (
     <div
-      className="flex h-full w-[340px] shrink-0 flex-col border-l"
+      className="relative flex h-full w-[340px] shrink-0 flex-col border-l"
       style={{
         background: theme.panel,
         borderColor: theme.border,
@@ -206,18 +236,36 @@ export function AiDrawer({
         style={{ borderColor: theme.border }}
       >
         <Sparkles size={15} className="text-primary" />
-        <span className="text-[13px] font-medium">Codex 伴读</span>
+        <span className="text-[13px] font-medium">AI 伴读</span>
         <span className="font-meta text-[10px]" style={{ color: theme.muted }}>
-          gpt-5.6-terra · medium
+          {aiConfig.provider} · {aiConfig.model.replace(/^deepseek-|^gpt-/, "")}{" "}
+          · {aiConfig.effort}
         </span>
         <button
+          onClick={() => setShowSettings(value => !value)}
+          className={`ml-auto rounded p-1 ${showSettings ? "bg-primary/10 text-primary" : "hover:opacity-70"}`}
+          style={{ color: showSettings ? undefined : theme.muted }}
+          title="AI 后台设置"
+          aria-label="AI 后台设置"
+        >
+          <Settings2 size={15} />
+        </button>
+        <button
           onClick={onClose}
-          className="ml-auto rounded p-1 hover:opacity-70"
+          className="rounded p-1 hover:opacity-70"
           style={{ color: theme.muted }}
         >
           <X size={15} />
         </button>
       </div>
+
+      {showSettings && (
+        <AiSettingsPanel
+          value={aiConfig}
+          onChange={setAiConfig}
+          theme={theme}
+        />
+      )}
 
       {/* 文段锚点 */}
       <div
@@ -260,7 +308,7 @@ export function AiDrawer({
               className="font-meta mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em]"
               style={{ color: theme.muted }}
             >
-              <BookOpenCheck size={11} /> 全书导读（已入库，后续提问直接复用）
+              <BookOpenCheck size={11} /> 全书导读（已缓存，后续提问直接复用）
             </div>
             {digest.overview}
           </div>
@@ -283,8 +331,7 @@ export function AiDrawer({
             className="flex items-center gap-2 p-2 text-[12px]"
             style={{ color: theme.muted }}
           >
-            <Loader2 size={13} className="animate-spin" /> Codex
-            正在结合全书思考…
+            <Loader2 size={13} className="animate-spin" /> AI 正在结合全书思考…
           </div>
         )}
         {error && (
@@ -329,9 +376,7 @@ export function AiDrawer({
               }
             }}
             placeholder={
-              phase === "digest"
-                ? "等待全书扫描完成…"
-                : "就这段文字向 Codex 提问…"
+              phase === "digest" ? "等待全书扫描完成…" : "就这段文字向 AI 提问…"
             }
             disabled={phase === "digest"}
             rows={2}

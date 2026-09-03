@@ -5,7 +5,7 @@
 ## 已实现能力
 
 - 导入并阅读 PDF / EPUB，支持 PDF 原版与重排模式、分屏对照和章节翻译。
-- 划线、批注、标签、双向引用、全局关系图，以及按文件夹组织的学习集。
+- 划线、批注、标签、双向引用、全局关系图，以及独立于书架文件夹、支持跨文件夹选书的学习集。
 - 可编辑脑图 / 大纲、章节 AI 提炼、摘录卡加入脑图并回跳原文。
 - 间隔复习、手动挖空，以及“阅读 / 沉浸 / 回忆”三态阅读。
 - Codex 伴读、全书导读与 AI 制卡。AI 制卡一次生成标题、解释、挖空、标签、复习状态和脑图节点。
@@ -35,6 +35,15 @@ CODEX_MODEL=gpt-5.6-terra
 CODEX_REASONING_EFFORT=medium
 CODEX_TIMEOUT_MS=180000
 ```
+
+AI 抽屉右上角的“AI 后台设置”可全局切换 Provider、Model 和 Effort。DeepSeek 使用官方 OpenAI 兼容接口；密钥可仅在当前浏览器会话中填写，也可在 `.env` 配置：
+
+```dotenv
+DEEPSEEK_API_KEY=sk-...
+DEEPSEEK_TIMEOUT_MS=180000
+```
+
+DeepSeek 当前提供 `deepseek-v4-flash`、`deepseek-v4-pro` 和 `deepseek-v4-flash-vision-exp`。Effort 设为 `none` 会关闭思考模式，其余可选 `low`、`high`、`max`。
 
 认证由 Codex 自己维护；应用不会读取或复制 `auth.json`。每次请求都在临时目录内以只读、短暂会话运行，结束后删除临时输出。浏览器数据存放在 IndexedDB；AI 导读缓存和开放 API 镜像使用 MySQL。Docker 部署需要在容器内另行安装 Codex CLI 并安全提供登录态，因此默认更适合本机运行。
 

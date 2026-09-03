@@ -21,6 +21,7 @@ export function SplitPane({
   onClose,
   onSplit,
   canSplit,
+  scopeLabel,
   theme,
   type,
 }: {
@@ -30,6 +31,7 @@ export function SplitPane({
   onClose: () => void;
   onSplit: (direction: SplitDirection) => void;
   canSplit: boolean;
+  scopeLabel?: string;
   theme: ReaderTheme;
   type: TypeSettings;
 }) {
@@ -103,7 +105,7 @@ export function SplitPane({
           disabled={!canSplit}
           className="shrink-0 rounded-md p-1 hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-30"
           style={{ color: theme.muted }}
-          title={canSplit ? "向右拆分此窗格" : "最多支持 3 个窗格"}
+          title={canSplit ? "向右拆分此窗格" : "最多支持 4 个窗格"}
         >
           <Columns2 size={14} />
         </button>
@@ -112,7 +114,7 @@ export function SplitPane({
           disabled={!canSplit}
           className="shrink-0 rounded-md p-1 hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-30"
           style={{ color: theme.muted }}
-          title={canSplit ? "向下拆分此窗格" : "最多支持 3 个窗格"}
+          title={canSplit ? "向下拆分此窗格" : "最多支持 4 个窗格"}
         >
           <Columns2 className="rotate-90" size={14} />
         </button>
@@ -184,7 +186,8 @@ export function SplitPane({
         style={{ borderColor: theme.border, color: theme.muted }}
       >
         <BookOpen size={10} />
-        参考窗格 · 划线与批注请在主阅读区进行
+        {scopeLabel ? `${scopeLabel} · ` : ""}参考窗格 ·
+        划线与批注请在主阅读区进行
       </div>
     </section>
   );

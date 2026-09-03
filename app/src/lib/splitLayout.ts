@@ -32,7 +32,7 @@ export function splitReaderPane(
   referenceId = uid("reference"),
   splitId = uid("split")
 ): ReaderPane {
-  if (countReaderPanes(node) >= 3) return node;
+  if (countReaderPanes(node) >= 4) return node;
   if (node.kind !== "split") {
     return node.id === paneId
       ? {
