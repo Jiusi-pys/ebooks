@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import type { Book, Chapter, Highlight, ReaderTheme } from "@/types";
-import { trpc } from "@/providers/trpc";
+import { trpc } from "@/lib/trpc-client";
 import { contentHashOfBook, scanBookStructure } from "@/lib/reading";
 import { AI_PROVIDERS, useAiConfig } from "@/lib/aiConfig";
 import { AiSettingsPanel } from "./AiSettingsPanel";

@@ -370,6 +370,70 @@ describe("citation graph relationships", () => {
     const unlinked: Highlight = { ...highlight, noteId: undefined };
     expect(buildGraph([book], [note], [unlinked]).edges).toEqual([]);
   });
+
+  it("keeps the chapter and content hierarchy for an original scanned PDF", () => {
+    const scannedBook: Book = {
+      ...book,
+      id: "scanned-citation-pdf",
+      title: "扫描资料",
+      format: "pdf",
+      readerMode: "original",
+      chapters: [],
+      progress: {
+        chapterId: "pdf-original:scanned-citation-pdf",
+        ratio: 0,
+      },
+    };
+    const pdfAnchor = {
+      page: 4,
+      rects: [{ x: 0.1, y: 0.2, width: 0.3, height: 0.04 }],
+    };
+    const citation: Highlight = {
+      ...highlight,
+      id: "scanned-pdf-citation",
+      bookId: scannedBook.id,
+      chapterId: `pdf-original:${scannedBook.id}`,
+      chapterTitle: "原版 PDF · 第 4 页",
+      text: "扫描页中的观点",
+      noteId: note.id,
+      pdfAnchor,
+      citation: {
+        level: "content",
+        chapterId: `pdf-original:${scannedBook.id}`,
+        pdfAnchor,
+      },
+    };
+
+    const graph = buildGraph([scannedBook], [note], [citation]);
+    const chapterNodeId =
+      "chapter:scanned-citation-pdf:pdf-original:scanned-citation-pdf";
+    const contentNode = graph.nodes.find(node => node.kind === "content");
+
+    expect(graph.nodes).toContainEqual(
+      expect.objectContaining({
+        id: chapterNodeId,
+        kind: "chapter",
+        label: "原版 PDF",
+      })
+    );
+    expect(contentNode).toMatchObject({
+      kind: "content",
+      bookId: scannedBook.id,
+      anchor: expect.objectContaining({ kind: "pdf", pdfAnchor }),
+    });
+    expect(graph.edges).toContainEqual({
+      source: `book:${scannedBook.id}`,
+      target: chapterNodeId,
+    });
+    expect(graph.edges).toContainEqual({
+      source: chapterNodeId,
+      target: contentNode?.id,
+    });
+    expect(graph.edges).toContainEqual({
+      source: `note:${note.id}`,
+      target: contentNode?.id,
+    });
+  });
 });
 
 describe("passage association graph relationships", () => {

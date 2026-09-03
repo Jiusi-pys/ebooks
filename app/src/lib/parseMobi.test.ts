@@ -39,6 +39,21 @@ describe("validateMobiBytes", () => {
     expect(() => validateMobiBytes(mobiEnvelope())).not.toThrow();
   });
 
+  it("accepts EXTH 121 UINT32_MAX as the no-KF8 sentinel", () => {
+    const bytes = mobiEnvelope();
+    const view = new DataView(bytes.buffer);
+    view.setUint32(RECORD_OFFSET + 128, 0x40, false);
+    const exthOffset = RECORD_OFFSET + 16 + 116;
+    bytes.set(new TextEncoder().encode("EXTH"), exthOffset);
+    view.setUint32(exthOffset + 4, 24, false);
+    view.setUint32(exthOffset + 8, 1, false);
+    view.setUint32(exthOffset + 12, 121, false);
+    view.setUint32(exthOffset + 16, 12, false);
+    view.setUint32(exthOffset + 20, 0xffffffff, false);
+
+    expect(() => validateMobiBytes(bytes)).not.toThrow();
+  });
+
   it("rejects a file without the BOOKMOBI signature", () => {
     const bytes = mobiEnvelope();
     bytes[60] = 0;

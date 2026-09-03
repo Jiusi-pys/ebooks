@@ -6,6 +6,7 @@ import {
   ListTree,
   Loader2,
   Quote,
+  RefreshCw,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -18,6 +19,7 @@ import {
   stackPdfAssociationBadges,
 } from "@/lib/pdfAnnotations";
 import { swatch } from "@/lib/reading";
+import { pdfViewerFailureMessage } from "@/lib/pdfViewerErrors";
 import type { Highlight, PdfAnchorRect, PdfHighlightAnchor } from "@/types";
 import "pdfjs-dist/web/pdf_viewer.css";
 
@@ -98,6 +100,7 @@ export function PdfCanvasViewer({
   const [toc, setToc] = useState<TocEntry[]>([]);
   const [tocOpen, setTocOpen] = useState(false);
   const [pageInput, setPageInput] = useState("");
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const pageAnnotations = useMemo(
     () => pdfAnnotationsForPage(highlights, page),
     [highlights, page]
@@ -127,13 +130,18 @@ export function PdfCanvasViewer({
   useEffect(() => {
     let cancelled = false;
     let loadingTask: pdfjs.PDFDocumentLoadingTask | null = null;
+    setError(null);
+    setRendering(true);
     (async () => {
-      const f = await getFile(bookId);
-      if (!f) {
-        setError("未找到原始 PDF 文件（可能是旧版本导入的书籍）。");
-        return;
-      }
       try {
+        const f = await getFile(bookId);
+        if (!f) {
+          if (!cancelled) {
+            setError("未找到原始 PDF 文件（可能是旧版本导入的书籍）。");
+            setRendering(false);
+          }
+          return;
+        }
         // Blob 是新导入格式；ArrayBuffer 分支兼容既有 IndexedDB 数据。
         // 两者都生成独立 buffer，避免 pdfjs 的 worker 转移影响持久化值。
         const data =
@@ -148,15 +156,18 @@ export function PdfCanvasViewer({
         setPageCount(loaded.numPages);
         setPage(p => Math.min(Math.max(1, p), loaded!.numPages));
       } catch (e) {
-        if (!cancelled)
-          setError(e instanceof Error ? e.message : "PDF 加载失败");
+        if (!cancelled) {
+          const message = pdfViewerFailureMessage(e, "load");
+          if (message) setError(message);
+          setRendering(false);
+        }
       }
     })();
     return () => {
       cancelled = true;
       void loadingTask?.destroy();
     };
-  }, [bookId]);
+  }, [bookId, retryAttempt]);
 
   /* ---------- 大纲 ---------- */
   useEffect(() => {
@@ -214,7 +225,7 @@ export function PdfCanvasViewer({
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [error]);
 
   /* ---------- 渲染当前页 ---------- */
   useEffect(() => {
@@ -241,13 +252,37 @@ export function PdfCanvasViewer({
 
         const canvas = canvasRef.current;
         const textDiv = textLayerRef.current;
-        if (!canvas || !textDiv) return;
+        if (!canvas || !textDiv) {
+          if (seq === renderSeq.current) {
+            setError(
+              pdfViewerFailureMessage(
+                new Error("阅读器页面容器不可用"),
+                "render",
+                page
+              )
+            );
+            setRendering(false);
+          }
+          return;
+        }
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
         canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
         canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
         const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        if (!ctx) {
+          if (seq === renderSeq.current) {
+            setError(
+              pdfViewerFailureMessage(
+                new Error("浏览器无法创建 Canvas 2D 上下文"),
+                "render",
+                page
+              )
+            );
+            setRendering(false);
+          }
+          return;
+        }
 
         renderTask = pg.render({ canvas, canvasContext: ctx, viewport });
         await renderTask.promise;
@@ -276,11 +311,12 @@ export function PdfCanvasViewer({
         setRendering(false);
         onProgress(page, doc.numPages);
       } catch (e) {
-        if (
-          seq === renderSeq.current &&
-          !(e instanceof Error && e.name === "RenderingCancelledException")
-        ) {
-          setRendering(false);
+        if (seq === renderSeq.current) {
+          const message = pdfViewerFailureMessage(e, "render", page);
+          if (message) {
+            setError(message);
+            setRendering(false);
+          }
         }
       }
     })();
@@ -406,13 +442,33 @@ export function PdfCanvasViewer({
     setPage(Math.min(Math.max(1, p), pageCount));
   };
 
+  const retry = () => {
+    renderSeq.current += 1;
+    setError(null);
+    setRendering(true);
+    setDoc(null);
+    setPageCount(0);
+    setToc([]);
+    setRetryAttempt(attempt => attempt + 1);
+  };
+
   if (error) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+      <div
+        role="alert"
+        className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground"
+      >
         <p>{error}</p>
         <p className="text-xs">
           可在书架的书籍菜单中切换回「重排文本」模式阅读。
         </p>
+        <button
+          type="button"
+          onClick={retry}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs text-foreground shadow-sm hover:bg-accent"
+        >
+          <RefreshCw size={13} /> 重试
+        </button>
       </div>
     );
   }

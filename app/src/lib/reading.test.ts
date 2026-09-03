@@ -3,6 +3,7 @@ import {
   DEFAULT_TYPE,
   loadTypeSettings,
   normalizePageMargin,
+  planReaderChapterEntry,
   readerPagePadding,
   saveTypeSettings,
 } from "./reading";
@@ -44,5 +45,40 @@ describe("reader page margin", () => {
 
   it("produces responsive padding for narrow split panes", () => {
     expect(readerPagePadding(48)).toBe("clamp(16px, 48px, 12%)");
+  });
+});
+
+describe("reader chapter entry", () => {
+  it("restores the saved ratio when reopening the current chapter", () => {
+    expect(
+      planReaderChapterEntry(
+        null,
+        "chapter-2",
+        { chapterId: "chapter-2", ratio: 0.62 },
+        false
+      )
+    ).toEqual({ ratio: 0.62, persist: false });
+  });
+
+  it("resets and persists explicit initial chapter navigation", () => {
+    expect(
+      planReaderChapterEntry(
+        null,
+        "chapter-2",
+        { chapterId: "chapter-2", ratio: 0.62 },
+        true
+      )
+    ).toEqual({ ratio: 0, persist: true });
+  });
+
+  it("resets when an already open reader changes chapter", () => {
+    expect(
+      planReaderChapterEntry(
+        "chapter-1",
+        "chapter-2",
+        { chapterId: "chapter-1", ratio: 0.9 },
+        false
+      )
+    ).toEqual({ ratio: 0, persist: true });
   });
 });

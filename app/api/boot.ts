@@ -6,10 +6,19 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
 import { v1 } from "./v1";
+import { auth } from "./auth";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
-app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+const limitRequestBody = bodyLimit({ maxSize: 50 * 1024 * 1024 });
+app.use(async (c, next) => {
+  // Some Node clients expose an empty, chunked body stream even for DELETE.
+  // Re-wrapping that consumed request breaks the Vite adapter on Node 24, and
+  // body limits are only meaningful for methods that accept a request body.
+  if (!["POST", "PUT", "PATCH"].includes(c.req.method)) return next();
+  return limitRequestBody(c, next);
+});
+app.route("/api/auth", auth);
 app.route("/api/v1", v1);
 app.use("/api/trpc/*", async c => {
   return fetchRequestHandler({

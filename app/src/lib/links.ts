@@ -227,7 +227,7 @@ export function buildGraph(
     const sourceChapter =
       sourceBook?.chapters.find(chapter => chapter.id === chapterId) ??
       (sourceBook?.format === "pdf" &&
-      anchor?.kind === "pdf" &&
+      (anchor?.kind === "pdf" || Boolean(fallbackHighlight?.pdfAnchor)) &&
       chapterId === `pdf-original:${bookId}`
         ? {
             id: chapterId,
@@ -276,9 +276,13 @@ export function buildGraph(
   for (const highlight of highlights) {
     if (!highlight.noteId || citationLevelOf(highlight) === "book") continue;
     const sourceBook = bookById.get(highlight.bookId);
-    const validChapter = sourceBook?.chapters.some(
-      chapter => chapter.id === highlight.chapterId
-    );
+    const validChapter =
+      sourceBook?.chapters.some(
+        chapter => chapter.id === highlight.chapterId
+      ) ||
+      (sourceBook?.format === "pdf" &&
+        Boolean(highlight.pdfAnchor) &&
+        highlight.chapterId === `pdf-original:${highlight.bookId}`);
     if (!validChapter) continue;
     const ids =
       hierarchicalBookLinks.get(highlight.noteId) ?? new Set<string>();
@@ -315,9 +319,17 @@ export function buildGraph(
       continue;
     }
 
-    const sourceChapter = sourceBook.chapters.find(
-      chapter => chapter.id === h.chapterId
-    );
+    const sourceChapter =
+      sourceBook.chapters.find(chapter => chapter.id === h.chapterId) ??
+      (sourceBook.format === "pdf" &&
+      Boolean(h.pdfAnchor) &&
+      h.chapterId === `pdf-original:${h.bookId}`
+        ? {
+            id: h.chapterId,
+            title: "原版 PDF",
+            paragraphs: [],
+          }
+        : undefined);
     // 损坏或旧版不完整锚点降级到书籍关系，绝不生成孤立层级节点。
     if (!sourceChapter) {
       addEdge(noteNodeId, bookNodeId);

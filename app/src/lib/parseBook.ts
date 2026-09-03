@@ -12,14 +12,23 @@ export interface ParsedBook {
   pageCount?: number;
 }
 
+export interface ParseBookOptions {
+  /**
+   * Original-layout PDFs only need their metadata, page count and cover during
+   * import. Skipping text extraction keeps a valid large/scanned PDF usable.
+   */
+  pdfMode?: "reflow" | "original";
+}
+
 export async function parseBookFile(
   file: File,
   format: ImportBookFormat,
-  onProgress?: (stage: string, ratio: number) => void
+  onProgress?: (stage: string, ratio: number) => void,
+  options: ParseBookOptions = {}
 ): Promise<ParsedBook> {
   switch (format) {
     case "pdf":
-      return parsePdf(file, onProgress);
+      return parsePdf(file, onProgress, options.pdfMode);
     case "epub":
       return parseEpub(file, onProgress);
     case "mobi":

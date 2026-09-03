@@ -7,11 +7,13 @@ import {
   Import,
   Layers,
   LibraryBig,
+  LogOut,
   Network,
   PanelLeftClose,
   PanelLeftDashed,
   Pin,
   StickyNote,
+  UserRound,
 } from "lucide-react";
 import type { Library } from "@/hooks/useLibrary";
 import {
@@ -37,6 +39,7 @@ const NAV = [
 
 interface SidebarProps {
   lib: Library;
+  userId: string;
   mode: SidebarMode;
   open: boolean;
   floating: boolean;
@@ -46,10 +49,12 @@ interface SidebarProps {
   onRequestClose: () => void;
   onInteractionStart: () => void;
   onInteractionEnd: () => void;
+  onLogout: () => Promise<void>;
 }
 
 export function Sidebar({
   lib,
+  userId,
   mode,
   open,
   floating,
@@ -59,10 +64,12 @@ export function Sidebar({
   onRequestClose,
   onInteractionStart,
   onInteractionEnd,
+  onLogout,
 }: SidebarProps) {
   const { route, navigate, books, notes, highlights, mindMaps, studySets } =
     lib;
   const [pendingPdfs, setPendingPdfs] = useState<File[] | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const go = (next: Route) => {
     navigate(next);
@@ -137,7 +144,7 @@ export function Sidebar({
             <button
               type="button"
               onClick={onRequestClose}
-              className="-mr-2 -mt-2 rounded-md p-2 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+              className="app-icon-button -mr-2 -mt-2 h-9 w-9"
               aria-label="关闭侧栏"
               title="关闭侧栏"
             >
@@ -152,7 +159,7 @@ export function Sidebar({
                 // leaves the sidebar.
                 if (event.detail > 0) event.currentTarget.blur();
               }}
-              className="-mr-2 -mt-2 rounded-md p-2 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="app-icon-button -mr-2 -mt-2 h-9 w-9"
               aria-label={mode === "pinned" ? "切换为自动隐藏" : "固定显示侧栏"}
               aria-pressed={mode === "pinned"}
               title={mode === "pinned" ? "切换为自动隐藏" : "固定显示侧栏"}
@@ -183,11 +190,13 @@ export function Sidebar({
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
               }`}
             >
-              <Icon
-                size={16}
-                strokeWidth={1.8}
-                className={active ? "text-primary" : "text-muted-foreground"}
-              />
+              <span
+                className={`app-icon-tile h-7 w-7 rounded-[9px] ${
+                  active ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
+              </span>
               <span className="flex-1 text-left">{label}</span>
               {counts[view] !== undefined && (
                 <span className="font-meta text-[10px] text-muted-foreground/70">
@@ -258,11 +267,32 @@ export function Sidebar({
             }}
           />
         </label>
-        <p className="font-meta mt-2 text-center text-[10px] leading-4 text-muted-foreground/60">
-          支持 {SUPPORTED_FORMAT_LABEL}
-          <br />
-          原始文件仅本地；提取正文可写入同源服务端镜像
-        </p>
+        <div className="mt-3 flex items-center gap-2 rounded-[14px] border border-sidebar-border bg-sidebar-accent/35 p-2">
+          <span className="app-icon-tile h-8 w-8 rounded-[10px] text-primary">
+            <UserRound size={15} aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[11px] font-medium">
+              {userId}
+            </span>
+            <span className="font-meta block text-[9px] uppercase tracking-wider text-muted-foreground">
+              Local account
+            </span>
+          </span>
+          <button
+            type="button"
+            className="app-icon-button h-8 w-8 rounded-[10px]"
+            disabled={loggingOut}
+            aria-label="退出登录"
+            title="退出登录"
+            onClick={() => {
+              setLoggingOut(true);
+              void onLogout().finally(() => setLoggingOut(false));
+            }}
+          >
+            <LogOut size={14} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       <ImportModeDialog

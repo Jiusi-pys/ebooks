@@ -42,16 +42,19 @@
  *   DELETE /api/v1/webhooks/:id
  *   POST   /api/v1/webhooks/:id/test    发送测试事件
  *
- * 鉴权：所有机器路由（除 GET /api/v1/）需要 X-API-Key；/events 仅额外允许本机同源浏览器上报。
+ * 鉴权：机器路由使用 X-API-Key/Bearer；/events 额外允许已登录的同源浏览器上报。
  */
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, or } from "drizzle-orm";
+import { createHash, randomUUID } from "node:crypto";
+import { eq, lt, or } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
 import { getDb } from "./queries/connection";
 import { bookDigests, webhookSubscriptions } from "@db/schema";
 import {
   mirrorBooks,
+  mirrorBookUploadChunks,
+  mirrorEventReceipts,
   mirrorHighlights,
   mirrorAssociations,
   mirrorNotes,
@@ -72,7 +75,14 @@ import {
   validateCitationCreate,
 } from "./lib/highlight-citation";
 import { normalizeReaderMirrorEvent } from "./lib/mirror-event";
-import { isTrustedLocalBrowserEvent } from "./lib/browser-event-auth";
+import { requireBrowserMutation } from "./auth";
+import {
+  BookMirrorUploadError,
+  completeBookMirrorUpload,
+  isBookMirrorUploadEvent,
+  putBookMirrorChunk,
+  startBookMirrorUpload,
+} from "./lib/book-mirror-upload";
 import {
   associationDbValues,
   associationFromRow,
@@ -84,6 +94,15 @@ import {
 } from "./lib/association";
 
 export const v1 = new Hono();
+
+type DatabaseClient = ReturnType<typeof getDb>;
+type DatabaseTransaction = Parameters<
+  Parameters<DatabaseClient["transaction"]>[0]
+>[0];
+type DatabaseExecutor = Pick<
+  DatabaseClient | DatabaseTransaction,
+  "select" | "insert" | "update" | "delete"
+>;
 
 /* 统一错误格式：业务错误一律 JSON */
 v1.onError((err, c) => {
@@ -131,10 +150,14 @@ v1.get("/", c =>
 
 v1.use("/*", async (c, next) => {
   if (c.req.path === "/api/v1" || c.req.path === "/api/v1/") return next();
-  // 本机同源阅读端允许免 key；远程服务即使伪造 Origin 也必须使用 API Key。
+  // 阅读端使用签名会话；机器客户端继续使用 API key/Bearer。
   if (c.req.path === "/api/v1/events") {
-    const origin = c.req.header("origin");
-    if (isTrustedLocalBrowserEvent(c.req.url, origin)) return next();
+    const key = c.req.header("x-api-key")?.trim();
+    const authorization = c.req.header("authorization");
+    if (key || authorization?.toLowerCase().startsWith("bearer ")) {
+      return requireApiKey(c, next);
+    }
+    return requireBrowserMutation(c, next);
   }
   return requireApiKey(c, next);
 });
@@ -219,18 +242,53 @@ async function findBook(extId: string) {
   return rows[0] ?? null;
 }
 
-async function deleteAssociationsForBook(
-  bookExtId: string,
-  source: "api" | "reader"
+async function deleteBookMirrorResourcesWith(
+  database: DatabaseExecutor,
+  bookExtId: string
 ) {
   const predicate = or(
     eq(mirrorAssociations.sourceBookExtId, bookExtId),
     eq(mirrorAssociations.targetBookExtId, bookExtId)
   );
-  const rows = await getDb().select().from(mirrorAssociations).where(predicate);
-  if (!rows.length) return;
-  await getDb().delete(mirrorAssociations).where(predicate);
-  for (const row of rows) {
+  const books = await database
+    .select()
+    .from(mirrorBooks)
+    .where(eq(mirrorBooks.extId, bookExtId))
+    .limit(1);
+  const associations = await database
+    .select()
+    .from(mirrorAssociations)
+    .where(predicate);
+
+  await database.delete(mirrorAssociations).where(predicate);
+  await database
+    .delete(mirrorBookUploadChunks)
+    .where(eq(mirrorBookUploadChunks.bookExtId, bookExtId));
+  await database
+    .delete(mirrorHighlights)
+    .where(eq(mirrorHighlights.bookExtId, bookExtId));
+  await database
+    .delete(mirrorTranslations)
+    .where(eq(mirrorTranslations.bookExtId, bookExtId));
+  await database
+    .delete(mirrorMindmaps)
+    .where(eq(mirrorMindmaps.bookExtId, bookExtId));
+  await database.delete(mirrorBooks).where(eq(mirrorBooks.extId, bookExtId));
+
+  return { book: books[0] ?? null, associations };
+}
+
+async function deleteBookMirrorResources(bookExtId: string) {
+  return getDb().transaction(tx =>
+    deleteBookMirrorResourcesWith(tx, bookExtId)
+  );
+}
+
+function fanoutDeletedAssociations(
+  associations: (typeof mirrorAssociations.$inferSelect)[],
+  source: "api" | "reader"
+) {
+  for (const row of associations) {
     fanout({
       type: "association.deleted",
       source,
@@ -270,14 +328,15 @@ v1.patch(
 
 v1.delete("/books/:extId", async c => {
   const extId = c.req.param("extId");
-  const b = await findBook(extId);
-  if (!b) return c.json({ error: "not_found" }, 404);
-  await deleteAssociationsForBook(extId, "api");
-  await getDb().delete(mirrorBooks).where(eq(mirrorBooks.extId, extId));
+  const deleted = await deleteBookMirrorResources(extId);
+  if (!deleted.book) return c.json({ error: "not_found" }, 404);
+  // WebHooks are deliberately emitted only after the database transaction has
+  // committed, so consumers never observe deletion that later rolls back.
+  fanoutDeletedAssociations(deleted.associations, "api");
   fanout({
     type: "book.deleted",
     source: "api",
-    data: { extId, title: b.title },
+    data: { extId, title: deleted.book.title },
   });
   return c.json({ ok: true });
 });
@@ -630,8 +689,11 @@ class AssociationConflictError extends Error {
   }
 }
 
-async function findAssociation(extId: string) {
-  const rows = await getDb()
+async function findAssociation(
+  extId: string,
+  database: DatabaseExecutor = getDb()
+) {
+  const rows = await database
     .select()
     .from(mirrorAssociations)
     .where(eq(mirrorAssociations.extId, extId))
@@ -639,8 +701,11 @@ async function findAssociation(extId: string) {
   return rows[0]?.extId === extId ? rows[0] : null;
 }
 
-async function findAssociationByPairKey(pairKey: string) {
-  const rows = await getDb()
+async function findAssociationByPairKey(
+  pairKey: string,
+  database: DatabaseExecutor = getDb()
+) {
+  const rows = await database
     .select()
     .from(mirrorAssociations)
     .where(eq(mirrorAssociations.pairKeyHash, associationPairKeyHash(pairKey)))
@@ -662,11 +727,12 @@ function mutableAssociationValues(association: AssociationSnapshot) {
 
 async function persistAssociation(
   association: AssociationSnapshot,
-  allowExistingUpdate: boolean
+  allowExistingUpdate: boolean,
+  database: DatabaseExecutor = getDb()
 ) {
   const [byId, byPair] = await Promise.all([
-    findAssociation(association.extId),
-    findAssociationByPairKey(association.pairKey),
+    findAssociation(association.extId, database),
+    findAssociationByPairKey(association.pairKey, database),
   ]);
   if (byPair && byPair.extId !== association.extId)
     throw new AssociationConflictError(
@@ -679,7 +745,7 @@ async function persistAssociation(
       );
     if (!allowExistingUpdate) return { created: false };
     const { mutable } = mutableAssociationValues(association);
-    await getDb()
+    await database
       .update(mirrorAssociations)
       .set(mutable)
       .where(eq(mirrorAssociations.extId, association.extId));
@@ -688,13 +754,13 @@ async function persistAssociation(
 
   const { values } = mutableAssociationValues(association);
   try {
-    await getDb().insert(mirrorAssociations).values(values);
+    await database.insert(mirrorAssociations).values(values);
     return { created: true };
   } catch (error) {
     // A concurrent request may have inserted the same id/pair after our read.
     const [concurrentById, concurrentByPair] = await Promise.all([
-      findAssociation(association.extId),
-      findAssociationByPairKey(association.pairKey),
+      findAssociation(association.extId, database),
+      findAssociationByPairKey(association.pairKey, database),
     ]);
     if (
       concurrentById?.pairKey === association.pairKey &&
@@ -1368,12 +1434,128 @@ v1.post(
 
 /* ---------- 浏览器端事件上报（转发给 WebHook 订阅者） ---------- */
 
+class MirrorEventDeliveryConflictError extends Error {
+  constructor() {
+    super("deliveryId has already been used for a different event");
+    this.name = "MirrorEventDeliveryConflictError";
+  }
+}
+
+class InvalidMirrorEventError extends Error {
+  readonly issues: { path: string; message: string }[];
+
+  constructor(issues: { path: string; message: string }[]) {
+    super("invalid mirror event");
+    this.name = "InvalidMirrorEventError";
+    this.issues = issues;
+  }
+}
+
+const MIRROR_EVENT_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const MIRROR_EVENT_RECEIPT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+const MIRROR_EVENT_RECEIPT_CLEANUP_BATCH_SIZE = 1_000;
+const MIRROR_EVENT_TRANSACTION_MAX_ATTEMPTS = 3;
+const RETRYABLE_MIRROR_EVENT_ERROR_CODES = new Set([
+  "ER_LOCK_DEADLOCK",
+  "ER_LOCK_WAIT_TIMEOUT",
+]);
+
+let mirrorEventReceiptCleanupRun: Promise<void> | null = null;
+let nextMirrorEventReceiptCleanupAt = 0;
+
+function databaseErrorCode(error: unknown): string | undefined {
+  const seen = new Set<object>();
+  let current = error;
+  while (current !== null && typeof current === "object") {
+    if (seen.has(current)) return undefined;
+    seen.add(current);
+    const candidate = current as { code?: unknown; cause?: unknown };
+    if (typeof candidate.code === "string") return candidate.code;
+    current = candidate.cause;
+  }
+  return undefined;
+}
+
+async function runWithMirrorEventLockRetry<T>(
+  operation: () => Promise<T>
+): Promise<T> {
+  for (
+    let attempt = 1;
+    attempt <= MIRROR_EVENT_TRANSACTION_MAX_ATTEMPTS;
+    attempt++
+  ) {
+    try {
+      return await operation();
+    } catch (error) {
+      const retryable = RETRYABLE_MIRROR_EVENT_ERROR_CODES.has(
+        databaseErrorCode(error) ?? ""
+      );
+      if (!retryable || attempt === MIRROR_EVENT_TRANSACTION_MAX_ATTEMPTS) {
+        throw error;
+      }
+      await new Promise(resolve =>
+        setTimeout(resolve, 10 * 2 ** (attempt - 1))
+      );
+    }
+  }
+  throw new Error("unreachable mirror event lock retry state");
+}
+
+async function cleanupExpiredMirrorEventReceipts(
+  database: DatabaseClient
+): Promise<void> {
+  // Check the in-flight run before the interval. Requests arriving in the
+  // first batch must all wait for the same cleanup before claiming receipts.
+  if (mirrorEventReceiptCleanupRun) {
+    await mirrorEventReceiptCleanupRun;
+    return;
+  }
+  if (Date.now() < nextMirrorEventReceiptCleanupAt) return;
+
+  const cleanupRun = (async () => {
+    await runWithMirrorEventLockRetry(async () => {
+      await database
+        .delete(mirrorEventReceipts)
+        .where(
+          lt(
+            mirrorEventReceipts.createdAt,
+            new Date(Date.now() - MIRROR_EVENT_RECEIPT_RETENTION_MS)
+          )
+        )
+        .limit(MIRROR_EVENT_RECEIPT_CLEANUP_BATCH_SIZE);
+    });
+    nextMirrorEventReceiptCleanupAt =
+      Date.now() + MIRROR_EVENT_RECEIPT_CLEANUP_INTERVAL_MS;
+  })();
+  mirrorEventReceiptCleanupRun = cleanupRun;
+  try {
+    await cleanupRun;
+  } finally {
+    if (mirrorEventReceiptCleanupRun === cleanupRun) {
+      mirrorEventReceiptCleanupRun = null;
+    }
+  }
+}
+
+async function runMirrorEventTransaction<T>(
+  database: DatabaseClient,
+  work: (transaction: DatabaseTransaction) => Promise<T>
+): Promise<T> {
+  return runWithMirrorEventLockRetry(() => database.transaction(work));
+}
+
 v1.post(
   "/events",
   zValidator(
     "json",
     z
       .object({
+        deliveryId: z
+          .string()
+          .min(16)
+          .max(64)
+          .regex(/^[A-Za-z0-9._:-]+$/)
+          .default(() => randomUUID()),
         type: z.string().min(1).max(64),
         data: z.record(z.string(), z.unknown()).default({}),
       })
@@ -1394,15 +1576,20 @@ v1.post(
         400
       );
     }
-    const event: ShufangEvent = {
+    let event: ShufangEvent = {
       type: ev.type,
       data: normalized.data,
       source: "reader",
     };
+    let suppressFanout = false;
+    let duplicateDelivery = false;
+    let deletedAssociations: (typeof mirrorAssociations.$inferSelect)[] = [];
+    let mirrorDatabase: DatabaseExecutor;
+    let mirrorClient: DatabaseClient;
 
     // 阅读动作同时落入镜像库，外部 AI 可读
     let mirrored: boolean | undefined;
-    try {
+    const persistEvent = async () => {
       const d = normalized.data;
       if (
         ev.type === "association.created" ||
@@ -1411,7 +1598,8 @@ v1.post(
         mirrored = false;
         await persistAssociation(
           associationSchema.parse(d),
-          ev.type === "association.updated"
+          ev.type === "association.updated",
+          mirrorDatabase
         );
         mirrored = true;
       } else if (
@@ -1419,7 +1607,7 @@ v1.post(
         typeof d.extId === "string"
       ) {
         mirrored = false;
-        await getDb()
+        await mirrorDatabase
           .delete(mirrorAssociations)
           .where(eq(mirrorAssociations.extId, d.extId));
         mirrored = true;
@@ -1428,7 +1616,7 @@ v1.post(
         typeof d.extId === "string" &&
         typeof d.text === "string"
       ) {
-        await getDb()
+        await mirrorDatabase
           .insert(mirrorHighlights)
           .values({
             extId: d.extId,
@@ -1502,7 +1690,7 @@ v1.post(
           d.end !== undefined ||
           d.pdfAnchor !== undefined;
         if (citationTouched) {
-          const rows = await getDb()
+          const rows = await mirrorDatabase
             .select()
             .from(mirrorHighlights)
             .where(eq(mirrorHighlights.extId, d.extId))
@@ -1547,13 +1735,9 @@ v1.post(
               }
             );
             if (!citation.success) {
-              return c.json(
-                {
-                  error: "invalid_event_data",
-                  issues: [{ path: "data", message: citation.message }],
-                },
-                400
-              );
+              throw new InvalidMirrorEventError([
+                { path: "data", message: citation.message },
+              ]);
             }
             patch.citationLevel = citation.data.citationLevel;
             patch.chapterId = citation.data.chapterId;
@@ -1564,7 +1748,7 @@ v1.post(
           }
         }
         if (Object.keys(patch).length)
-          await getDb()
+          await mirrorDatabase
             .update(mirrorHighlights)
             .set(patch)
             .where(eq(mirrorHighlights.extId, d.extId));
@@ -1572,7 +1756,7 @@ v1.post(
         ev.type === "highlight.deleted" &&
         typeof d.extId === "string"
       ) {
-        await getDb()
+        await mirrorDatabase
           .delete(mirrorHighlights)
           .where(eq(mirrorHighlights.extId, d.extId));
       } else if (
@@ -1581,7 +1765,7 @@ v1.post(
         typeof d.title === "string" &&
         typeof d.content === "string"
       ) {
-        await getDb()
+        await mirrorDatabase
           .insert(mirrorNotes)
           .values({ extId: d.extId, title: d.title, content: d.content })
           .onDuplicateKeyUpdate({
@@ -1592,28 +1776,30 @@ v1.post(
         if (typeof d.title === "string") notePatch.title = d.title;
         if (typeof d.content === "string") notePatch.content = d.content;
         if (typeof d.title === "string" && typeof d.content === "string") {
-          await getDb()
+          await mirrorDatabase
             .insert(mirrorNotes)
             .values({ extId: d.extId, title: d.title, content: d.content })
             .onDuplicateKeyUpdate({ set: notePatch });
         } else if (Object.keys(notePatch).length) {
-          await getDb()
+          await mirrorDatabase
             .update(mirrorNotes)
             .set(notePatch)
             .where(eq(mirrorNotes.extId, d.extId));
         }
       } else if (ev.type === "note.deleted" && typeof d.extId === "string") {
-        await getDb()
+        await mirrorDatabase
           .update(mirrorHighlights)
           .set({ noteExtId: "" })
           .where(eq(mirrorHighlights.noteExtId, d.extId));
-        await getDb().delete(mirrorNotes).where(eq(mirrorNotes.extId, d.extId));
+        await mirrorDatabase
+          .delete(mirrorNotes)
+          .where(eq(mirrorNotes.extId, d.extId));
       } else if (
         ev.type === "highlight.tagged" &&
         typeof d.extId === "string" &&
         Array.isArray(d.tags)
       ) {
-        await getDb()
+        await mirrorDatabase
           .update(mirrorHighlights)
           .set({
             tags: JSON.stringify(
@@ -1624,18 +1810,18 @@ v1.post(
       } else if (ev.type === "review.updated" && typeof d.extId === "string") {
         // 浏览器端上报：inReview=false 移出复习；带完整 review 对象则落库
         if (d.inReview === false) {
-          await getDb()
+          await mirrorDatabase
             .update(mirrorHighlights)
             .set({ review: null })
             .where(eq(mirrorHighlights.extId, d.extId));
         } else if (d.review && typeof d.review === "object") {
-          await getDb()
+          await mirrorDatabase
             .update(mirrorHighlights)
             .set({ review: JSON.stringify(d.review) })
             .where(eq(mirrorHighlights.extId, d.extId));
         } else if (typeof d.due === "number") {
           // 只有评分结果：合并进已有 review
-          const rows = await getDb()
+          const rows = await mirrorDatabase
             .select()
             .from(mirrorHighlights)
             .where(eq(mirrorHighlights.extId, d.extId))
@@ -1653,7 +1839,7 @@ v1.post(
                 ? { lastRating: d.rating, lastReviewedAt: Date.now() }
                 : {}),
             };
-            await getDb()
+            await mirrorDatabase
               .update(mirrorHighlights)
               .set({ review: JSON.stringify(next) })
               .where(eq(mirrorHighlights.extId, d.extId));
@@ -1664,10 +1850,47 @@ v1.post(
         typeof d.extId === "string" &&
         Array.isArray(d.aiQa)
       ) {
-        await getDb()
+        await mirrorDatabase
           .update(mirrorHighlights)
           .set({ aiQa: JSON.stringify(d.aiQa) })
           .where(eq(mirrorHighlights.extId, d.extId));
+      } else if (ev.type === "book.import.started") {
+        mirrored = false;
+        await startBookMirrorUpload(
+          normalized.data as Parameters<typeof startBookMirrorUpload>[0],
+          mirrorClient
+        );
+        mirrored = true;
+        suppressFanout = true;
+      } else if (ev.type === "book.import.chunk") {
+        mirrored = false;
+        await putBookMirrorChunk(
+          normalized.data as Parameters<typeof putBookMirrorChunk>[0],
+          mirrorClient
+        );
+        mirrored = true;
+        suppressFanout = true;
+      } else if (ev.type === "book.import.completed") {
+        mirrored = false;
+        const completed = await completeBookMirrorUpload(
+          normalized.data as Parameters<typeof completeBookMirrorUpload>[0],
+          mirrorClient
+        );
+        mirrored = true;
+        suppressFanout = completed.alreadyCompleted;
+        event = {
+          type: "book.imported",
+          source: "reader",
+          data: {
+            extId: completed.extId,
+            title: completed.title,
+            author: completed.author,
+            format: completed.format,
+            folder: completed.folder,
+            contentHash: completed.contentHash,
+            chapterCount: completed.chapterCount,
+          },
+        };
       } else if (
         ev.type === "book.imported" &&
         typeof d.extId === "string" &&
@@ -1675,7 +1898,7 @@ v1.post(
         Array.isArray(d.chapters)
       ) {
         mirrored = false;
-        await getDb()
+        await mirrorDatabase
           .insert(mirrorBooks)
           .values({
             extId: d.extId,
@@ -1692,15 +1915,18 @@ v1.post(
         mirrored = true;
       } else if (ev.type === "book.deleted" && typeof d.extId === "string") {
         mirrored = false;
-        await deleteAssociationsForBook(d.extId, "reader");
-        await getDb().delete(mirrorBooks).where(eq(mirrorBooks.extId, d.extId));
+        const deleted = await deleteBookMirrorResourcesWith(
+          mirrorDatabase,
+          d.extId
+        );
+        deletedAssociations = deleted.associations;
         mirrored = true;
       } else if (
         ev.type === "translation.created" &&
         typeof d.extId === "string" &&
         typeof d.text === "string"
       ) {
-        await getDb()
+        await mirrorDatabase
           .insert(mirrorTranslations)
           .values({
             extId: d.extId,
@@ -1724,7 +1950,7 @@ v1.post(
         typeof d.title === "string" &&
         d.root
       ) {
-        await getDb()
+        await mirrorDatabase
           .insert(mirrorMindmaps)
           .values({
             extId: d.extId,
@@ -1742,27 +1968,117 @@ v1.post(
             },
           });
       } else if (ev.type === "mindmap.deleted" && typeof d.extId === "string") {
-        await getDb()
+        await mirrorDatabase
           .delete(mirrorMindmaps)
           .where(eq(mirrorMindmaps.extId, d.extId));
       }
+    };
+
+    try {
+      const database = getDb();
+      mirrorClient = database;
+      mirrorDatabase = database;
+      if (isBookMirrorUploadEvent(ev.type)) {
+        // The chunk protocol already uses `(extId, uploadId, index)` as its
+        // durable idempotency key and suppresses staging WebHooks.
+        await persistEvent();
+      } else {
+        await cleanupExpiredMirrorEventReceipts(database);
+        const payloadHash = createHash("sha256")
+          .update(JSON.stringify({ type: ev.type, data: normalized.data }))
+          .digest("hex");
+        await runMirrorEventTransaction(database, async transaction => {
+          // The callback can be rerun after an InnoDB deadlock rolls back the
+          // prior attempt, so reset every attempt-scoped response side effect.
+          mirrorDatabase = transaction;
+          duplicateDelivery = false;
+          deletedAssociations = [];
+          mirrored = undefined;
+          const claimResult = await transaction
+            .insert(mirrorEventReceipts)
+            .ignore()
+            .values({
+              deliveryId: ev.deliveryId,
+              eventType: ev.type,
+              payloadHash,
+            });
+          const affectedRows = Number(
+            (claimResult[0] as { affectedRows?: number } | null | undefined)
+              ?.affectedRows ?? 0
+          );
+          if (affectedRows === 0) {
+            const receipts = await transaction
+              .select()
+              .from(mirrorEventReceipts)
+              .where(eq(mirrorEventReceipts.deliveryId, ev.deliveryId))
+              .limit(1);
+            const receipt = receipts[0];
+            if (
+              !receipt ||
+              receipt.eventType !== ev.type ||
+              receipt.payloadHash !== payloadHash
+            ) {
+              throw new MirrorEventDeliveryConflictError();
+            }
+            duplicateDelivery = true;
+            mirrored = true;
+            return;
+          }
+          await persistEvent();
+          mirrored = true;
+        });
+      }
     } catch (error) {
-      const cause =
-        error instanceof Error && "cause" in error ? error.cause : error;
-      const errorCode =
-        cause !== null &&
-        typeof cause === "object" &&
-        "code" in cause &&
-        typeof cause.code === "string"
-          ? cause.code
-          : undefined;
+      if (error instanceof BookMirrorUploadError) {
+        return c.json(
+          { ok: false, mirrored: false, error: error.code },
+          error.status
+        );
+      }
+      if (error instanceof InvalidMirrorEventError) {
+        return c.json(
+          { error: "invalid_event_data", issues: error.issues },
+          400
+        );
+      }
+      if (error instanceof MirrorEventDeliveryConflictError) {
+        return c.json(
+          {
+            ok: false,
+            mirrored: false,
+            error: "delivery_id_conflict",
+          },
+          409
+        );
+      }
+      if (error instanceof AssociationConflictError) {
+        return c.json(
+          { ok: false, mirrored: false, error: "association_conflict" },
+          409
+        );
+      }
+      const errorCode = databaseErrorCode(error);
       console.error("[api/v1/events] mirror failed", {
         eventType: ev.type,
         errorName: error instanceof Error ? error.name : "UnknownError",
         ...(errorCode ? { errorCode } : {}),
       });
+      return c.json(
+        {
+          ok: false,
+          mirrored: false,
+          error: "mirror_write_failed",
+        },
+        503
+      );
     }
-    fanout(event);
+    if (duplicateDelivery) {
+      return c.json({ ok: true, mirrored: true, duplicate: true });
+    }
+    if (deletedAssociations.length > 0) {
+      fanoutDeletedAssociations(deletedAssociations, "reader");
+    }
+    if (!suppressFanout) fanout(event);
     return c.json({
       ok: true,
       ...(mirrored === undefined ? {} : { mirrored }),

@@ -26,6 +26,8 @@ export interface Book {
   format: BookFormat;
   /** dataURL 封面缩略图 */
   cover?: string;
+  /** 用户覆盖的自定义封面；清除后继续使用书籍内置封面。 */
+  customCover?: string;
   /** 无封面时使用的确定性配色索引 */
   coverTone: number;
   chapters: Chapter[];
@@ -47,10 +49,22 @@ export interface Book {
   outline?: OutlineItem[];
 }
 
+export type FolderIconKey =
+  | "folder"
+  | "library"
+  | "study"
+  | "archive"
+  | "work"
+  | "heart"
+  | "sparkles"
+  | "bookmark";
+
 /** 书架分类文件夹 */
 export interface Folder {
   id: string;
   name: string;
+  /** 书架展示图标；旧数据缺省时使用 folder。 */
+  icon?: FolderIconKey;
   createdAt: number;
 }
 

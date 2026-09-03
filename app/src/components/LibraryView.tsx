@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useMemo, useRef, useState, type DragEvent } from "react";
 import {
   BookOpenText,
   BookUp2,
   CheckSquare,
   ChevronLeft,
   FileText,
-  Folder as FolderIcon,
   FolderPlus,
   FolderInput,
+  ImagePlus,
   MoreHorizontal,
   Pencil,
+  RotateCcw,
+  Shapes,
   Trash2,
 } from "lucide-react";
 import type { Library } from "@/hooks/useLibrary";
@@ -20,6 +22,8 @@ import {
 } from "@/lib/bookFormats";
 import type { Book, Folder } from "@/types";
 import { BookCover } from "./BookCover";
+import { FolderGlyph } from "./FolderGlyph";
+import { FOLDER_ICON_OPTIONS } from "@/lib/folderIcons";
 import { BatchAction, BatchBar, SelectDot } from "./BatchBar";
 import { ImportModeDialog } from "./ImportModeDialog";
 import { useSelection } from "@/hooks/useSelection";
@@ -37,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { prepareCoverImage } from "@/lib/coverImage";
 
 function bookProgress(b: Book): number {
   const idx = b.chapters.findIndex(c => c.id === b.progress.chapterId);
@@ -59,19 +64,22 @@ function RenameDialog({
   onSubmit: (v: string) => void;
   onClose: () => void;
 }) {
-  const [value, setValue] = useState(initial);
-  useEffect(() => {
-    if (open) setValue(initial);
-  }, [open, initial]);
+  const [draft, setDraft] = useState<string | null>(null);
+  const value = draft ?? initial;
+
+  const close = () => {
+    setDraft(null);
+    onClose();
+  };
 
   const submit = () => {
     const v = value.trim();
     if (v) onSubmit(v);
-    onClose();
+    close();
   };
 
   return (
-    <Dialog open={open} onOpenChange={o => !o && onClose()}>
+    <Dialog open={open} onOpenChange={o => !o && close()}>
       <DialogContent className="max-w-sm bg-card">
         <DialogHeader>
           <DialogTitle className="text-[15px]">{title}</DialogTitle>
@@ -79,7 +87,7 @@ function RenameDialog({
         <input
           autoFocus
           value={value}
-          onChange={e => setValue(e.target.value)}
+          onChange={e => setDraft(e.target.value)}
           onKeyDown={e => {
             if (e.key === "Enter") submit();
           }}
@@ -88,7 +96,7 @@ function RenameDialog({
         />
         <div className="mt-1 flex justify-end gap-2">
           <button
-            onClick={onClose}
+            onClick={close}
             className="rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground"
           >
             取消
@@ -125,6 +133,8 @@ function BookCard({
 }) {
   const pct = bookProgress(book);
   const [renaming, setRenaming] = useState(false);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div
@@ -192,6 +202,20 @@ function BookCard({
             <DropdownMenuItem onClick={() => setRenaming(true)}>
               <Pencil size={13} className="mr-2" /> 重命名
             </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={coverBusy}
+              onClick={() => coverInputRef.current?.click()}
+            >
+              <ImagePlus size={13} className="mr-2" />
+              {coverBusy ? "正在处理封面…" : "自定义封面"}
+            </DropdownMenuItem>
+            {book.customCover && (
+              <DropdownMenuItem
+                onClick={() => void lib.setBookCustomCover(book.id)}
+              >
+                <RotateCcw size={13} className="mr-2" /> 恢复书籍封面
+              </DropdownMenuItem>
+            )}
             {book.format === "pdf" && (
               <DropdownMenuItem
                 onClick={async () => {
@@ -220,7 +244,7 @@ function BookCard({
                 disabled={book.folderId === f.id}
                 onClick={() => lib.moveBook(book.id, f.id)}
               >
-                <FolderIcon size={13} className="mr-2 text-primary/70" />{" "}
+                <FolderGlyph icon={f.icon} size="sm" className="mr-2" />
                 {f.name}
                 {book.folderId === f.id && (
                   <span className="ml-auto text-[10px] text-primary">当前</span>
@@ -253,6 +277,25 @@ function BookCard({
         </DropdownMenu>
       )}
 
+      <input
+        ref={coverInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={event => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) return;
+          setCoverBusy(true);
+          void prepareCoverImage(file)
+            .then(dataUrl => lib.setBookCustomCover(book.id, dataUrl))
+            .catch(error =>
+              alert(error instanceof Error ? error.message : String(error))
+            )
+            .finally(() => setCoverBusy(false));
+        }}
+      />
+
       <RenameDialog
         open={renaming}
         title="重命名书籍"
@@ -278,6 +321,7 @@ function FolderCard({
   onOpen: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
+  const [choosingIcon, setChoosingIcon] = useState(false);
   const [over, setOver] = useState(false);
 
   return (
@@ -306,13 +350,7 @@ function FolderCard({
               : "border-foreground/15 bg-accent/30 hover:bg-accent/50"
           }`}
         >
-          <FolderIcon
-            size={44}
-            strokeWidth={1.1}
-            className="text-primary/80"
-            fill="currentColor"
-            fillOpacity={0.12}
-          />
+          <FolderGlyph icon={folder.icon} size="lg" />
           <span className="font-meta text-[10px] uppercase tracking-wider text-muted-foreground">
             {count} 册
           </span>
@@ -341,6 +379,9 @@ function FolderCard({
           <DropdownMenuItem onClick={() => setRenaming(true)}>
             <Pencil size={13} className="mr-2" /> 重命名
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setChoosingIcon(true)}>
+            <Shapes size={13} className="mr-2" /> 更换图标
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"
@@ -365,6 +406,34 @@ function FolderCard({
         onSubmit={v => lib.renameFolder(folder.id, v)}
         onClose={() => setRenaming(false)}
       />
+      <Dialog open={choosingIcon} onOpenChange={setChoosingIcon}>
+        <DialogContent className="max-w-sm rounded-[22px] bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-[15px]">选择文件夹图标</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-4 gap-2 pt-1">
+            {FOLDER_ICON_OPTIONS.map(option => (
+              <button
+                key={option.id}
+                type="button"
+                className={`flex flex-col items-center gap-1.5 rounded-[14px] border px-2 py-3 text-[10px] transition hover:-translate-y-0.5 hover:bg-accent/60 ${
+                  folder.icon === option.id
+                    ? "border-primary/60 bg-primary/5 text-primary"
+                    : "border-border"
+                }`}
+                onClick={() => {
+                  void lib
+                    .setFolderIcon(folder.id, option.id)
+                    .then(() => setChoosingIcon(false));
+                }}
+              >
+                <FolderGlyph icon={option.id} size="sm" />
+                <span>{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -458,12 +527,7 @@ export function LibraryView({ lib }: { lib: Library }) {
                   <ChevronLeft size={12} /> 书架
                 </button>
                 <h1 className="font-reading flex items-center gap-3 text-[42px] font-bold leading-tight tracking-wide">
-                  <FolderIcon
-                    size={30}
-                    className="text-primary/80"
-                    fill="currentColor"
-                    fillOpacity={0.12}
-                  />
+                  <FolderGlyph icon={activeFolder.icon} />
                   {activeFolder.name}
                 </h1>
               </div>
@@ -499,9 +563,6 @@ export function LibraryView({ lib }: { lib: Library }) {
             <BookUp2 size={22} strokeWidth={1.6} className="text-primary" />
             <span className="mt-2 text-sm font-medium">
               拖入文件，或点击选择
-            </span>
-            <span className="font-meta mt-1 text-[11px] text-muted-foreground">
-              支持 {SUPPORTED_FORMAT_LABEL} · 本地解析，原始文件仅存浏览器
             </span>
             <input
               type="file"
@@ -640,7 +701,7 @@ export function LibraryView({ lib }: { lib: Library }) {
                       key={f.id}
                       onClick={() => batchMove(f.id)}
                     >
-                      <FolderIcon size={13} className="mr-2 text-primary/70" />{" "}
+                      <FolderGlyph icon={f.icon} size="sm" className="mr-2" />
                       {f.name}
                     </DropdownMenuItem>
                   ))}

@@ -1,8 +1,27 @@
-import { useState } from "react";
-import { CheckCircle2, KeyRound, Loader2, XCircle } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CheckCircle2,
+  KeyRound,
+  Loader2,
+  LogIn,
+  LogOut,
+  RefreshCw,
+  ShieldCheck,
+  XCircle,
+} from "lucide-react";
 import type { AiConfig, AiProviderId, ReaderTheme } from "@/types";
-import { AI_PROVIDERS } from "@/lib/aiConfig";
-import { trpc } from "@/providers/trpc";
+import { AI_PROVIDERS, defaultAiConfigFor } from "@/lib/aiConfig";
+import { readCodexAuthJson } from "@/lib/codexAuthResponse";
+import { createLatestRequestGate } from "@/lib/latestRequest";
+import { trpc } from "@/lib/trpc-client";
+
+interface CodexAuthStatus {
+  available: boolean;
+  authenticated: boolean;
+  method: "chatgpt" | "api-key" | "access-token" | "unknown";
+  loginRunning: boolean;
+  lastLoginError: string | null;
+}
 
 export function AiSettingsPanel({
   value,
@@ -15,13 +34,116 @@ export function AiSettingsPanel({
 }) {
   const [testResult, setTestResult] = useState<"" | "ok" | "error">("");
   const [testMessage, setTestMessage] = useState("");
+  const [codexStatus, setCodexStatus] = useState<CodexAuthStatus | null>(null);
+  const [codexStatusError, setCodexStatusError] = useState("");
+  const [codexBusy, setCodexBusy] = useState(false);
+  const codexRequests = useRef<ReturnType<
+    typeof createLatestRequestGate
+  > | null>(null);
+  if (!codexRequests.current) codexRequests.current = createLatestRequestGate();
   const testConnection = trpc.ai.testConnection.useMutation();
   const options = AI_PROVIDERS[value.provider];
 
   const switchProvider = (provider: AiProviderId) => {
-    const next = AI_PROVIDERS[provider];
     setTestResult("");
-    onChange({ provider, model: next.models[0], effort: next.efforts[0] });
+    onChange(defaultAiConfigFor(provider));
+  };
+
+  const refreshCodexStatus = useCallback(async (showBusy = true) => {
+    const requests = codexRequests.current!;
+    const ticket = requests.begin();
+    if (showBusy) setCodexBusy(true);
+    setCodexStatusError("");
+    try {
+      const response = await fetch("/api/auth/codex/status", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      const status = await readCodexAuthJson<CodexAuthStatus>(response);
+      if (requests.isCurrent(ticket)) setCodexStatus(status);
+    } catch (error) {
+      if (requests.isCurrent(ticket)) {
+        setCodexStatusError(
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    } finally {
+      // Background polling may supersede this status response, but it must not
+      // strand the spinner owned by the user's explicit refresh.
+      if (showBusy) setCodexBusy(false);
+    }
+  }, []);
+
+  useEffect(
+    () => () => {
+      codexRequests.current?.invalidate();
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (value.provider === "codex") void refreshCodexStatus(false);
+  }, [refreshCodexStatus, value.provider]);
+
+  useEffect(() => {
+    if (value.provider !== "codex" || !codexStatus?.loginRunning) return;
+    const timer = window.setInterval(() => {
+      void refreshCodexStatus(false);
+    }, 2_000);
+    return () => window.clearInterval(timer);
+  }, [codexStatus?.loginRunning, refreshCodexStatus, value.provider]);
+
+  const startCodexLogin = async () => {
+    const requests = codexRequests.current!;
+    const ticket = requests.begin();
+    setCodexBusy(true);
+    setCodexStatusError("");
+    try {
+      const response = await fetch("/api/auth/codex/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      await readCodexAuthJson(response);
+      if (requests.isCurrent(ticket)) await refreshCodexStatus(false);
+    } catch (error) {
+      if (requests.isCurrent(ticket)) {
+        setCodexStatusError(
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    } finally {
+      setCodexBusy(false);
+    }
+  };
+
+  const logoutCodex = async () => {
+    if (!confirm("退出本机 Codex 登录？这会同时注销该用户的 Codex CLI。")) {
+      return;
+    }
+    const requests = codexRequests.current!;
+    const ticket = requests.begin();
+    setCodexBusy(true);
+    setCodexStatusError("");
+    try {
+      const response = await fetch("/api/auth/codex/logout", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      await readCodexAuthJson(response);
+      if (requests.isCurrent(ticket)) await refreshCodexStatus(false);
+    } catch (error) {
+      if (requests.isCurrent(ticket)) {
+        setCodexStatusError(
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    } finally {
+      setCodexBusy(false);
+    }
   };
 
   const test = async () => {
@@ -67,6 +189,89 @@ export function AiSettingsPanel({
           ))}
         </select>
       </Field>
+
+      {value.provider === "codex" && (
+        <div
+          className="mb-3 rounded-[16px] border p-3"
+          style={{ borderColor: theme.border }}
+        >
+          <div className="flex items-start gap-2.5">
+            <span className="app-icon-tile h-9 w-9 text-primary">
+              <ShieldCheck size={17} aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[12px] font-medium">ChatGPT Codex 登录</p>
+              <p
+                className="mt-0.5 text-[10px] leading-4"
+                style={{ color: theme.muted }}
+              >
+                {codexStatus?.authenticated && codexStatus.method === "chatgpt"
+                  ? "已复用本机 ChatGPT 登录态；不使用 OpenAI API Key。"
+                  : codexStatus?.loginRunning
+                    ? "登录窗口已启动，请在浏览器完成授权。"
+                    : codexStatus?.available === false
+                      ? "未找到 Codex CLI，请检查 CODEX_BIN。"
+                      : "尚未检测到 ChatGPT 登录态。"}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="app-icon-button h-8 w-8"
+              onClick={() => void refreshCodexStatus()}
+              disabled={codexBusy}
+              title="刷新 Codex 登录状态"
+              aria-label="刷新 Codex 登录状态"
+            >
+              <RefreshCw
+                size={14}
+                className={codexBusy ? "animate-spin" : ""}
+              />
+            </button>
+          </div>
+          {(!codexStatus?.authenticated ||
+            codexStatus.method !== "chatgpt") && (
+            <button
+              type="button"
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[12px] border border-primary/25 bg-primary/10 py-2 text-[11px] font-medium text-primary disabled:opacity-50"
+              onClick={() => void startCodexLogin()}
+              disabled={codexBusy || codexStatus?.loginRunning}
+            >
+              {codexBusy || codexStatus?.loginRunning ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <LogIn size={13} />
+              )}
+              {codexStatus?.loginRunning
+                ? "等待浏览器授权…"
+                : "使用 ChatGPT 登录"}
+            </button>
+          )}
+          {codexStatus?.authenticated && codexStatus.method === "chatgpt" && (
+            <button
+              type="button"
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[12px] border py-2 text-[10.5px] disabled:opacity-50"
+              style={{ borderColor: theme.border, color: theme.muted }}
+              onClick={() => void logoutCodex()}
+              disabled={codexBusy}
+            >
+              <LogOut size={12} /> 退出 Codex 登录
+            </button>
+          )}
+          {(codexStatusError || codexStatus?.lastLoginError) && (
+            <p className="mt-2 text-[10px] leading-4 text-destructive">
+              {codexStatusError || codexStatus?.lastLoginError}
+            </p>
+          )}
+          <p
+            className="mt-2 text-[9.5px] leading-4"
+            style={{ color: theme.muted }}
+          >
+            无法打开浏览器时，可在终端运行
+            <code> codex login --device-auth</code>；状态命令为
+            <code> codex login status</code>。
+          </p>
+        </div>
+      )}
 
       <Field label="Model">
         <select

@@ -33,7 +33,7 @@ import {
   type ParagraphAnchor,
 } from "@/lib/bilingual";
 import { cn } from "@/lib/utils";
-import { trpc } from "@/providers/trpc";
+import { trpc } from "@/lib/trpc-client";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -140,6 +140,7 @@ export function BilingualReader({
     translation: 0,
   });
   const progressTimer = useRef<number | null>(null);
+  const onProgressRef = useRef(onProgress);
   const utils = trpc.useUtils();
   const [aiConfig] = useAiConfig();
 
@@ -231,8 +232,33 @@ export function BilingualReader({
   }, [loadTranslation]);
 
   useEffect(() => {
-    sourceScrollRef.current?.scrollTo({ top: 0 });
-    translationScrollRef.current?.scrollTo({ top: 0 });
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const source = sourceScrollRef.current;
+      const translation = translationScrollRef.current;
+      const ratio =
+        chapter && book.progress.chapterId === chapter.id
+          ? Math.min(1, Math.max(0, book.progress.ratio))
+          : 0;
+      if (source) {
+        const max = Math.max(0, source.scrollHeight - source.clientHeight);
+        source.scrollTo({ top: max * ratio });
+      }
+      translation?.scrollTo({ top: 0 });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (progressTimer.current) {
+        window.clearTimeout(progressTimer.current);
+        progressTimer.current = null;
+      }
+    };
+    // Progress changes are the result of scrolling and must not re-run this
+    // entry positioning effect, or a saved position can trigger another save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter?.id]);
 
   const suppressNextScroll = useCallback((side: PaneSide) => {
@@ -248,7 +274,7 @@ export function BilingualReader({
   }, []);
 
   const synchronizeFrom = useCallback(
-    (side: PaneSide) => {
+    (side: PaneSide, persistProgress = true) => {
       if (!chapter) return;
       const source =
         side === "source"
@@ -277,16 +303,16 @@ export function BilingualReader({
         interpolateParagraphAnchor(anchor, sourceCount, targetCount)
       );
 
-      if (onProgress) {
+      if (persistProgress && onProgressRef.current) {
         if (progressTimer.current) window.clearTimeout(progressTimer.current);
         const ratio = paragraphAnchorProgress(anchor, sourceCount);
         progressTimer.current = window.setTimeout(
-          () => onProgress(chapter.id, ratio),
+          () => onProgressRef.current?.(chapter.id, ratio),
           350
         );
       }
     },
-    [chapter, onProgress, suppressNextScroll, translatedParagraphs.length]
+    [chapter, suppressNextScroll, translatedParagraphs.length]
   );
 
   const onPaneScroll = useCallback(
@@ -306,7 +332,8 @@ export function BilingualReader({
 
   useEffect(() => {
     if (translatedParagraphs.length === 0) return;
-    const frame = requestAnimationFrame(() => synchronizeFrom("source"));
+    // Align freshly loaded translation without treating layout as user scroll.
+    const frame = requestAnimationFrame(() => synchronizeFrom("source", false));
     return () => cancelAnimationFrame(frame);
   }, [synchronizeFrom, translatedParagraphs.length]);
 

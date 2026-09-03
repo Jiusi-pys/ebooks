@@ -4,9 +4,9 @@
  * - 依据行间距、缩进、句末标点推断段落边界
  */
 
-const CJK = /[㐀-鿿豈-﫿＀-￯　-〿]$/;
-const CJK_START = /^[㐀-鿿豈-﫿＀-￯　-〿]/;
-const SENTENCE_END = /[。！？…：；」』”’）】\.!?]$/;
+const CJK = /[\u3400-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]$/u;
+const CJK_START = /^[\u3400-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]/u;
+const SENTENCE_END = /[。！？…：；」』”’）】.!?]$/u;
 
 export interface RawLine {
   text: string;
@@ -23,27 +23,30 @@ export function joinBrokenLines(a: string, b: string): string {
   // 拉丁断词：行尾连字符直接去掉并拼接
   if (/-$/.test(a) && /^[a-zA-Z]/.test(b)) return a.slice(0, -1) + b;
   const needSpace = !CJK.test(a) && !CJK_START.test(b);
-  return a + (needSpace ? ' ' : '') + b;
+  return a + (needSpace ? " " : "") + b;
 }
 
 /** 把带几何信息的行折叠为段落 */
 export function reflowLines(lines: RawLine[]): string[] {
   if (lines.length === 0) return [];
-  const heights = lines.map((l) => l.height).filter((h) => h > 0).sort((a, b) => a - b);
+  const heights = lines
+    .map(l => l.height)
+    .filter(h => h > 0)
+    .sort((a, b) => a - b);
   const medH = heights[Math.floor(heights.length / 2)] || 12;
-  const xs = lines.map((l) => l.x).sort((a, b) => a - b);
+  const xs = lines.map(l => l.x).sort((a, b) => a - b);
   const minX = xs[0] ?? 0;
   // 行距中位数：段落间距是相对“常规行距”判定的，而非字号
   const gaps = lines
     .slice(1)
-    .map((l) => l.gapAbove)
-    .filter((g) => g > 0 && g < medH * 10)
+    .map(l => l.gapAbove)
+    .filter(g => g > 0 && g < medH * 10)
     .sort((a, b) => a - b);
   const medGap = gaps[Math.floor(gaps.length / 2)] || medH * 1.4;
   const paraGap = Math.max(medH * 1.6, medGap * 1.35);
 
   const paragraphs: string[] = [];
-  let cur = '';
+  let cur = "";
   for (const line of lines) {
     const text = line.text.trim();
     if (!text) continue;
@@ -61,13 +64,15 @@ export function reflowLines(lines: RawLine[]): string[] {
     }
   }
   if (cur) paragraphs.push(cur);
-  return paragraphs.map(normalizeParagraph).filter((p) => p.length > 0);
+  return paragraphs.map(normalizeParagraph).filter(p => p.length > 0);
 }
 
 export function normalizeParagraph(p: string): string {
-  let t = p.replace(/[ \t]+/g, ' ').trim();
+  let t = p.replace(/[ \t]+/g, " ").trim();
   // 中英文之间补一个窄空隙感（用普通空格，排版端用 CSS 控制）
-  t = t.replace(/([A-Za-z0-9])([㐀-鿿])/g, '$1 $2').replace(/([㐀-鿿])([A-Za-z0-9])/g, '$1 $2');
+  t = t
+    .replace(/([A-Za-z0-9])([\u3400-\u9fff])/gu, "$1 $2")
+    .replace(/([\u3400-\u9fff])([A-Za-z0-9])/gu, "$1 $2");
   return t;
 }
 

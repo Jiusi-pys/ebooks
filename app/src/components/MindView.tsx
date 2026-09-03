@@ -36,7 +36,7 @@ import {
   removeNode,
   updateNode,
 } from "@/lib/mind";
-import { trpc } from "@/providers/trpc";
+import { trpc } from "@/lib/trpc-client";
 
 interface TopicNode {
   title: string;
@@ -90,6 +90,7 @@ export function MindView({ lib }: { lib: Library }) {
 
   const maps = lib.mindMaps;
   const current = maps.find(m => m.id === selectedMapId) ?? maps[0] ?? null;
+  const currentRef = useRef(current);
   const currentBook = current?.bookId
     ? lib.books.find(b => b.id === current.bookId)
     : undefined;
@@ -111,9 +112,14 @@ export function MindView({ lib }: { lib: Library }) {
   }, [bookId, lib.books]);
 
   useEffect(() => {
-    if (current) {
-      setSelectedNodeId(current.root.id);
-      setDraft(current.root.text);
+    currentRef.current = current;
+  }, [current]);
+
+  useEffect(() => {
+    const selectedMap = currentRef.current;
+    if (selectedMap) {
+      setSelectedNodeId(selectedMap.root.id);
+      setDraft(selectedMap.root.text);
       setError("");
       setFocusNodeId(null);
     }
@@ -121,7 +127,7 @@ export function MindView({ lib }: { lib: Library }) {
 
   useEffect(() => {
     setDraft(selectedNode?.text ?? "");
-  }, [selectedNodeId, current?.id]);
+  }, [selectedNodeId, selectedNode?.text, current?.id]);
 
   const saveMap = useCallback(
     async (map: MindMap, type: "mindmap.created" | "mindmap.updated") => {

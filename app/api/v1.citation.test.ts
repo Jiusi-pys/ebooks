@@ -6,46 +6,71 @@ const state = vi.hoisted(() => ({
   upserted: null as Record<string, unknown> | null,
   updated: null as Record<string, unknown> | null,
   events: [] as Record<string, unknown>[],
+  receiptTable: null as unknown,
 }));
 
 vi.mock("./queries/connection", () => ({
-  getDb: () => ({
-    select: () => {
-      const builder = {
-        from: () => builder,
-        where: () => builder,
-        limit: async (count: number) => state.rows.slice(0, count),
-        then: (
-          resolve: (value: Record<string, unknown>[]) => unknown,
-          reject: (reason: unknown) => unknown
-        ) => Promise.resolve(state.rows).then(resolve, reject),
-      };
-      return builder;
-    },
-    insert: () => ({
-      values: (value: Record<string, unknown>) => {
-        state.inserted = value;
-        return {
-          onDuplicateKeyUpdate: async ({
-            set,
-          }: {
-            set: Record<string, unknown>;
-          }) => {
-            state.upserted = set;
-            return [{ insertId: 1 }];
-          },
+  getDb: () => {
+    const operations = {
+      select: () => {
+        const builder = {
+          from: () => builder,
+          where: () => builder,
+          limit: async (count: number) => state.rows.slice(0, count),
+          then: (
+            resolve: (value: Record<string, unknown>[]) => unknown,
+            reject: (reason: unknown) => unknown
+          ) => Promise.resolve(state.rows).then(resolve, reject),
         };
+        return builder;
       },
-    }),
-    update: () => ({
-      set: (value: Record<string, unknown>) => ({
-        where: async () => {
-          state.updated = value;
+      insert: (table: unknown) => ({
+        ignore: () => ({
+          values: async () => [{ affectedRows: 1 }],
+        }),
+        values: (value: Record<string, unknown>) => {
+          if (table === state.receiptTable) {
+            return Promise.resolve([{ affectedRows: 1 }]);
+          }
+          state.inserted = value;
+          return {
+            onDuplicateKeyUpdate: async ({
+              set,
+            }: {
+              set: Record<string, unknown>;
+            }) => {
+              state.upserted = set;
+              return [{ insertId: 1 }];
+            },
+          };
         },
       }),
-    }),
-    delete: () => ({ where: async () => undefined }),
-  }),
+      update: () => ({
+        set: (value: Record<string, unknown>) => ({
+          where: async () => {
+            state.updated = value;
+          },
+        }),
+      }),
+      delete: () => {
+        const builder = {
+          where: () => builder,
+          limit: async () => undefined,
+          then: (
+            resolve: (value: undefined) => unknown,
+            reject: (reason: unknown) => unknown
+          ) => Promise.resolve(undefined).then(resolve, reject),
+        };
+        return builder;
+      },
+    };
+    return {
+      ...operations,
+      transaction: async <T>(
+        work: (tx: typeof operations) => Promise<T>
+      ): Promise<T> => work(operations),
+    };
+  },
 }));
 
 vi.mock("./lib/openapi-auth", () => ({
@@ -60,8 +85,16 @@ vi.mock("./lib/webhooks", () => ({
   fanout: (event: Record<string, unknown>) => state.events.push(event),
 }));
 
-vi.mock("./lib/codex", () => ({ askCodex: vi.fn() }));
+vi.mock("./lib/codex", () => ({
+  askCodex: vi.fn(),
+  codexAuthController: {
+    status: vi.fn(),
+    startLogin: vi.fn(),
+    logout: vi.fn(),
+  },
+}));
 
+import { mirrorEventReceipts } from "@db/mirror-schema";
 import { v1 } from "./v1";
 
 const storedContentCitation = {
@@ -106,6 +139,7 @@ describe("v1 citation hierarchy persistence", () => {
     state.upserted = null;
     state.updated = null;
     state.events = [];
+    state.receiptTable = mirrorEventReceipts;
   });
 
   it("persists and emits every POST content anchor", async () => {

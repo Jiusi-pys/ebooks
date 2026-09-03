@@ -10,7 +10,7 @@ import {
 } from "./reflow";
 
 const MAX_FILE_BYTES = 64 * 1024 * 1024;
-const MAX_TEXT_CHARACTERS = 12_000_000;
+export const MAX_TEXT_CHARACTERS = 70 * 1024 * 1024;
 const MAX_CHAPTERS = 5_000;
 const MAX_PARAGRAPHS = 250_000;
 const DETECTION_SAMPLE_BYTES = 1024 * 1024;
@@ -31,6 +31,52 @@ const EBOOK_STRUCTURE =
 interface DecodedText {
   text: string;
   encoding: string;
+}
+
+function detectBomlessUtf16(bytes: Uint8Array): "utf-16le" | "utf-16be" | null {
+  if (bytes.byteLength < 8 || bytes.byteLength % 2 !== 0) return null;
+
+  const sampleLength = Math.min(bytes.byteLength, 64 * 1024);
+  const evenSampleLength = sampleLength - (sampleLength % 2);
+  let evenZeros = 0;
+  let oddZeros = 0;
+  let pairs = 0;
+  for (let offset = 0; offset < evenSampleLength; offset += 2) {
+    if (bytes[offset] === 0) evenZeros++;
+    if (bytes[offset + 1] === 0) oddZeros++;
+    pairs++;
+  }
+  if (pairs === 0) return null;
+
+  // ASCII-heavy UTF-16 prose leaves NULs almost exclusively on one byte lane.
+  // Requiring both a strong lane and a weak opposite lane avoids classifying
+  // arbitrary binary data as text. CJK-only UTF-16 uses semantic scoring below.
+  const minimumLaneZeros = Math.max(2, Math.floor(pairs * 0.02));
+  if (oddZeros >= minimumLaneZeros && oddZeros >= evenZeros * 4 + 1) {
+    return "utf-16le";
+  }
+  if (evenZeros >= minimumLaneZeros && evenZeros >= oddZeros * 4 + 1) {
+    return "utf-16be";
+  }
+
+  // A short CJK-only sample may contain few ASCII characters (and therefore
+  // few NUL bytes). Compare both endian interpretations using the same ebook
+  // language/structure signals as the legacy-codepage detector.
+  try {
+    const littleText = new TextDecoder("utf-16le", { fatal: true }).decode(
+      bytes.subarray(0, evenSampleLength)
+    );
+    const bigText = new TextDecoder("utf-16be", { fatal: true }).decode(
+      bytes.subarray(0, evenSampleLength)
+    );
+    const littleScore = scoreLegacyText(littleText, "utf-16le", null);
+    const bigScore = scoreLegacyText(bigText, "utf-16be", null);
+    if (littleScore >= 24 && littleScore - bigScore >= 18) return "utf-16le";
+    if (bigScore >= 24 && bigScore - littleScore >= 18) return "utf-16be";
+  } catch {
+    // Invalid UTF-16 candidates fall through to UTF-8/legacy detection.
+  }
+  return null;
 }
 
 function decodeUtf32(bytes: Uint8Array, littleEndian: boolean): string {
@@ -235,6 +281,14 @@ export function decodeTxtBytes(bytes: Uint8Array): DecodedText {
     };
   }
 
+  const bomlessUtf16 = detectBomlessUtf16(bytes);
+  if (bomlessUtf16) {
+    return {
+      text: new TextDecoder(bomlessUtf16, { fatal: true }).decode(bytes),
+      encoding: bomlessUtf16,
+    };
+  }
+
   try {
     return {
       text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
@@ -433,7 +487,7 @@ export async function parseTxt(
   }
 
   if (decoded.text.length > MAX_TEXT_CHARACTERS) {
-    throw new Error("TXT 解码后超过 1200 万字符，请拆分后再导入");
+    throw new Error("TXT 解码后超过 70 Mi 字符，请拆分后再导入");
   }
 
   const cleaned = decoded.text

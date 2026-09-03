@@ -12,6 +12,7 @@ import {
   timestamp,
   int,
   index,
+  primaryKey,
 } from "drizzle-orm/mysql-core";
 
 /** 书籍镜像：外部 AI 可注册书目 + 章节正文，供问答与检索 */
@@ -35,6 +36,60 @@ export const mirrorBooks = mysqlTable(
 );
 
 export type MirrorBook = typeof mirrorBooks.$inferSelect;
+
+/**
+ * Resumable browser-to-MySQL book mirror upload. Row -1 is the manifest and
+ * rows 0..N-1 are idempotent JSON-text chunks. Completion promotes the staged
+ * payload to mirror_books in one transaction, then removes these rows.
+ */
+export const mirrorBookUploadChunks = mysqlTable(
+  "mirror_book_upload_chunks",
+  {
+    bookExtId: varchar("book_ext_id", { length: 64 }).notNull(),
+    uploadId: varchar("upload_id", { length: 64 }).notNull(),
+    chunkIndex: int("chunk_index").notNull(),
+    chunkCount: int("chunk_count").notNull(),
+    encodedBytes: int("encoded_bytes").notNull(),
+    title: varchar("title", { length: 255 }).notNull().default(""),
+    author: varchar("author", { length: 255 }).notNull().default(""),
+    format: varchar("format", { length: 16 }).notNull().default("unknown"),
+    folder: varchar("folder", { length: 255 }).notNull().default(""),
+    contentHash: varchar("content_hash", { length: 64 }).notNull().default(""),
+    chapterCount: int("chapter_count").notNull().default(0),
+    payload: longtext("payload").notNull(),
+    /** Non-null after the staged payload has been atomically promoted. */
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+  },
+  table => [
+    primaryKey({
+      name: "pk_mirror_book_upload_chunks",
+      columns: [table.bookExtId, table.uploadId, table.chunkIndex],
+    }),
+    index("idx_mirror_book_uploads_updated").on(table.updatedAt),
+  ]
+);
+
+export type MirrorBookUploadChunk = typeof mirrorBookUploadChunks.$inferSelect;
+
+/**
+ * Idempotency receipts for browser mirror events. The receipt and the mirrored
+ * mutation are committed in the same MySQL transaction, so retrying an event
+ * after a lost response cannot repeat its side effect or WebHook fanout.
+ */
+export const mirrorEventReceipts = mysqlTable(
+  "mirror_event_receipts",
+  {
+    deliveryId: varchar("delivery_id", { length: 64 }).primaryKey(),
+    eventType: varchar("event_type", { length: 64 }).notNull(),
+    payloadHash: varchar("payload_hash", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  table => [index("idx_mirror_event_receipts_created").on(table.createdAt)]
+);
+
+export type MirrorEventReceipt = typeof mirrorEventReceipts.$inferSelect;
 
 /** 书摘 / 批注镜像（含 AI 问答记录） */
 export const mirrorHighlights = mysqlTable(

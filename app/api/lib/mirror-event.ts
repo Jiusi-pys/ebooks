@@ -5,6 +5,11 @@ import {
   validateCitationCreate,
 } from "./highlight-citation";
 import { associationDeletedSchema, associationSchema } from "./association";
+import {
+  bookImportChunkSchema,
+  bookImportCompletedSchema,
+  bookImportStartedSchema,
+} from "./book-mirror-upload";
 
 const aiQaSchema = z
   .array(
@@ -158,7 +163,13 @@ export function normalizeReaderMirrorEvent(
                   ? readerNoteUpdatedSchema
                   : type === "note.deleted"
                     ? readerNoteDeletedSchema
-                    : null;
+                    : type === "book.import.started"
+                      ? bookImportStartedSchema
+                      : type === "book.import.chunk"
+                        ? bookImportChunkSchema
+                        : type === "book.import.completed"
+                          ? bookImportCompletedSchema
+                          : null;
   if (!schema) return { success: true, data };
 
   const parsed = schema.safeParse(data);

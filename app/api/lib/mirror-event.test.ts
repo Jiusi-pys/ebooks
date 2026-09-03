@@ -178,4 +178,55 @@ describe("normalizeReaderMirrorEvent", () => {
       }).success
     ).toBe(false);
   });
+
+  it("strictly validates the three internal book upload events", () => {
+    expect(
+      normalizeReaderMirrorEvent("book.import.started", {
+        extId: "book-1",
+        uploadId: "upload-1",
+        chunkCount: 2,
+        encodedBytes: 1024,
+        title: "Large book",
+        author: "",
+        format: "txt",
+        chapterCount: 1,
+      }).success
+    ).toBe(true);
+    expect(
+      normalizeReaderMirrorEvent("book.import.chunk", {
+        extId: "book-1",
+        uploadId: "upload-1",
+        index: 1,
+        chunkCount: 2,
+        payload: "chunk",
+      }).success
+    ).toBe(true);
+    expect(
+      normalizeReaderMirrorEvent("book.import.completed", {
+        extId: "book-1",
+        uploadId: "upload-1",
+        chunkCount: 2,
+        encodedBytes: 1024,
+      }).success
+    ).toBe(true);
+
+    expect(
+      normalizeReaderMirrorEvent("book.import.chunk", {
+        extId: "book-1",
+        uploadId: "upload-1",
+        index: 2,
+        chunkCount: 2,
+        payload: "out-of-range",
+      }).success
+    ).toBe(false);
+    expect(
+      normalizeReaderMirrorEvent("book.import.completed", {
+        extId: "book-1",
+        uploadId: "upload-1",
+        chunkCount: 2,
+        encodedBytes: 1024,
+        unexpected: true,
+      }).success
+    ).toBe(false);
+  });
 });

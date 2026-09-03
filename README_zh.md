@@ -1,0 +1,268 @@
+# 書房（Shufang）
+
+[English](README.md)
+
+書房是一款本地优先的深度阅读与书籍管理 Web 应用，工作流参考 MarginNote 4。它把多格式阅读、划线批注、分级引用、文段关联、学习集、脑图、间隔复习和 AI 伴读整合在同一工作区中。
+
+本项目不是 MarginNote 的逐像素复刻。Apple Pencil 手写、视频时间轴批注、iCloud 同步、原生 OCR 与 Apple 平台扩展不在当前 Web 版本范围内。
+
+## 已实现功能
+
+- 导入 PDF、EPUB、无 DRM 的 MOBI/AZW/AZW3（含 KF8）、FB2 与 TXT。
+- PDF 支持原版与重排阅读、文字划线/批注，以及文档或页面渲染失败后的可见错误与重试。
+- 支持横向、纵向及嵌套分屏，可组成可调尺寸的 2、3、4 窗口；学习集内仅选择该学习集的书，书架阅读默认继续打开当前书。
+- 可排版书籍支持中文/English 同步双语对照阅读。
+- 支持划线、批注、标签、挖空，以及书籍、章节、精确文段三级引用。
+- 可把不同书籍中的精确文段建立单向或双向“关联”，并在关系图中查看。
+- 书架文件夹与逻辑学习集相互独立；文件夹图标、书籍封面、目录和阅读排版均可自定义。
+- 支持可编辑脑图、复习卡片、回忆模式和间隔复习队列。
+- 默认通过本机 ChatGPT 登录调用 Codex，也可在 AI 后台选择 DeepSeek API。
+
+## 架构与数据存储
+
+应用代码位于 [`app/`](app/)：
+
+```text
+app/
+├── src/          React 19 前端、阅读器、Hooks、解析器与 IndexedDB
+├── api/          Hono 服务、tRPC、鉴权、AI 与开放 REST API
+├── contracts/    前后端共享请求及错误契约
+├── db/           Drizzle Schema 与 MySQL 迁移
+├── public/       静态资源及 PDF.js Worker
+└── verifier/     历史验收标准与执行记录
+```
+
+浏览器 IndexedDB 是主存储。PDF 原文件会保留在其中用于原版渲染；可排版格式只保存解析后的章节结构，不保留源文件。启用 MySQL 后，提取出的书目信息、章节正文、批注、关联、译文、脑图及事件回执会镜像到服务端，供 AI 和机器客户端使用。正常浏览器导入流程不会上传原始书籍文件。
+
+## 环境要求
+
+| 依赖      | 要求                                                    |
+| --------- | ------------------------------------------------------- |
+| Node.js   | `20.19+` 或 `22.12+`；推荐 Node 22 LTS 或 Node 24       |
+| npm       | 随 Node.js 安装；仓库已提交锁文件                       |
+| MySQL     | 推荐并已验证 MySQL 8.4                                  |
+| 浏览器    | 支持 IndexedDB 的新版 Chromium、Edge、Firefox 或 Safari |
+| Codex CLI | 可选；使用默认 AI Provider 时必须安装                   |
+
+## 快速启动
+
+克隆仓库并进入应用目录：
+
+```bash
+git clone git@github.com:Jiusi-pys/ebooks.git
+cd ebooks/app
+```
+
+Windows PowerShell 请优先使用 `.cmd` 启动器。即使系统禁止执行 `npm.ps1`，以下命令也无需修改全局执行策略：
+
+```powershell
+npm.cmd ci
+Copy-Item .env.example .env
+```
+
+Linux 或 macOS：
+
+```bash
+npm ci
+cp .env.example .env
+```
+
+完成下方 MySQL 与 `.env` 配置后执行：
+
+```powershell
+# Windows PowerShell
+npm.cmd run db:migrate
+npm.cmd run dev
+```
+
+```bash
+# Linux / macOS
+npm run db:migrate
+npm run dev
+```
+
+访问 <http://127.0.0.1:3000/>，使用 `app/.env` 中的 `APP_ID` 与 `APP_SECRET` 登录。
+
+## MySQL 配置
+
+先使用系统服务管理器启动 MySQL，再以管理员身份连接并创建数据库和专用账户。MySQL 账户的 Host 必须与 `DATABASE_URL` 中的主机一致。
+
+```sql
+CREATE DATABASE shufang
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'shufang'@'127.0.0.1'
+  IDENTIFIED BY '请替换为足够长的随机密码';
+GRANT ALL PRIVILEGES ON shufang.* TO 'shufang'@'127.0.0.1';
+```
+
+为了安全提升较大的正文镜像，需要把 MySQL 的 `max_allowed_packet` 配置为 `256M`。在服务端配置文件的 `[mysqld]` 下加入以下内容，重启 MySQL 后检查生效值：
+
+```ini
+[mysqld]
+max_allowed_packet=256M
+```
+
+```sql
+SHOW VARIABLES LIKE 'max_allowed_packet';
+```
+
+常见配置位置包括 Windows 的 `C:\ProgramData\MySQL\` 下的 `my.ini`、Linux 的 `/etc/mysql/`，以及 macOS Homebrew 的 MySQL 配置目录。服务名和准确路径取决于安装方式。
+
+## 环境变量配置
+
+编辑 `app/.env`，不要提交该文件。数据库密码包含特殊字符时，必须先进行 URL 编码再写入 `DATABASE_URL`。
+
+```dotenv
+APP_ID=reader
+APP_SECRET=请替换为至少32字节的随机值
+HOST=127.0.0.1
+PORT=3000
+PUBLIC_ORIGIN=
+SESSION_TTL_SECONDS=43200
+SESSION_COOKIE_SECURE=false
+OPEN_API_KEY=请使用独立的机器接口密钥
+
+DATABASE_URL=mysql://shufang:编码后的密码@127.0.0.1:3306/shufang
+
+CODEX_BIN=codex
+CODEX_MODEL=gpt-5.6-terra
+CODEX_REASONING_EFFORT=medium
+CODEX_TIMEOUT_MS=180000
+CODEX_LOGIN_TIMEOUT_MS=300000
+
+DEEPSEEK_API_KEY=
+DEEPSEEK_TIMEOUT_MS=180000
+```
+
+可使用以下命令生成合适的 `APP_SECRET`：
+
+```powershell
+# Windows PowerShell
+[Convert]::ToHexString(
+  [Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+).ToLower()
+```
+
+```bash
+# Linux / macOS
+openssl rand -hex 32
+```
+
+| 变量                    | 用途                                                  |
+| ----------------------- | ----------------------------------------------------- |
+| `APP_ID`                | 浏览器本地登录账号；生产模式必填                      |
+| `APP_SECRET`            | 登录密码及 HMAC 会话签名密钥；生产模式必填            |
+| `DATABASE_URL`          | MySQL 连接 URI；生产启动和 Drizzle 命令必填           |
+| `HOST` / `PORT`         | 生产服务监听地址与端口，默认 `127.0.0.1:3000`         |
+| `PUBLIC_ORIGIN`         | TLS 反向代理后的完整外部 Origin，不允许包含路径       |
+| `SESSION_TTL_SECONDS`   | 会话时长，实际范围限制为 300–604800 秒                |
+| `SESSION_COOKIE_SECURE` | 强制会话 Cookie 使用 `Secure` 属性                    |
+| `OPEN_API_KEY`          | `/api/v1/*` 机器客户端密钥；空值时回退到 `APP_SECRET` |
+| `CODEX_*`               | Codex 可执行文件、默认模型/强度和超时时间             |
+| `DEEPSEEK_*`            | 可选的 DeepSeek 密钥和超时时间                        |
+
+单机使用时保持 `HOST=127.0.0.1`。如果 HTTPS 在反向代理处终止，应把 `PUBLIC_ORIGIN` 设置为浏览器实际访问的 Origin，例如 `https://books.example.com`，并启用安全 Cookie。应用不会使用客户端可伪造的 `X-Forwarded-*` 请求头进行同源判断。
+
+## 使用 ChatGPT 登录 Codex（不使用 OpenAI API Key）
+
+请为运行書房服务的同一个系统用户安装 Codex CLI。npm 安装方式可跨 Windows、Linux 和 macOS 使用：
+
+```powershell
+# Windows PowerShell
+npm.cmd install -g @openai/codex
+codex login
+codex login status
+```
+
+```bash
+# Linux / macOS
+npm install -g @openai/codex
+codex login
+codex login status
+```
+
+在浏览器流程中选择 **Sign in with ChatGPT**。无图形界面的主机可使用 `codex login --device-auth`。本项目通过 `codex exec` 复用登录态，只接受 ChatGPT 鉴权；如果检测到 API-key 鉴权会拒绝调用，从而避免 OpenAI API 计费。项目不会复制 `auth.json`，凭据始终由 Codex CLI 自行查找和维护。参见官方 [Codex CLI 指南](https://learn.chatgpt.com/docs/codex/cli)与[鉴权说明](https://learn.chatgpt.com/docs/auth)。
+
+每次阅读请求都会在临时目录中启动短暂、只读的 Codex 会话。Shell、Web、浏览器、插件、记忆等无关工具均被禁用，同时应用/API 密钥不会传入子进程。默认配置为 `gpt-5.6-terra` 与 `medium`，AI 后台可以选择本版本列出的其他模型和思考强度。
+
+## 可选 DeepSeek Provider
+
+DeepSeek 与“不使用 API Key”的 Codex 路径相互独立，会产生 DeepSeek API 计费。可以在服务端设置 `DEEPSEEK_API_KEY`，也可以在 AI 后台临时填写；界面填写的密钥仅保存在浏览器 `sessionStorage`。当前版本提供：
+
+- 模型：`deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-v4-flash-vision-exp`
+- 思考强度：`none`、`low`、`high`、`max`
+
+当前适配器只发送文本消息，即使所选模型名称中包含 `vision` 也不会发送图片。
+
+建议先在 AI 后台点击“测试连接”，再执行翻译、对话、脑图生成或 AI 制卡。
+
+## 生产模式启动
+
+每次部署前先执行数据库迁移，再构建并启动合并后的静态前端与 Hono 服务：
+
+```powershell
+# Windows PowerShell
+npm.cmd run db:migrate
+npm.cmd run build
+npm.cmd run start
+```
+
+```bash
+# Linux / macOS
+npm run db:migrate
+npm run build
+npm run start
+```
+
+`npm run start` 通过 `cross-env` 跨平台设置 `NODE_ENV=production`。生产模式缺少 `APP_ID`、`APP_SECRET` 或 `DATABASE_URL` 时会直接拒绝启动。
+
+### 可选容器构建
+
+镜像不会包含 `.env` 或 Codex 凭据：
+
+```bash
+docker build -t shufang ./app
+docker run --rm --name shufang \
+  -p 127.0.0.1:3000:3000 \
+  --env-file app/.env \
+  -e HOST=0.0.0.0 \
+  shufang
+```
+
+`DATABASE_URL` 必须指向容器能够访问的 MySQL 地址；Docker Desktop 通常可使用 `host.docker.internal`。镜像不会安装 Codex，也不会复制其凭据存储。若要使用 ChatGPT 登录的 Codex，推荐直接使用本机 Node.js 启动；如需容器化，必须在运行时单独提供 CLI 和凭据存储，不能把凭据烘焙进镜像。
+
+## 开放 API
+
+访问 `GET /api/v1/` 可以查看机器可读的接口目录。资源接口要求请求头 `X-API-Key: <OPEN_API_KEY>` 或 `Authorization: Bearer <OPEN_API_KEY>`。当前 API 覆盖书籍与章节、书摘、复习卡、文段关联、笔记、文件夹、译文、脑图、事件和 WebHook。浏览器写入事件时也可使用已签名的应用会话与同源校验。
+
+## 文件支持限制
+
+- PDF、EPUB、MOBI/AZW/AZW3 与 FB2：单文件最多 128 MiB。
+- TXT：单文件最多 64 MiB，并自动识别 UTF-8、UTF-16 与常见中文编码。
+- 超过 600 页的 PDF 仍可使用原版阅读，但不会生成可能缺页的重排副本。
+- 不支持受 DRM 保护的 Kindle 文件与 KFX。
+- 服务端正文镜像的编码后上传上限为 96 MiB，并使用可恢复的分块上传。
+
+## 质量检查
+
+提交前执行：
+
+```bash
+npm run check
+npm test
+npm run lint
+npm run build
+npx drizzle-kit check
+```
+
+Vitest 同时覆盖后端 API 行为和浏览器侧存储、解析工具。贡献规范见 [`AGENTS.md`](AGENTS.md)。
+
+## 常见问题
+
+- **PowerShell 提示禁止运行 `npm.ps1`：** 改用 `npm.cmd` 和 `npx.cmd`，无需修改系统执行策略。
+- **登录页提示未配置鉴权：** 填写 `APP_ID` 与 `APP_SECRET` 后重启服务。
+- **迁移或镜像连接失败：** 检查 MySQL 是否运行、账户 Host 是否匹配 `DATABASE_URL`，并确认密码已经 URL 编码。
+- **Codex 已安装但被拒绝：** 执行 `codex login status`。如果显示 API Key，请先 `codex logout`，再使用 ChatGPT 登录。
+- **经过反向代理的修改请求返回 403：** 配置准确的 HTTPS `PUBLIC_ORIGIN` 并重启書房。
+- **3000 端口被占用：** 停止已有进程，或为生产服务设置其他 `PORT`；开发模式可使用 `npm run dev -- --port 3001`。

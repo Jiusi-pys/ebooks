@@ -1,7 +1,8 @@
 import { CheckSquare, Plus, StickyNote, Trash2 } from "lucide-react";
 import type { Library } from "@/hooks/useLibrary";
 import { formatDate } from "@/lib/covers";
-import { extractLinks, plainExcerpt } from "@/components/MarkdownLite";
+import { extractLinks } from "@/lib/links";
+import { plainExcerpt } from "@/lib/markdown";
 import { BatchAction, BatchBar, SelectDot } from "./BatchBar";
 import { useSelection } from "@/hooks/useSelection";
 

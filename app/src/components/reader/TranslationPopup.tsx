@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Languages, Loader2, X } from "lucide-react";
 import type { ReaderTheme } from "@/types";
-import { trpc } from "@/providers/trpc";
+import { trpc } from "@/lib/trpc-client";
 import { friendlyAiError } from "@/lib/aiError";
 import { useAiConfig } from "@/lib/aiConfig";
 

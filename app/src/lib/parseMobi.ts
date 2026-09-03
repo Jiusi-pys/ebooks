@@ -166,7 +166,10 @@ function parseExthBoundary(
     }
     if (type === 121) {
       if (entryLength < 12) return damagedRecords();
-      boundary = readUint32(bytes, cursor + 8);
+      const parsed = readUint32(bytes, cursor + 8);
+      // EXTH 121 uses UINT32_MAX to explicitly say that this legacy MOBI has
+      // no KF8 companion section. It is a sentinel, not a PalmDB record index.
+      boundary = parsed === 0xffffffff ? undefined : parsed;
     }
     cursor += entryLength;
   }

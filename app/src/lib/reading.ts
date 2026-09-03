@@ -154,6 +154,40 @@ export function readerPagePadding(pageMargin: number): string {
   return `clamp(${PAGE_MARGIN_MIN}px, ${normalizePageMargin(pageMargin)}px, 12%)`;
 }
 
+export interface ReaderChapterEntryPlan {
+  /** Position to apply after the chapter DOM has completed layout. */
+  ratio: number;
+  /** Whether entering this chapter represents an explicit navigation. */
+  persist: boolean;
+}
+
+/**
+ * Reopening a book resumes its saved intra-chapter position. Moving to a
+ * chapter explicitly (or changing chapter in an already mounted reader)
+ * starts that chapter at the top and persists the reset.
+ */
+export function planReaderChapterEntry(
+  previousChapterId: string | null,
+  chapterId: string,
+  savedProgress: Book["progress"],
+  explicitInitialTarget: boolean
+): ReaderChapterEntryPlan {
+  const isInitialEntry = previousChapterId === null;
+  if (
+    isInitialEntry &&
+    !explicitInitialTarget &&
+    savedProgress.chapterId === chapterId
+  ) {
+    return {
+      ratio: Number.isFinite(savedProgress.ratio)
+        ? Math.min(1, Math.max(0, savedProgress.ratio))
+        : 0,
+      persist: false,
+    };
+  }
+  return { ratio: 0, persist: true };
+}
+
 export function loadTypeSettings(
   storage: Pick<TypeSettingsStorage, "getItem"> = localStorage
 ): TypeSettings {

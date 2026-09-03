@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PanelLeftOpen } from "lucide-react";
+import { AlertTriangle, PanelLeftOpen, RefreshCw } from "lucide-react";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -22,8 +22,54 @@ import { MindView } from "@/components/MindView";
 import { ReviewView } from "@/components/ReviewView";
 import { StudySetView } from "@/components/StudySetView";
 import { ImportTray } from "@/components/ImportTray";
+import { LoginView } from "@/components/LoginView";
+import { useAppSession } from "@/lib/appAuth";
 
 export default function App() {
+  const auth = useAppSession();
+
+  if (auth.loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="font-reading text-[40px] font-bold tracking-[0.2em] text-foreground">
+            書房
+          </div>
+          <div className="font-meta mt-3 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+            Verifying your session…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!auth.session?.authenticated || !auth.session.user) {
+    return (
+      <LoginView
+        configured={auth.session?.configured ?? Boolean(auth.error)}
+        serverError={auth.error}
+        onLogin={auth.login}
+        onRetry={auth.refresh}
+      />
+    );
+  }
+
+  return (
+    <WorkspaceApp
+      key={auth.session.user.id}
+      userId={auth.session.user.id}
+      onLogout={auth.logout}
+    />
+  );
+}
+
+function WorkspaceApp({
+  userId,
+  onLogout,
+}: {
+  userId: string;
+  onLogout: () => Promise<void>;
+}) {
   const lib = useLibrary();
   const isMobile = useIsMobile();
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>(() =>
@@ -92,15 +138,40 @@ export default function App() {
   }, [cancelSidebarClose]);
 
   if (!lib.ready) {
+    const initializationMessage =
+      lib.initializationError || lib.databaseIssue?.message;
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <div className="text-center">
           <div className="font-reading text-[40px] font-bold tracking-[0.2em] text-foreground">
             書房
           </div>
-          <div className="font-meta mt-3 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-            Loading your library…
-          </div>
+          {initializationMessage ? (
+            <div className="mx-auto mt-6 max-w-md rounded-[18px] border border-destructive/20 bg-card p-5 text-left shadow-lg">
+              <p className="flex items-center gap-2 text-sm font-medium text-destructive">
+                <AlertTriangle size={16} /> 无法打开本地书库
+              </p>
+              <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                {initializationMessage}
+              </p>
+              {lib.databaseIssue?.kind === "upgrade-blocked" && (
+                <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                  请关闭其他仍打开书房的标签页，再重试数据库升级。
+                </p>
+              )}
+              <button
+                type="button"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-[12px] bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
+                onClick={lib.retryInitialization}
+              >
+                <RefreshCw size={13} /> 重试
+              </button>
+            </div>
+          ) : (
+            <div className="font-meta mt-3 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+              Loading your library…
+            </div>
+          )}
         </div>
       </div>
     );
@@ -118,6 +189,23 @@ export default function App() {
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden bg-background text-foreground">
+      {lib.databaseIssue && (
+        <div
+          role="status"
+          className="fixed left-1/2 top-3 z-[70] flex -translate-x-1/2 items-center gap-2 rounded-[14px] border border-amber-500/25 bg-card/95 px-3 py-2 text-xs shadow-lg backdrop-blur"
+        >
+          <AlertTriangle size={14} className="text-amber-600" />
+          <span>{lib.databaseIssue.message}</span>
+          <button
+            type="button"
+            className="app-icon-button h-7 w-7"
+            onClick={lib.retryInitialization}
+            aria-label="重新连接本地书库"
+          >
+            <RefreshCw size={12} />
+          </button>
+        </div>
+      )}
       {isMobile && sidebarOpen && (
         <button
           type="button"
@@ -128,6 +216,7 @@ export default function App() {
       )}
       <Sidebar
         lib={lib}
+        userId={userId}
         mode={sidebarMode}
         open={sidebarOpen}
         floating={!sidebarPinned}
@@ -137,6 +226,7 @@ export default function App() {
         onRequestClose={closeTransientSidebar}
         onInteractionStart={cancelSidebarClose}
         onInteractionEnd={isMobile ? cancelSidebarClose : scheduleSidebarClose}
+        onLogout={onLogout}
       />
       {!sidebarOpen && (
         <>

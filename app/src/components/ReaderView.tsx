@@ -37,6 +37,7 @@ import {
   fontStack,
   loadTypeSettings,
   locateHighlight,
+  planReaderChapterEntry,
   readerPagePadding,
   saveTypeSettings,
   swatch,
@@ -147,6 +148,7 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     useState<AssociationPopupState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const activeChapterRef = useRef<string | null>(null);
 
   const theme = themeById(type.themeId);
   /** 原版 PDF 版面模式（保留排版逐页阅读） */
@@ -256,13 +258,36 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
 
   useEffect(() => saveTypeSettings(type), [type]);
 
-  // 切章：回顶部 + 记录进度
+  // 首次打开恢复章内进度；只有明确切章时才回到顶部并记录重置。
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 });
+    if (!chapter) return;
+    const plan = planReaderChapterEntry(
+      activeChapterRef.current,
+      chapter.id,
+      book.progress,
+      activeChapterRef.current === null && Boolean(lib.route.chapterId)
+    );
+    activeChapterRef.current = chapter.id;
     setSel(null);
     setHlPopup(null);
     setPdfCitationPopup(null);
-    if (chapter) lib.saveProgress(book.id, chapter.id, 0);
+    let secondFrame: number | null = null;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        const container = scrollRef.current;
+        if (!container) return;
+        const max = Math.max(
+          0,
+          container.scrollHeight - container.clientHeight
+        );
+        container.scrollTo({ top: max * plan.ratio });
+      });
+    });
+    if (plan.persist) void lib.saveProgress(book.id, chapter.id, 0);
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame !== null) cancelAnimationFrame(secondFrame);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter?.id]);
 
@@ -426,6 +451,20 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
       );
     }, 400);
   }, [book.id, chapter, lib]);
+
+  useEffect(
+    () => () => {
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      if (pdfSaveTimer.current) window.clearTimeout(pdfSaveTimer.current);
+    },
+    [chapter?.id]
+  );
+
+  const onBilingualProgress = useCallback(
+    (progressChapterId: string, ratio: number) =>
+      lib.saveProgress(book.id, progressChapterId, ratio),
+    [book.id, lib]
+  );
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -1516,9 +1555,7 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                     );
                     if (index >= 0) gotoChapter(index);
                   }}
-                  onProgress={(progressChapterId, ratio) =>
-                    lib.saveProgress(book.id, progressChapterId, ratio)
-                  }
+                  onProgress={onBilingualProgress}
                   className="flex-1"
                 />
               ) : (

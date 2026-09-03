@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BookOpen, CheckCircle2, GraduationCap, RotateCcw } from "lucide-react";
 import type { Library } from "@/hooks/useLibrary";
 import type { Highlight } from "@/types";
@@ -27,6 +27,12 @@ export function ReviewView({ lib }: { lib: Library }) {
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [doneCount, setDoneCount] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   /** 从学习集进入时，只复习该独立学习集所选书籍的卡片。 */
   const studySetFilter = useMemo(() => {
@@ -51,12 +57,12 @@ export function ReviewView({ lib }: { lib: Library }) {
   );
   const deckCards =
     deck === "all" ? reviewCards : reviewCards.filter(h => h.bookId === deck);
-  const due = dueCards(deckCards);
+  const due = dueCards(deckCards, now);
   const upcoming = deckCards
-    .filter(h => h.review && h.review.due > Date.now())
+    .filter(h => h.review && h.review.due > now)
     .sort((a, b) => a.review!.due - b.review!.due);
 
-  const todayStart = new Date();
+  const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
   const todayReviewed = reviewCards.filter(
     h =>
@@ -170,7 +176,7 @@ export function ReviewView({ lib }: { lib: Library }) {
                 <div className="font-meta mt-1 text-[11px] text-muted-foreground">
                   {due.length > 0 ? `${due.length} 张已到期` : "没有到期卡片"}
                   {upcoming.length > 0 &&
-                    ` · 下一张 ${formatDue(upcoming[0].review!.due)}`}
+                    ` · 下一张 ${formatDue(upcoming[0].review!.due, now)}`}
                 </div>
               </div>
               <button
@@ -195,7 +201,7 @@ export function ReviewView({ lib }: { lib: Library }) {
                       className="flex w-full items-center gap-3 rounded-md bg-card p-3 text-left shadow-sm hover:opacity-80"
                     >
                       <span className="font-meta w-16 shrink-0 text-[10.5px] text-primary">
-                        {formatDue(h.review!.due)}
+                        {formatDue(h.review!.due, now)}
                       </span>
                       <span className="font-reading flex-1 truncate text-[13px]">
                         {h.text}

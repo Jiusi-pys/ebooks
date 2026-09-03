@@ -31,6 +31,16 @@ export const DEFAULT_AI_CONFIG: AiConfig = {
   effort: "medium",
 };
 
+export function defaultAiConfigFor(provider: AiProviderId): AiConfig {
+  if (provider === DEFAULT_AI_CONFIG.provider) return { ...DEFAULT_AI_CONFIG };
+  const options = AI_PROVIDERS[provider];
+  return {
+    provider,
+    model: options.models[0],
+    effort: options.efforts[0],
+  };
+}
+
 export function loadAiConfig(): AiConfig {
   if (typeof window === "undefined") return DEFAULT_AI_CONFIG;
   try {
@@ -40,14 +50,15 @@ export function loadAiConfig(): AiConfig {
     const provider =
       saved.provider && AI_PROVIDERS[saved.provider] ? saved.provider : "codex";
     const options = AI_PROVIDERS[provider];
+    const defaults = defaultAiConfigFor(provider);
     const model =
       saved.model && options.models.includes(saved.model)
         ? saved.model
-        : options.models[0];
+        : defaults.model;
     const effort =
       saved.effort && options.efforts.includes(saved.effort)
         ? saved.effort
-        : options.efforts[0];
+        : defaults.effort;
     return {
       provider,
       model,

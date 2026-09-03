@@ -123,7 +123,8 @@ async function flattenOutline(
 
 export async function parsePdf(
   file: File,
-  onProgress?: (stage: string, ratio: number) => void
+  onProgress?: (stage: string, ratio: number) => void,
+  mode: "reflow" | "original" = "reflow"
 ): Promise<ParsedBook> {
   assertPdfFileSize(file.size);
   const data = await file.arrayBuffer();
@@ -145,6 +146,11 @@ export async function parsePdf(
     }
 
     const cover = await renderCover(await doc.getPage(1));
+
+    if (mode === "original") {
+      onProgress?.("完成原版 PDF 导入", 1);
+      return { title, author, cover, pageCount, chapters: [] };
+    }
 
     // A partial text copy is worse than an explicit original-only import:
     // navigation/search must never claim success while omitting later pages.

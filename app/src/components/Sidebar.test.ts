@@ -20,6 +20,7 @@ function renderSidebar(mode: SidebarMode, mobile = false) {
   return renderToStaticMarkup(
     createElement(Sidebar, {
       lib,
+      userId: "local-reader",
       mode,
       open: true,
       floating: mode === "auto" || mobile,
@@ -29,6 +30,7 @@ function renderSidebar(mode: SidebarMode, mobile = false) {
       onRequestClose: vi.fn(),
       onInteractionStart: vi.fn(),
       onInteractionEnd: vi.fn(),
+      onLogout: vi.fn(async () => undefined),
     })
   );
 }

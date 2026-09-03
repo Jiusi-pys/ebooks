@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decodeTxtBytes, parseTxt } from "./parseTxt";
+import { decodeTxtBytes, MAX_TEXT_CHARACTERS, parseTxt } from "./parseTxt";
 
 function fakeFile(name: string, bytes: Uint8Array, size = bytes.byteLength) {
   return {
@@ -21,6 +21,15 @@ function utf16LeBom(text: string): Uint8Array {
   const view = new DataView(bytes.buffer);
   for (let i = 0; i < text.length; i++) {
     view.setUint16(2 + i * 2, text.charCodeAt(i), true);
+  }
+  return bytes;
+}
+
+function utf16WithoutBom(text: string, littleEndian: boolean): Uint8Array {
+  const bytes = new Uint8Array(text.length * 2);
+  const view = new DataView(bytes.buffer);
+  for (let i = 0; i < text.length; i++) {
+    view.setUint16(i * 2, text.charCodeAt(i), littleEndian);
   }
   return bytes;
 }
@@ -49,6 +58,10 @@ const SHORT_BIG5 = new Uint8Array([
 ]);
 
 describe("parseTxt", () => {
+  it("keeps the decoded-text budget above the supported 64 MiB file size", () => {
+    expect(MAX_TEXT_CHARACTERS).toBeGreaterThan(64 * 1024 * 1024);
+  });
+
   it("提取元数据并按标题切分章节", async () => {
     const text = [
       "书名：测试小说",
@@ -86,6 +99,35 @@ describe("parseTxt", () => {
       title: "序章",
       paragraphs: ["正文内容。"],
     });
+  });
+
+  it.each([
+    ["utf-16le", true],
+    ["utf-16be", false],
+  ] as const)("支持无 BOM 的 %s", async (encoding, littleEndian) => {
+    const bytes = utf16WithoutBom(
+      "书名：无 BOM 编码\n作者：王五\n\n第一章\n正文内容。",
+      littleEndian
+    );
+
+    expect(decodeTxtBytes(bytes)).toMatchObject({
+      encoding,
+      text: expect.stringContaining("无 BOM 编码"),
+    });
+    const parsed = await parseTxt(fakeFile(`${encoding}.txt`, bytes));
+    expect(parsed).toMatchObject({ title: "无 BOM 编码", author: "王五" });
+    expect(parsed.chapters[0].paragraphs).toEqual(["正文内容。"]);
+  });
+
+  it.each([
+    ["utf-16le", true],
+    ["utf-16be", false],
+  ] as const)("可从纯 CJK 单行识别无 BOM 的 %s", (encoding, littleEndian) => {
+    const bytes = utf16WithoutBom(
+      "书名：编码测试作者：张三第一章正文内容。",
+      littleEndian
+    );
+    expect(decodeTxtBytes(bytes)).toMatchObject({ encoding });
   });
 
   it("正确识别并解码 GB18030 真实字节", async () => {

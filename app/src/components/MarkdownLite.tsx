@@ -1,5 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
-import { extractLinks } from '@/lib/links';
+import { useMemo, type ReactNode } from "react";
 
 interface Props {
   content: string;
@@ -13,7 +12,7 @@ interface Props {
 function renderInline(
   text: string,
   existingTitles: Set<string>,
-  onOpenTitle: (t: string) => void,
+  onOpenTitle: (t: string) => void
 ): ReactNode[] {
   const out: ReactNode[] = [];
   const re = /(\[\[[^\]\n]{1,60}\]\]|\*\*[^*\n]+\*\*)/g;
@@ -23,21 +22,21 @@ function renderInline(
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index));
     const tok = m[0];
-    if (tok.startsWith('[[')) {
+    if (tok.startsWith("[[")) {
       const target = tok.slice(2, -2).trim();
       const exists = existingTitles.has(target.toLowerCase());
       out.push(
         <a
           key={k++}
-          className={`wikilink${exists ? '' : ' wikilink-missing'}`}
-          onClick={(e) => {
+          className={`wikilink${exists ? "" : " wikilink-missing"}`}
+          onClick={e => {
             e.stopPropagation();
             onOpenTitle(target);
           }}
           title={exists ? `打开「${target}」` : `创建笔记「${target}」`}
         >
           {target}
-        </a>,
+        </a>
       );
     } else {
       out.push(<strong key={k++}>{tok.slice(2, -2)}</strong>);
@@ -48,9 +47,14 @@ function renderInline(
   return out;
 }
 
-export function MarkdownLite({ content, existingTitles, onOpenTitle, compact }: Props) {
+export function MarkdownLite({
+  content,
+  existingTitles,
+  onOpenTitle,
+  compact,
+}: Props) {
   const blocks = useMemo(() => {
-    const lines = content.split('\n');
+    const lines = content.split("\n");
     const out: ReactNode[] = [];
     let list: { ordered: boolean; items: string[] } | null = null;
     const flushList = (key: number) => {
@@ -59,7 +63,11 @@ export function MarkdownLite({ content, existingTitles, onOpenTitle, compact }: 
         <li key={i}>{renderInline(it, existingTitles, onOpenTitle)}</li>
       ));
       out.push(
-        list.ordered ? <ol key={`l${key}`}>{items}</ol> : <ul key={`l${key}`}>{items}</ul>,
+        list.ordered ? (
+          <ol key={`l${key}`}>{items}</ol>
+        ) : (
+          <ul key={`l${key}`}>{items}</ul>
+        )
       );
       list = null;
     };
@@ -79,16 +87,28 @@ export function MarkdownLite({ content, existingTitles, onOpenTitle, compact }: 
       }
       flushList(i);
       if (!line.trim()) return;
-      if (line.startsWith('## ')) {
-        out.push(<h2 key={i}>{renderInline(line.slice(3), existingTitles, onOpenTitle)}</h2>);
-      } else if (line.startsWith('# ')) {
-        out.push(<h1 key={i}>{renderInline(line.slice(2), existingTitles, onOpenTitle)}</h1>);
-      } else if (line.startsWith('> ')) {
+      if (line.startsWith("## ")) {
         out.push(
-          <blockquote key={i}>{renderInline(line.slice(2), existingTitles, onOpenTitle)}</blockquote>,
+          <h2 key={i}>
+            {renderInline(line.slice(3), existingTitles, onOpenTitle)}
+          </h2>
+        );
+      } else if (line.startsWith("# ")) {
+        out.push(
+          <h1 key={i}>
+            {renderInline(line.slice(2), existingTitles, onOpenTitle)}
+          </h1>
+        );
+      } else if (line.startsWith("> ")) {
+        out.push(
+          <blockquote key={i}>
+            {renderInline(line.slice(2), existingTitles, onOpenTitle)}
+          </blockquote>
         );
       } else {
-        out.push(<p key={i}>{renderInline(line, existingTitles, onOpenTitle)}</p>);
+        out.push(
+          <p key={i}>{renderInline(line, existingTitles, onOpenTitle)}</p>
+        );
       }
     });
     flushList(lines.length);
@@ -96,20 +116,11 @@ export function MarkdownLite({ content, existingTitles, onOpenTitle, compact }: 
   }, [content, existingTitles, onOpenTitle]);
 
   if (compact) {
-    return <div className="note-render text-sm leading-7 line-clamp-6 overflow-hidden">{blocks}</div>;
+    return (
+      <div className="note-render text-sm leading-7 line-clamp-6 overflow-hidden">
+        {blocks}
+      </div>
+    );
   }
   return <div className="note-render">{blocks}</div>;
 }
-
-/** 纯文本摘要（用于列表预览） */
-export function plainExcerpt(content: string, max = 90): string {
-  const t = content
-    .replace(/^#+\s+/gm, '')
-    .replace(/\[\[([^\]]+)\]\]/g, '$1')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return t.length > max ? t.slice(0, max) + '…' : t;
-}
-
-export { extractLinks };

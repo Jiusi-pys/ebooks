@@ -4,6 +4,7 @@ import type {
   AssociationDirection,
   Book,
   Folder,
+  FolderIconKey,
   Highlight,
   MindMap,
   Note,
@@ -27,9 +28,17 @@ import {
   getAllMindMaps,
   getAllNotes,
   getAllStudySets,
+  getDatabaseConnectionIssue,
   getFile,
   getHighlights,
-  putBook,
+  patchBookFolder,
+  patchBookOutline,
+  patchBookProgress,
+  patchBookCustomCover,
+  patchBookReaderMode,
+  patchBookTitle,
+  patchFolderIcon,
+  patchFolderName,
   putAssociation,
   putFolder,
   putHighlight,
@@ -37,6 +46,8 @@ import {
   putMindMap,
   putNote,
   putStudySet,
+  subscribeDatabaseConnectionIssue,
+  type DatabaseConnectionIssue,
   type StoredFile,
   uid,
 } from "@/lib/db";
@@ -45,6 +56,7 @@ import { parseBookFile } from "@/lib/parseBook";
 import { toneForTitle } from "@/lib/covers";
 import { seedIfEmpty } from "@/lib/seed";
 import { emitEvent } from "@/lib/events";
+import { mirrorImportTrayProgress, syncBookMirror } from "@/lib/mirrorSync";
 import { selectImportedPdfMode } from "@/lib/pdfReaderState";
 import {
   citationDescriptorForHighlight,
@@ -118,6 +130,10 @@ function citationNoteUpdates(
 
 export function useLibrary() {
   const [ready, setReady] = useState(false);
+  const [startupError, setStartupError] = useState<string | null>(null);
+  const [databaseIssue, setDatabaseIssue] =
+    useState<DatabaseConnectionIssue | null>(getDatabaseConnectionIssue);
+  const [initializationAttempt, setInitializationAttempt] = useState(0);
   const [books, setBooks] = useState<Book[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -147,13 +163,41 @@ export function useLibrary() {
     setStudySets(s);
   }, []);
 
+  useEffect(
+    () =>
+      subscribeDatabaseConnectionIssue(issue => {
+        setDatabaseIssue(issue);
+        if (issue) setReady(false);
+      }),
+    []
+  );
+
   useEffect(() => {
-    (async () => {
-      await seedIfEmpty();
-      await reload();
-      setReady(true);
+    let cancelled = false;
+    void (async () => {
+      try {
+        await seedIfEmpty();
+        await reload();
+        if (!cancelled) setReady(true);
+      } catch (reason) {
+        if (cancelled) return;
+        setStartupError(
+          reason instanceof Error
+            ? `本地书库初始化失败：${reason.message}`
+            : "本地书库初始化失败，请重新加载后再试。"
+        );
+      }
     })();
-  }, [reload]);
+    return () => {
+      cancelled = true;
+    };
+  }, [initializationAttempt, reload]);
+
+  const retryInitialization = useCallback(() => {
+    setReady(false);
+    setStartupError(null);
+    setInitializationAttempt(attempt => attempt + 1);
+  }, []);
 
   const navigate = useCallback((r: Route) => setRoute(r), []);
 
@@ -191,8 +235,10 @@ export function useLibrary() {
             setImports(s =>
               s.map(t => (t.id === taskId ? { ...t, stage, ratio } : t))
             );
-          const parsed = await parseBookFile(file, format, onProgress);
           const requestedPdfMode = pdfModes?.get(file) ?? "reflow";
+          const parsed = await parseBookFile(file, format, onProgress, {
+            pdfMode: requestedPdfMode,
+          });
           const readerMode =
             format === "pdf"
               ? selectImportedPdfMode(requestedPdfMode, parsed.chapters)
@@ -229,17 +275,48 @@ export function useLibrary() {
           }
           // 书目与原始 PDF 同一事务提交，失败时不会遗留孤儿文件。
           await putImportedBook(book, sourceFile);
-          emitEvent("book.imported", {
-            extId: book.id,
-            title: book.title,
-            author: book.author,
-            format: book.format,
-            chapters: book.chapters.map(c => ({
-              id: c.id,
-              title: c.title,
-              paragraphs: c.paragraphs,
-            })),
-          });
+          try {
+            await syncBookMirror(
+              {
+                extId: book.id,
+                title: book.title,
+                author: book.author,
+                format: book.format,
+                folder: book.folderId,
+                contentHash: book.contentHash,
+                chapters: book.chapters,
+              },
+              {
+                onProgress: progress => {
+                  const trayProgress = mirrorImportTrayProgress(progress);
+                  setImports(current =>
+                    current.map(task =>
+                      task.id === taskId ? { ...task, ...trayProgress } : task
+                    )
+                  );
+                },
+              }
+            );
+          } catch (mirrorError) {
+            const detail =
+              mirrorError instanceof Error
+                ? mirrorError.message
+                : "未知镜像错误";
+            setImports(current =>
+              current.map(task =>
+                task.id === taskId
+                  ? {
+                      ...task,
+                      stage: "本地已保存，镜像失败",
+                      ratio: 1,
+                      status: "error",
+                      error: `本地已保存，镜像失败：${detail}`,
+                    }
+                  : task
+              )
+            );
+            continue;
+          }
           setImports(s =>
             s.map(t =>
               t.id === taskId
@@ -279,9 +356,15 @@ export function useLibrary() {
         const f = await getFile(bookId);
         if (!f) return false;
       }
-      const updated: Book = { ...book, readerMode: mode };
-      await putBook(updated);
-      setBooks(s => s.map(b => (b.id === bookId ? updated : b)));
+      const updated = await patchBookReaderMode(bookId, mode);
+      if (!updated) return false;
+      setBooks(current =>
+        current.map(item =>
+          item.id === bookId
+            ? { ...item, readerMode: updated.readerMode }
+            : item
+        )
+      );
       return true;
     },
     [books]
@@ -297,13 +380,17 @@ export function useLibrary() {
 
   const saveProgress = useCallback(
     async (bookId: string, chapterId: string, ratio: number) => {
-      const book = books.find(b => b.id === bookId);
-      if (!book) return;
-      const updated = { ...book, progress: { chapterId, ratio } };
-      await putBook(updated);
-      setBooks(s => s.map(b => (b.id === bookId ? updated : b)));
+      const updated = await patchBookProgress(bookId, chapterId, ratio);
+      if (!updated) return;
+      // Merge just the field we own. A concurrent outline/cover edit may have
+      // already reached React state after this IndexedDB transaction began.
+      setBooks(current =>
+        current.map(book =>
+          book.id === bookId ? { ...book, progress: updated.progress } : book
+        )
+      );
     },
-    [books]
+    []
   );
 
   const createNote = useCallback(
@@ -438,7 +525,6 @@ export function useLibrary() {
         (content, descriptors) =>
           renameCitationBookTitles(content, descriptors, t)
       );
-      const updated = { ...book, title: t };
       // Persist generated blocks before changing the title used to identify
       // them. Hand-written wiki-links are intentionally not rewritten.
       await Promise.all(updatedNotes.map(putNote));
@@ -448,7 +534,8 @@ export function useLibrary() {
           title: note.title,
           content: note.content,
         });
-      await putBook(updated);
+      const updated = await patchBookTitle(id, t);
+      if (!updated) return;
       setNotes(current => {
         const replacements = new Map(updatedNotes.map(note => [note.id, note]));
         return current
@@ -456,34 +543,53 @@ export function useLibrary() {
           .sort((a, b) => b.updatedAt - a.updatedAt);
       });
       setBooks(current =>
-        current.map(item => (item.id === id ? updated : item))
+        current.map(item =>
+          item.id === id ? { ...item, title: updated.title } : item
+        )
       );
     },
     [books, highlights, notes]
   );
 
+  const setBookCustomCover = useCallback(
+    async (id: string, dataUrl?: string) => {
+      const updated = await patchBookCustomCover(id, dataUrl);
+      if (!updated) return;
+      setBooks(current =>
+        current.map(book =>
+          book.id === id ? { ...book, customCover: updated.customCover } : book
+        )
+      );
+    },
+    []
+  );
+
   const updateBookOutline = useCallback(
     async (id: string, outline: OutlineItem[]) => {
-      setBooks(current => {
-        const book = current.find(item => item.id === id);
-        if (!book) return current;
-        const updated = { ...book, outline };
-        void putBook(updated);
-        return current.map(item => (item.id === id ? updated : item));
-      });
+      const updated = await patchBookOutline(id, outline);
+      if (!updated) return;
+      setBooks(current =>
+        current.map(item =>
+          item.id === id ? { ...item, outline: updated.outline } : item
+        )
+      );
     },
     []
   );
 
   const moveBook = useCallback(
     async (id: string, folderId: string | undefined) => {
-      setBooks(s => {
-        const book = s.find(b => b.id === id);
-        if (!book) return s;
-        const updated = { ...book, folderId };
-        void putBook(updated);
-        return s.map(b => (b.id === id ? updated : b));
-      });
+      const updated = await patchBookFolder(id, folderId);
+      if (!updated) return;
+      setBooks(current =>
+        current.map(item => {
+          if (item.id !== id) return item;
+          const next = { ...item };
+          if (updated.folderId) next.folderId = updated.folderId;
+          else delete next.folderId;
+          return next;
+        })
+      );
     },
     []
   );
@@ -502,13 +608,23 @@ export function useLibrary() {
   const renameFolder = useCallback(async (id: string, name: string) => {
     const t = name.trim();
     if (!t) return;
-    setFolders(s => {
-      const f = s.find(x => x.id === id);
-      if (!f) return s;
-      const updated = { ...f, name: t };
-      void putFolder(updated);
-      return s.map(x => (x.id === id ? updated : x));
-    });
+    const updated = await patchFolderName(id, t);
+    if (!updated) return;
+    setFolders(current =>
+      current.map(folder =>
+        folder.id === id ? { ...folder, name: updated.name } : folder
+      )
+    );
+  }, []);
+
+  const setFolderIcon = useCallback(async (id: string, icon: FolderIconKey) => {
+    const updated = await patchFolderIcon(id, icon);
+    if (!updated) return;
+    setFolders(current =>
+      current.map(folder =>
+        folder.id === id ? { ...folder, icon: updated.icon } : folder
+      )
+    );
   }, []);
 
   const removeFolder = useCallback(
@@ -775,6 +891,9 @@ export function useLibrary() {
 
   return {
     ready,
+    initializationError: startupError ?? databaseIssue?.message ?? null,
+    databaseIssue,
+    retryInitialization,
     books,
     notes,
     highlights,
@@ -796,10 +915,12 @@ export function useLibrary() {
     removeNote,
     removeBook,
     renameBook,
+    setBookCustomCover,
     updateBookOutline,
     moveBook,
     createFolder,
     renameFolder,
+    setFolderIcon,
     removeFolder,
     createStudySet,
     saveStudySet,
