@@ -14,6 +14,14 @@ export function getBookOutline(book: Book): OutlineItem[] {
   ).map(item => ({ ...item }));
 }
 
+/**
+ * Imported chapter entries use a deterministic id. Everything else in the
+ * editable outline was created by the reader and may be removed.
+ */
+export function isUserOutlineItem(book: Book, item: OutlineItem): boolean {
+  return !book.chapters.some(chapter => item.id === `chapter:${chapter.id}`);
+}
+
 function subtreeEnd(items: OutlineItem[], index: number) {
   const depth = items[index].depth;
   let end = index + 1;
@@ -47,6 +55,20 @@ export function removeOutlineItem(
         ? { ...item, depth: Math.max(0, item.depth - 1) }
         : item
     );
+}
+
+/**
+ * Remove only a reader-created entry. Children are promoted one level instead
+ * of being discarded, so their chapter/paragraph navigation anchors survive.
+ */
+export function removeUserOutlineItem(
+  book: Book,
+  items: OutlineItem[],
+  id: string
+): OutlineItem[] {
+  const item = items.find(candidate => candidate.id === id);
+  if (!item || !isUserOutlineItem(book, item)) return items;
+  return removeOutlineItem(items, id);
 }
 
 export function changeOutlineDepth(

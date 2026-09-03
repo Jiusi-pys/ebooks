@@ -1,4 +1,4 @@
-import * as pdfjs from 'pdfjs-dist';
+import * as pdfjs from "pdfjs-dist";
 
 /**
  * worker 走 public/ 下的固定路径：
@@ -8,5 +8,15 @@ import * as pdfjs from 'pdfjs-dist';
  * 开发与生产环境都是同源稳定路径。
  */
 pdfjs.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`;
+
+/** Shared loading-task factory for text extraction and canvas rendering. */
+export function openPdfDocument(data: ArrayBuffer | Uint8Array) {
+  return pdfjs.getDocument({
+    data,
+    // Let PDF.js downsample oversized images to this canvas-memory budget.
+    // `maxImageSize` is intentionally omitted because it drops high-DPI scans.
+    canvasMaxAreaInBytes: 64 * 1024 * 1024,
+  });
+}
 
 export { pdfjs };

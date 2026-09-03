@@ -1,29 +1,46 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, CornerLeftUp, Eye, Link2, Quote, Trash2 } from 'lucide-react';
-import type { Library } from '@/hooks/useLibrary';
-import type { Note } from '@/types';
-import { computeBacklinks, extractLinks } from '@/lib/links';
-import { MarkdownLite } from './MarkdownLite';
-import { formatDate } from '@/lib/covers';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  CornerLeftUp,
+  Eye,
+  Link2,
+  Quote,
+  Trash2,
+  Unlink,
+} from "lucide-react";
+import type { Library } from "@/hooks/useLibrary";
+import type { Note } from "@/types";
+import { computeBacklinks, extractLinks } from "@/lib/links";
+import { MarkdownLite } from "./MarkdownLite";
+import { formatDate } from "@/lib/covers";
+import {
+  citationDescriptorForHighlight,
+  citationLevelOf,
+  removeCitationBlock,
+} from "@/lib/citations";
 
 interface Suggestion {
   label: string;
-  kind: 'book' | 'note' | 'new';
+  kind: "book" | "note" | "new";
 }
 
 export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [preview, setPreview] = useState(false);
-  const [sug, setSug] = useState<{ query: string; items: Suggestion[]; active: number } | null>(null);
+  const [sug, setSug] = useState<{
+    query: string;
+    items: Suggestion[];
+    active: number;
+  } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const saveTimer = useRef<number | null>(null);
   const dirty = useRef(false);
 
   const existingTitles = useMemo(() => {
     const s = new Set<string>();
-    lib.books.forEach((b) => s.add(b.title.toLowerCase()));
-    lib.notes.forEach((n) => s.add(n.title.toLowerCase()));
+    lib.books.forEach(b => s.add(b.title.toLowerCase()));
+    lib.notes.forEach(n => s.add(n.title.toLowerCase()));
     return s;
   }, [lib.books, lib.notes]);
 
@@ -34,11 +51,11 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
     (t: string, c: string) => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
       saveTimer.current = window.setTimeout(() => {
-        lib.saveNote({ ...note, title: t.trim() || '未命名笔记', content: c });
+        lib.saveNote({ ...note, title: t.trim() || "未命名笔记", content: c });
         dirty.current = false;
       }, 700);
     },
-    [lib, note],
+    [lib, note]
   );
 
   useEffect(() => {
@@ -51,10 +68,11 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
   useEffect(
     () => () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
-      if (dirty.current) lib.saveNote({ ...note, title: title.trim() || '未命名笔记', content });
+      if (dirty.current)
+        lib.saveNote({ ...note, title: title.trim() || "未命名笔记", content });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [note.id],
+    [note.id]
   );
 
   /** 检测光标前的 [[ 触发联想 */
@@ -68,19 +86,23 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
       }
       const q = m[1].trim().toLowerCase();
       const pool: Suggestion[] = [
-        ...lib.books.map((b) => ({ label: b.title, kind: 'book' as const })),
-        ...lib.notes.filter((n) => n.id !== note.id).map((n) => ({ label: n.title, kind: 'note' as const })),
+        ...lib.books.map(b => ({ label: b.title, kind: "book" as const })),
+        ...lib.notes
+          .filter(n => n.id !== note.id)
+          .map(n => ({ label: n.title, kind: "note" as const })),
       ];
-      const items = pool.filter((p) => !q || p.label.toLowerCase().includes(q)).slice(0, 7);
-      if (q && !items.some((i) => i.label.toLowerCase() === q))
-        items.push({ label: m[1].trim(), kind: 'new' });
+      const items = pool
+        .filter(p => !q || p.label.toLowerCase().includes(q))
+        .slice(0, 7);
+      if (q && !items.some(i => i.label.toLowerCase() === q))
+        items.push({ label: m[1].trim(), kind: "new" });
       if (items.length === 0) {
         setSug(null);
         return;
       }
       setSug({ query: m[1], items, active: 0 });
     },
-    [lib.books, lib.notes, note.id],
+    [lib.books, lib.notes, note.id]
   );
 
   const applySuggestion = useCallback(
@@ -88,7 +110,9 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
       const ta = taRef.current;
       if (!ta || !sug) return;
       const caret = ta.selectionStart;
-      const before = content.slice(0, caret).replace(/\[\[[^\]\n]{0,40}$/, `[[${item.label}]]`);
+      const before = content
+        .slice(0, caret)
+        .replace(/\[\[[^\]\n]{0,40}$/, `[[${item.label}]]`);
       const next = before + content.slice(caret);
       setContent(next);
       persist(title, next);
@@ -99,27 +123,33 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
         ta.setSelectionRange(pos, pos);
       });
     },
-    [content, persist, sug, title],
+    [content, persist, sug, title]
   );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (sug) {
-      if (e.key === 'ArrowDown') {
+      if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSug((s) => s && { ...s, active: (s.active + 1) % s.items.length });
+        setSug(s => s && { ...s, active: (s.active + 1) % s.items.length });
         return;
       }
-      if (e.key === 'ArrowUp') {
+      if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSug((s) => s && { ...s, active: (s.active - 1 + s.items.length) % s.items.length });
+        setSug(
+          s =>
+            s && {
+              ...s,
+              active: (s.active - 1 + s.items.length) % s.items.length,
+            }
+        );
         return;
       }
-      if (e.key === 'Enter' || e.key === 'Tab') {
+      if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
         applySuggestion(sug.items[sug.active]);
         return;
       }
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         setSug(null);
         return;
       }
@@ -128,32 +158,59 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
 
   const backlinks = useMemo(
     () => computeBacklinks(title, lib.notes, note.id),
-    [title, lib.notes, note.id],
+    [title, lib.notes, note.id]
   );
   const linkedHighlights = useMemo(
-    () => lib.highlights.filter((h) => h.noteId === note.id),
-    [lib.highlights, note.id],
+    () => lib.highlights.filter(h => h.noteId === note.id),
+    [lib.highlights, note.id]
   );
   const outLinks = useMemo(() => extractLinks(content), [content]);
+
+  const unlinkHighlightCitation = async (
+    highlight: (typeof linkedHighlights)[number]
+  ) => {
+    const book = lib.books.find(item => item.id === highlight.bookId);
+    const latestNote = {
+      ...note,
+      title: title.trim() || "未命名笔记",
+      content,
+    };
+    const nextContent = book
+      ? removeCitationBlock(
+          content,
+          citationDescriptorForHighlight(highlight, book.title)
+        )
+      : content;
+
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    dirty.current = false;
+    setContent(nextContent);
+    await lib.unlinkCitation(highlight.id, {
+      ...latestNote,
+      content: nextContent,
+    });
+  };
 
   return (
     <div className="flex h-full flex-col">
       {/* 顶栏 */}
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
         <button
-          onClick={() => lib.navigate({ view: 'notes' })}
+          onClick={() => lib.navigate({ view: "notes" })}
           className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
         >
           <ArrowLeft size={15} /> 笔记
         </button>
         <div className="flex-1" />
         <button
-          onClick={() => setPreview((v) => !v)}
+          onClick={() => setPreview(v => !v)}
           className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] transition-colors ${
-            preview ? 'border-primary bg-accent/50 text-foreground' : 'border-border text-muted-foreground hover:bg-card'
+            preview
+              ? "border-primary bg-accent/50 text-foreground"
+              : "border-border text-muted-foreground hover:bg-card"
           }`}
         >
-          <Eye size={13} /> {preview ? '继续编辑' : '预览'}
+          <Eye size={13} /> {preview ? "继续编辑" : "预览"}
         </button>
         <button
           onClick={() => {
@@ -171,7 +228,7 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
           {/* 标题 */}
           <input
             value={title}
-            onChange={(e) => {
+            onChange={e => {
               setTitle(e.target.value);
               dirty.current = true;
               persist(e.target.value, content);
@@ -180,14 +237,15 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
             className="font-reading w-full border-none bg-transparent text-[32px] font-bold tracking-wide outline-none placeholder:text-muted-foreground/40"
           />
           <div className="font-meta mt-2 text-[10.5px] uppercase tracking-[0.14em] text-muted-foreground/70">
-            更新于 {formatDate(note.updatedAt)} · {content.length} 字 · 提示：输入 [[ 联想书名或笔记名
+            更新于 {formatDate(note.updatedAt)} · {content.length} 字 ·
+            提示：输入 [[ 联想书名或笔记名
           </div>
 
           {/* 出链 chips */}
           {outLinks.length > 0 && (
             <div className="mt-4 flex flex-wrap items-center gap-1.5">
               <Link2 size={12} className="text-muted-foreground" />
-              {outLinks.map((l) => (
+              {outLinks.map(l => (
                 <button
                   key={l}
                   onClick={() => openByTitle(l)}
@@ -203,7 +261,11 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
           {preview ? (
             <div className="mt-6">
               {content.trim() ? (
-                <MarkdownLite content={content} existingTitles={existingTitles} onOpenTitle={openByTitle} />
+                <MarkdownLite
+                  content={content}
+                  existingTitles={existingTitles}
+                  onOpenTitle={openByTitle}
+                />
               ) : (
                 <p className="text-sm text-muted-foreground">还没有内容。</p>
               )}
@@ -213,15 +275,19 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
               <textarea
                 ref={taRef}
                 value={content}
-                onChange={(e) => {
+                onChange={e => {
                   setContent(e.target.value);
                   dirty.current = true;
                   persist(title, e.target.value);
                   updateSuggest(e.target.value, e.target.selectionStart);
                 }}
                 onKeyDown={onKeyDown}
-                onClick={(e) => updateSuggest(content, e.currentTarget.selectionStart)}
-                placeholder={'开始书写……\n\n支持 # 标题、> 引用、- 列表、**粗体**，以及 [[双链]] 关联书籍与笔记。'}
+                onClick={e =>
+                  updateSuggest(content, e.currentTarget.selectionStart)
+                }
+                placeholder={
+                  "开始书写……\n\n支持 # 标题、> 引用、- 列表、**粗体**，以及 [[双链]] 关联书籍与笔记。"
+                }
                 className="min-h-[420px] w-full resize-y rounded-md border border-border bg-card p-5 text-[15px] leading-8 outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary/60"
               />
               {/* [[ 联想面板 */}
@@ -233,24 +299,28 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
                   {sug.items.map((item, i) => (
                     <button
                       key={`${item.kind}-${item.label}`}
-                      onMouseDown={(e) => {
+                      onMouseDown={e => {
                         e.preventDefault();
                         applySuggestion(item);
                       }}
                       className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${
-                        i === sug.active ? 'bg-sidebar-accent' : ''
+                        i === sug.active ? "bg-sidebar-accent" : ""
                       }`}
                     >
                       <span
                         className={`font-meta shrink-0 rounded px-1 text-[9.5px] uppercase ${
-                          item.kind === 'book'
-                            ? 'bg-primary/10 text-primary'
-                            : item.kind === 'note'
-                              ? 'bg-foreground/10 text-muted-foreground'
-                              : 'bg-accent text-accent-foreground'
+                          item.kind === "book"
+                            ? "bg-primary/10 text-primary"
+                            : item.kind === "note"
+                              ? "bg-foreground/10 text-muted-foreground"
+                              : "bg-accent text-accent-foreground"
                         }`}
                       >
-                        {item.kind === 'book' ? '书' : item.kind === 'note' ? '笔记' : '新建'}
+                        {item.kind === "book"
+                          ? "书"
+                          : item.kind === "note"
+                            ? "笔记"
+                            : "新建"}
                       </span>
                       <span className="truncate">{item.label}</span>
                     </button>
@@ -260,30 +330,74 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
             </div>
           )}
 
-          {/* 书摘引用 */}
+          {/* 书籍 / 章节 / 内容分级引用 */}
           {linkedHighlights.length > 0 && (
             <section className="mt-12">
               <h3 className="font-meta flex items-center gap-2 text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
-                <Quote size={12} /> 引用书摘 · {linkedHighlights.length}
+                <Quote size={12} /> 分级引用 · {linkedHighlights.length}
               </h3>
               <div className="mt-3 space-y-2.5">
-                {linkedHighlights.map((h) => {
-                  const b = lib.books.find((x) => x.id === h.bookId);
+                {linkedHighlights.map(h => {
+                  const b = lib.books.find(x => x.id === h.bookId);
+                  const level = citationLevelOf(h);
+                  const levelLabel =
+                    level === "book"
+                      ? "书籍"
+                      : level === "chapter"
+                        ? "章节"
+                        : "具体内容";
                   return (
-                    <button
+                    <div
                       key={h.id}
-                      onClick={() =>
-                        b &&
-                        lib.navigate({ view: 'reader', bookId: b.id, chapterId: h.chapterId, highlightId: h.id })
-                      }
-                      className="block w-full rounded-md border-l-[3px] border-primary bg-card p-3.5 text-left transition-shadow hover:shadow-md"
+                      className="flex items-start rounded-md border-l-[3px] border-primary bg-card transition-shadow hover:shadow-md"
                     >
-                      <p className="font-reading text-[13.5px] leading-7">{h.text}</p>
-                      {h.note && <p className="mt-1.5 text-[12.5px] leading-6 text-muted-foreground">批注：{h.note}</p>}
-                      <div className="font-meta mt-1.5 text-[10.5px] text-muted-foreground">
-                        《{b?.title ?? '未知书籍'}》· {h.chapterTitle} · 点击回到原文位置
-                      </div>
-                    </button>
+                      <button
+                        onClick={() => {
+                          if (!b) return;
+                          if (level === "book") {
+                            lib.openReader(b.id);
+                            return;
+                          }
+                          lib.navigate({
+                            view: "reader",
+                            bookId: b.id,
+                            chapterId: h.chapterId,
+                            highlightId: level === "content" ? h.id : undefined,
+                          });
+                        }}
+                        className="min-w-0 flex-1 p-3.5 text-left"
+                      >
+                        <div className="font-meta mb-1.5 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
+                          {levelLabel}引用
+                        </div>
+                        <p className="font-reading text-[13.5px] leading-7">
+                          {level === "book"
+                            ? `《${b?.title ?? "未知书籍"}》`
+                            : level === "chapter"
+                              ? h.chapterTitle
+                              : h.text}
+                        </p>
+                        {h.note && (
+                          <p className="mt-1.5 text-[12.5px] leading-6 text-muted-foreground">
+                            批注：{h.note}
+                          </p>
+                        )}
+                        <div className="font-meta mt-1.5 text-[10.5px] text-muted-foreground">
+                          《{b?.title ?? "未知书籍"}》
+                          {level !== "book" && ` → ${h.chapterTitle}`}
+                          {level === "content" && " → 具体内容"} · 点击跳转
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        title="取消引用"
+                        aria-label={`取消引用：${h.text.slice(0, 24)}`}
+                        onClick={() => void unlinkHighlightCitation(h)}
+                        className="m-2 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Unlink size={14} />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -297,18 +411,25 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
             </h3>
             {backlinks.length === 0 ? (
               <p className="mt-3 text-[13px] leading-7 text-muted-foreground">
-                还没有其他笔记链接到这里。在别的笔记里输入 <span className="wikilink">[[{title}]]</span> 即可建立回链。
+                还没有其他笔记链接到这里。在别的笔记里输入{" "}
+                <span className="wikilink">[[{title}]]</span> 即可建立回链。
               </p>
             ) : (
               <div className="mt-3 space-y-2">
-                {backlinks.map((b) => (
+                {backlinks.map(b => (
                   <button
                     key={b.noteId}
-                    onClick={() => lib.navigate({ view: 'note', noteId: b.noteId })}
+                    onClick={() =>
+                      lib.navigate({ view: "note", noteId: b.noteId })
+                    }
                     className="block w-full rounded-md bg-card p-3.5 text-left transition-shadow hover:shadow-md"
                   >
-                    <div className="text-[13.5px] font-medium">{b.noteTitle}</div>
-                    <div className="mt-1 truncate text-[12.5px] text-muted-foreground">…{b.excerpt}…</div>
+                    <div className="text-[13.5px] font-medium">
+                      {b.noteTitle}
+                    </div>
+                    <div className="mt-1 truncate text-[12.5px] text-muted-foreground">
+                      …{b.excerpt}…
+                    </div>
                   </button>
                 ))}
               </div>

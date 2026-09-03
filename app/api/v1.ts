@@ -12,11 +12,14 @@
  *   GET    /api/v1/books/:extId/chapters/:idx 章节正文
  *   GET    /api/v1/digest/:contentHash  全书结构 + AI 导读缓存
  *
- *   GET    /api/v1/highlights           书摘/批注列表（?book= 过滤；含 tags/cloze/review 字段）
- *   POST   /api/v1/highlights           新增书摘/批注 → highlight.created
- *   PATCH  /api/v1/highlights/:extId    修改批注/样式/标签/挖空/复习状态 → highlight.updated（+ highlight.tagged / review.updated）
+ *   GET    /api/v1/highlights           书摘/批注/三级引用列表（?book= 过滤）
+ *   POST   /api/v1/highlights           新增书摘/批注/书籍→章节→内容引用 → highlight.created
+ *   PATCH  /api/v1/highlights/:extId    修改引用锚点/批注/样式/复习状态 → highlight.updated
  *   DELETE /api/v1/highlights/:extId    删除 → highlight.deleted
  *   GET    /api/v1/review/due           到期复习队列（?all=1 返回全部复习卡片，按 due 排序）
+ *
+ *   GET/POST /api/v1/associations       精确文段关联列表/创建 → association.created
+ *   GET/PATCH/DELETE /api/v1/associations/:extId
  *
  *   GET    /api/v1/notes                笔记列表
  *   POST   /api/v1/notes                新建笔记（[[双链]] 文本）→ note.created
@@ -39,17 +42,18 @@
  *   DELETE /api/v1/webhooks/:id
  *   POST   /api/v1/webhooks/:id/test    发送测试事件
  *
- * 鉴权：所有机器路由（除 GET /api/v1/）需要 X-API-Key 头；/events 额外允许本站同源浏览器上报。
+ * 鉴权：所有机器路由（除 GET /api/v1/）需要 X-API-Key；/events 仅额外允许本机同源浏览器上报。
  */
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
 import { getDb } from "./queries/connection";
 import { bookDigests, webhookSubscriptions } from "@db/schema";
 import {
   mirrorBooks,
   mirrorHighlights,
+  mirrorAssociations,
   mirrorNotes,
   mirrorFolders,
   mirrorTranslations,
@@ -58,6 +62,26 @@ import {
 import { requireApiKey } from "./lib/openapi-auth";
 import { fanout, EVENT_TYPES, type ShufangEvent } from "./lib/webhooks";
 import { askCodex } from "./lib/codex";
+import {
+  citationCreateShape,
+  citationPatchShape,
+  parseStoredCitationLevel,
+  parseStoredPdfAnchor,
+  resolveCitationPatch,
+  serializePdfAnchor,
+  validateCitationCreate,
+} from "./lib/highlight-citation";
+import { normalizeReaderMirrorEvent } from "./lib/mirror-event";
+import { isTrustedLocalBrowserEvent } from "./lib/browser-event-auth";
+import {
+  associationDbValues,
+  associationFromRow,
+  associationPairKeyHash,
+  associationPatchSchema,
+  associationSchema,
+  resolveAssociationPatch,
+  type AssociationSnapshot,
+} from "./lib/association";
 
 export const v1 = new Hono();
 
@@ -85,6 +109,8 @@ v1.get("/", c =>
       "GET/POST /api/v1/highlights",
       "PATCH/DELETE /api/v1/highlights/:extId",
       "GET /api/v1/review/due",
+      "GET/POST /api/v1/associations",
+      "GET/PATCH/DELETE /api/v1/associations/:extId",
       "GET/POST /api/v1/notes",
       "GET/PATCH/DELETE /api/v1/notes/:extId",
       "GET/POST /api/v1/folders",
@@ -105,15 +131,10 @@ v1.get("/", c =>
 
 v1.use("/*", async (c, next) => {
   if (c.req.path === "/api/v1" || c.req.path === "/api/v1/") return next();
-  // 浏览器阅读端的事件上报是同域请求，允许免 key；外部机器调用仍必须带 X-API-Key
+  // 本机同源阅读端允许免 key；远程服务即使伪造 Origin 也必须使用 API Key。
   if (c.req.path === "/api/v1/events") {
     const origin = c.req.header("origin");
-    try {
-      if (origin && new URL(origin).host === new URL(c.req.url).host)
-        return next();
-    } catch {
-      /* fall through to API key */
-    }
+    if (isTrustedLocalBrowserEvent(c.req.url, origin)) return next();
   }
   return requireApiKey(c, next);
 });
@@ -180,7 +201,10 @@ v1.post("/books", zValidator("json", bookBody), async c => {
       extId: b.extId,
       title: b.title,
       author: b.author,
+      format: b.format,
       folder: b.folder,
+      contentHash: b.contentHash,
+      chapterCount: b.chapters.length,
     },
   });
   return c.json({ ok: true, extId: b.extId }, 201);
@@ -193,6 +217,26 @@ async function findBook(extId: string) {
     .where(eq(mirrorBooks.extId, extId))
     .limit(1);
   return rows[0] ?? null;
+}
+
+async function deleteAssociationsForBook(
+  bookExtId: string,
+  source: "api" | "reader"
+) {
+  const predicate = or(
+    eq(mirrorAssociations.sourceBookExtId, bookExtId),
+    eq(mirrorAssociations.targetBookExtId, bookExtId)
+  );
+  const rows = await getDb().select().from(mirrorAssociations).where(predicate);
+  if (!rows.length) return;
+  await getDb().delete(mirrorAssociations).where(predicate);
+  for (const row of rows) {
+    fanout({
+      type: "association.deleted",
+      source,
+      data: { extId: row.extId },
+    });
+  }
 }
 
 v1.get("/books/:extId", async c => {
@@ -228,6 +272,7 @@ v1.delete("/books/:extId", async c => {
   const extId = c.req.param("extId");
   const b = await findBook(extId);
   if (!b) return c.json({ error: "not_found" }, 404);
+  await deleteAssociationsForBook(extId, "api");
   await getDb().delete(mirrorBooks).where(eq(mirrorBooks.extId, extId));
   fanout({
     type: "book.deleted",
@@ -297,34 +342,63 @@ const reviewStateSchema = z.object({
   addedAt: z.number(),
 });
 
-const highlightBody = z.object({
-  extId: z.string().min(1).max(64),
-  bookExtId: z.string().max(64).default(""),
-  bookTitle: z.string().max(255).default(""),
-  chapterTitle: z.string().max(255).default(""),
-  text: z.string().min(1).max(20000),
-  styleKind: z
-    .enum(["underline", "background", "color", "none"])
-    .default("underline"),
-  styleColor: z.string().max(32).default("orange"),
-  note: z.string().max(20000).optional(),
-  noteExtId: z.string().max(64).default(""),
-  aiQa: z
-    .array(z.object({ q: z.string(), a: z.string(), ts: z.number() }))
-    .optional(),
-  tags: z.array(z.string().min(1).max(64)).max(32).optional(),
-  cloze: z.array(z.string().min(1).max(255)).max(32).optional(),
-  /** 传入对象 = 加入/更新复习；null = 移出复习；缺省 = 不变 */
-  review: reviewStateSchema.nullable().optional(),
-});
+const highlightBody = z
+  .object({
+    ...citationCreateShape,
+    extId: z.string().min(1).max(64),
+    bookExtId: z.string().max(64).default(""),
+    bookTitle: z.string().max(255).default(""),
+    chapterTitle: z.string().max(255).default(""),
+    text: z.string().min(1).max(20000),
+    styleKind: z
+      .enum(["underline", "background", "color", "none"])
+      .default("underline"),
+    styleColor: z.string().max(32).default("orange"),
+    note: z.string().max(20000).optional(),
+    noteExtId: z.string().max(64).default(""),
+    aiQa: z
+      .array(
+        z.object({ q: z.string(), a: z.string(), ts: z.number() }).strict()
+      )
+      .optional(),
+    tags: z.array(z.string().min(1).max(64)).max(32).optional(),
+    cloze: z.array(z.string().min(1).max(255)).max(32).optional(),
+    /** 传入对象 = 加入/更新复习；null = 移出复习；缺省 = 不变 */
+    review: reviewStateSchema.nullable().optional(),
+  })
+  .strict()
+  .superRefine(validateCitationCreate);
+
+const highlightPatchBody = z
+  .object({
+    ...citationPatchShape,
+    bookExtId: z.string().max(64).optional(),
+    bookTitle: z.string().max(255).optional(),
+    chapterTitle: z.string().max(255).optional(),
+    text: z.string().min(1).max(20000).optional(),
+    note: z.string().max(20000).nullable().optional(),
+    styleKind: z.enum(["underline", "background", "color", "none"]).optional(),
+    styleColor: z.string().max(32).optional(),
+    noteExtId: z.string().max(64).nullable().optional(),
+    tags: z.array(z.string().min(1).max(64)).max(32).optional(),
+    cloze: z.array(z.string().min(1).max(255)).max(32).optional(),
+    review: reviewStateSchema.nullable().optional(),
+  })
+  .strict();
 
 function highlightJson(h: typeof mirrorHighlights.$inferSelect) {
   return {
     extId: h.extId,
     bookExtId: h.bookExtId,
     bookTitle: h.bookTitle,
+    citationLevel: parseStoredCitationLevel(h.citationLevel),
+    chapterId: h.chapterId || undefined,
     chapterTitle: h.chapterTitle,
     text: h.text,
+    paraIndex: h.paraIndex ?? undefined,
+    start: h.start ?? undefined,
+    end: h.end ?? undefined,
+    pdfAnchor: parseStoredPdfAnchor(h.pdfAnchor) ?? undefined,
     style: { kind: h.styleKind, color: h.styleColor },
     note: h.note ?? undefined,
     noteExtId: h.noteExtId || undefined,
@@ -350,7 +424,21 @@ v1.post("/highlights", zValidator("json", highlightBody), async c => {
   await getDb()
     .insert(mirrorHighlights)
     .values({
-      ...h,
+      extId: h.extId,
+      bookExtId: h.bookExtId,
+      bookTitle: h.bookTitle,
+      citationLevel: h.citationLevel,
+      chapterId: h.chapterId,
+      chapterTitle: h.chapterTitle,
+      text: h.text,
+      paraIndex: h.paraIndex ?? null,
+      start: h.start ?? null,
+      end: h.end ?? null,
+      pdfAnchor: serializePdfAnchor(h.pdfAnchor),
+      styleKind: h.styleKind,
+      styleColor: h.styleColor,
+      note: h.note ?? null,
+      noteExtId: h.noteExtId,
       aiQa: h.aiQa ? JSON.stringify(h.aiQa) : null,
       tags: h.tags ? JSON.stringify(h.tags) : null,
       cloze: h.cloze ? JSON.stringify(h.cloze) : null,
@@ -358,7 +446,16 @@ v1.post("/highlights", zValidator("json", highlightBody), async c => {
     })
     .onDuplicateKeyUpdate({
       set: {
+        bookExtId: h.bookExtId,
+        bookTitle: h.bookTitle,
+        citationLevel: h.citationLevel,
+        chapterId: h.chapterId,
+        chapterTitle: h.chapterTitle,
         text: h.text,
+        paraIndex: h.paraIndex ?? null,
+        start: h.start ?? null,
+        end: h.end ?? null,
+        pdfAnchor: serializePdfAnchor(h.pdfAnchor),
         styleKind: h.styleKind,
         styleColor: h.styleColor,
         note: h.note ?? null,
@@ -376,7 +473,15 @@ v1.post("/highlights", zValidator("json", highlightBody), async c => {
       extId: h.extId,
       bookExtId: h.bookExtId,
       bookTitle: h.bookTitle,
+      citationLevel: h.citationLevel,
+      chapterId: h.chapterId || undefined,
+      chapterTitle: h.chapterTitle,
       text: h.text.slice(0, 200),
+      paraIndex: h.paraIndex,
+      start: h.start,
+      end: h.end,
+      pdfAnchor: h.pdfAnchor,
+      noteExtId: h.noteExtId || undefined,
       note: h.note,
     },
   });
@@ -385,20 +490,7 @@ v1.post("/highlights", zValidator("json", highlightBody), async c => {
 
 v1.patch(
   "/highlights/:extId",
-  zValidator(
-    "json",
-    z.object({
-      note: z.string().max(20000).optional(),
-      styleKind: z
-        .enum(["underline", "background", "color", "none"])
-        .optional(),
-      styleColor: z.string().max(32).optional(),
-      noteExtId: z.string().max(64).optional(),
-      tags: z.array(z.string().min(1).max(64)).max(32).optional(),
-      cloze: z.array(z.string().min(1).max(255)).max(32).optional(),
-      review: reviewStateSchema.nullable().optional(),
-    })
-  ),
+  zValidator("json", highlightPatchBody),
   async c => {
     const extId = c.req.param("extId");
     const rows = await getDb()
@@ -408,11 +500,48 @@ v1.patch(
       .limit(1);
     if (!rows[0]) return c.json({ error: "not_found" }, 404);
     const body = c.req.valid("json");
+    const current = rows[0];
+    const citation = resolveCitationPatch(
+      {
+        citationLevel: parseStoredCitationLevel(current.citationLevel),
+        chapterId: current.chapterId,
+        paraIndex: current.paraIndex,
+        start: current.start,
+        end: current.end,
+        pdfAnchor: parseStoredPdfAnchor(current.pdfAnchor),
+      },
+      body
+    );
+    if (!citation.success) {
+      return c.json(
+        { error: "invalid_citation", message: citation.message },
+        400
+      );
+    }
     const patch: Record<string, unknown> = {};
+    if (body.bookExtId !== undefined) patch.bookExtId = body.bookExtId;
+    if (body.bookTitle !== undefined) patch.bookTitle = body.bookTitle;
+    if (body.chapterTitle !== undefined) patch.chapterTitle = body.chapterTitle;
+    if (body.text !== undefined) patch.text = body.text;
     if (body.note !== undefined) patch.note = body.note;
     if (body.styleKind !== undefined) patch.styleKind = body.styleKind;
     if (body.styleColor !== undefined) patch.styleColor = body.styleColor;
-    if (body.noteExtId !== undefined) patch.noteExtId = body.noteExtId;
+    if (body.noteExtId !== undefined) patch.noteExtId = body.noteExtId ?? "";
+    const citationTouched =
+      body.citationLevel !== undefined ||
+      body.chapterId !== undefined ||
+      body.paraIndex !== undefined ||
+      body.start !== undefined ||
+      body.end !== undefined ||
+      body.pdfAnchor !== undefined;
+    if (citationTouched) {
+      patch.citationLevel = citation.data.citationLevel;
+      patch.chapterId = citation.data.chapterId;
+      patch.paraIndex = citation.data.paraIndex;
+      patch.start = citation.data.start;
+      patch.end = citation.data.end;
+      patch.pdfAnchor = serializePdfAnchor(citation.data.pdfAnchor);
+    }
     if (body.tags !== undefined) patch.tags = JSON.stringify(body.tags);
     if (body.cloze !== undefined) patch.cloze = JSON.stringify(body.cloze);
     if (body.review !== undefined)
@@ -425,7 +554,21 @@ v1.patch(
     fanout({
       type: "highlight.updated",
       source: "api",
-      data: { extId, ...body },
+      data: {
+        extId,
+        ...body,
+        ...(body.noteExtId === null ? { noteExtId: null } : {}),
+        ...(citationTouched
+          ? {
+              citationLevel: citation.data.citationLevel,
+              chapterId: citation.data.chapterId || null,
+              paraIndex: citation.data.paraIndex,
+              start: citation.data.start,
+              end: citation.data.end,
+              pdfAnchor: citation.data.pdfAnchor,
+            }
+          : {}),
+      },
     });
     if (body.tags !== undefined)
       fanout({
@@ -476,13 +619,234 @@ v1.delete("/highlights/:extId", async c => {
   return c.json({ ok: true });
 });
 
+/* ---------- 内容关联 ---------- */
+
+type AssociationInsert = typeof mirrorAssociations.$inferInsert;
+
+class AssociationConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AssociationConflictError";
+  }
+}
+
+async function findAssociation(extId: string) {
+  const rows = await getDb()
+    .select()
+    .from(mirrorAssociations)
+    .where(eq(mirrorAssociations.extId, extId))
+    .limit(1);
+  return rows[0]?.extId === extId ? rows[0] : null;
+}
+
+async function findAssociationByPairKey(pairKey: string) {
+  const rows = await getDb()
+    .select()
+    .from(mirrorAssociations)
+    .where(eq(mirrorAssociations.pairKeyHash, associationPairKeyHash(pairKey)))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  if (row.pairKey !== pairKey)
+    throw new AssociationConflictError("association pair hash collision");
+  return row;
+}
+
+function mutableAssociationValues(association: AssociationSnapshot) {
+  const values = associationDbValues(association) as AssociationInsert;
+  const mutable: Partial<AssociationInsert> = { ...values };
+  delete mutable.extId;
+  delete mutable.createdAt;
+  return { values, mutable };
+}
+
+async function persistAssociation(
+  association: AssociationSnapshot,
+  allowExistingUpdate: boolean
+) {
+  const [byId, byPair] = await Promise.all([
+    findAssociation(association.extId),
+    findAssociationByPairKey(association.pairKey),
+  ]);
+  if (byPair && byPair.extId !== association.extId)
+    throw new AssociationConflictError(
+      "the same association pair already exists under another id"
+    );
+  if (byId) {
+    if (byId.pairKey !== association.pairKey && !allowExistingUpdate)
+      throw new AssociationConflictError(
+        "association id already exists with different endpoints"
+      );
+    if (!allowExistingUpdate) return { created: false };
+    const { mutable } = mutableAssociationValues(association);
+    await getDb()
+      .update(mirrorAssociations)
+      .set(mutable)
+      .where(eq(mirrorAssociations.extId, association.extId));
+    return { created: false };
+  }
+
+  const { values } = mutableAssociationValues(association);
+  try {
+    await getDb().insert(mirrorAssociations).values(values);
+    return { created: true };
+  } catch (error) {
+    // A concurrent request may have inserted the same id/pair after our read.
+    const [concurrentById, concurrentByPair] = await Promise.all([
+      findAssociation(association.extId),
+      findAssociationByPairKey(association.pairKey),
+    ]);
+    if (
+      concurrentById?.pairKey === association.pairKey &&
+      (!concurrentByPair || concurrentByPair.extId === association.extId)
+    )
+      return { created: false };
+    throw error;
+  }
+}
+
+v1.get("/associations", async c => {
+  const book = c.req.query("book");
+  if (book !== undefined && (book.length < 1 || book.length > 64)) {
+    return c.json(
+      { error: "invalid_query", message: "book must contain 1-64 characters" },
+      400
+    );
+  }
+  const query = getDb().select().from(mirrorAssociations);
+  const rows = book
+    ? await query.where(
+        or(
+          eq(mirrorAssociations.sourceBookExtId, book),
+          eq(mirrorAssociations.targetBookExtId, book)
+        )
+      )
+    : await query;
+  const associations = rows
+    .map(associationFromRow)
+    .sort(
+      (left, right) =>
+        right.updatedAt - left.updatedAt ||
+        left.extId.localeCompare(right.extId)
+    );
+  return c.json({ associations });
+});
+
+v1.post("/associations", zValidator("json", associationSchema), async c => {
+  const association = c.req.valid("json");
+  let created: boolean;
+  try {
+    ({ created } = await persistAssociation(association, false));
+  } catch (error) {
+    if (error instanceof AssociationConflictError)
+      return c.json(
+        { error: "association_conflict", message: error.message },
+        409
+      );
+    throw error;
+  }
+  if (created)
+    fanout({
+      type: "association.created",
+      source: "api",
+      data: association,
+    });
+  return c.json(
+    {
+      ok: true,
+      created,
+      extId: association.extId,
+      pairKey: association.pairKey,
+    },
+    created ? 201 : 200
+  );
+});
+
+v1.get("/associations/:extId", async c => {
+  const row = await findAssociation(c.req.param("extId"));
+  if (!row) return c.json({ error: "not_found" }, 404);
+  return c.json(associationFromRow(row));
+});
+
+v1.patch(
+  "/associations/:extId",
+  zValidator("json", associationPatchSchema),
+  async c => {
+    const extId = c.req.param("extId");
+    const row = await findAssociation(extId);
+    if (!row) return c.json({ error: "not_found" }, 404);
+    const resolved = resolveAssociationPatch(
+      associationFromRow(row),
+      c.req.valid("json")
+    );
+    if (!resolved.success) {
+      return c.json(
+        {
+          error: "invalid_association",
+          issues: resolved.issues.map(issue => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        },
+        400
+      );
+    }
+    const next = resolved.data;
+    const pairOwner = await findAssociationByPairKey(next.pairKey);
+    if (pairOwner && pairOwner.extId !== extId)
+      return c.json(
+        {
+          error: "association_conflict",
+          message: "the same association pair already exists under another id",
+        },
+        409
+      );
+    const set: Partial<AssociationInsert> = associationDbValues(next);
+    delete set.extId;
+    delete set.createdAt;
+    await getDb()
+      .update(mirrorAssociations)
+      .set(set)
+      .where(eq(mirrorAssociations.extId, extId));
+    fanout({
+      type: "association.updated",
+      source: "api",
+      data: next,
+    });
+    return c.json({ ok: true, association: next });
+  }
+);
+
+v1.delete("/associations/:extId", async c => {
+  const extId = c.req.param("extId");
+  const row = await findAssociation(extId);
+  if (!row) return c.json({ error: "not_found" }, 404);
+  await getDb()
+    .delete(mirrorAssociations)
+    .where(eq(mirrorAssociations.extId, extId));
+  fanout({
+    type: "association.deleted",
+    source: "api",
+    data: { extId },
+  });
+  return c.json({ ok: true });
+});
+
 /* ---------- 笔记 ---------- */
 
-const noteBody = z.object({
-  extId: z.string().min(1).max(64),
-  title: z.string().min(1).max(255),
-  content: z.string().max(200000).default(""),
-});
+const noteBody = z
+  .object({
+    extId: z.string().min(1).max(64),
+    title: z.string().min(1).max(255),
+    content: z.string().max(200000).default(""),
+  })
+  .strict();
+
+const notePatchBody = noteBody
+  .partial()
+  .refine(value => value.title !== undefined || value.content !== undefined, {
+    message: "title or content is required",
+  });
 
 v1.get("/notes", async c => {
   const rows = await getDb().select().from(mirrorNotes);
@@ -506,7 +870,7 @@ v1.post("/notes", zValidator("json", noteBody), async c => {
   fanout({
     type: "note.created",
     source: "api",
-    data: { extId: n.extId, title: n.title },
+    data: { extId: n.extId, title: n.title, content: n.content },
   });
   return c.json({ ok: true, extId: n.extId }, 201);
 });
@@ -528,7 +892,7 @@ v1.get("/notes/:extId", async c => {
   });
 });
 
-v1.patch("/notes/:extId", zValidator("json", noteBody.partial()), async c => {
+v1.patch("/notes/:extId", zValidator("json", notePatchBody), async c => {
   const extId = c.req.param("extId");
   const rows = await getDb()
     .select()
@@ -536,7 +900,11 @@ v1.patch("/notes/:extId", zValidator("json", noteBody.partial()), async c => {
     .where(eq(mirrorNotes.extId, extId))
     .limit(1);
   if (!rows[0]) return c.json({ error: "not_found" }, 404);
-  const { extId: _drop, ...patch } = c.req.valid("json");
+  const body = c.req.valid("json");
+  const patch = {
+    ...(body.title !== undefined ? { title: body.title } : {}),
+    ...(body.content !== undefined ? { content: body.content } : {}),
+  };
   await getDb()
     .update(mirrorNotes)
     .set(patch)
@@ -544,7 +912,11 @@ v1.patch("/notes/:extId", zValidator("json", noteBody.partial()), async c => {
   fanout({
     type: "note.updated",
     source: "api",
-    data: { extId, title: patch.title ?? rows[0].title },
+    data: {
+      extId,
+      title: patch.title ?? rows[0].title,
+      content: patch.content ?? rows[0].content,
+    },
   });
   return c.json({ ok: true });
 });
@@ -557,7 +929,12 @@ v1.delete("/notes/:extId", async c => {
     .where(eq(mirrorNotes.extId, extId))
     .limit(1);
   if (!rows[0]) return c.json({ error: "not_found" }, 404);
+  await getDb()
+    .update(mirrorHighlights)
+    .set({ noteExtId: "" })
+    .where(eq(mirrorHighlights.noteExtId, extId));
   await getDb().delete(mirrorNotes).where(eq(mirrorNotes.extId, extId));
+  fanout({ type: "note.deleted", source: "api", data: { extId } });
   return c.json({ ok: true });
 });
 
@@ -995,24 +1372,58 @@ v1.post(
   "/events",
   zValidator(
     "json",
-    z.object({
-      type: z.string().min(1).max(64),
-      data: z.record(z.string(), z.unknown()).default({}),
-    })
+    z
+      .object({
+        type: z.string().min(1).max(64),
+        data: z.record(z.string(), z.unknown()).default({}),
+      })
+      .strict()
   ),
   async c => {
     const ev = c.req.valid("json");
+    const normalized = normalizeReaderMirrorEvent(ev.type, ev.data);
+    if (!normalized.success) {
+      return c.json(
+        {
+          error: "invalid_event_data",
+          issues: normalized.issues.map(issue => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        },
+        400
+      );
+    }
     const event: ShufangEvent = {
       type: ev.type,
-      data: ev.data,
+      data: normalized.data,
       source: "reader",
     };
-    fanout(event);
 
     // 阅读动作同时落入镜像库，外部 AI 可读
+    let mirrored: boolean | undefined;
     try {
-      const d = ev.data as Record<string, unknown>;
+      const d = normalized.data;
       if (
+        ev.type === "association.created" ||
+        ev.type === "association.updated"
+      ) {
+        mirrored = false;
+        await persistAssociation(
+          associationSchema.parse(d),
+          ev.type === "association.updated"
+        );
+        mirrored = true;
+      } else if (
+        ev.type === "association.deleted" &&
+        typeof d.extId === "string"
+      ) {
+        mirrored = false;
+        await getDb()
+          .delete(mirrorAssociations)
+          .where(eq(mirrorAssociations.extId, d.extId));
+        mirrored = true;
+      } else if (
         ev.type === "highlight.created" &&
         typeof d.extId === "string" &&
         typeof d.text === "string"
@@ -1023,17 +1434,43 @@ v1.post(
             extId: d.extId,
             bookExtId: String(d.bookExtId ?? ""),
             bookTitle: String(d.bookTitle ?? ""),
+            citationLevel: String(d.citationLevel ?? "content"),
+            chapterId: String(d.chapterId ?? ""),
             chapterTitle: String(d.chapterTitle ?? ""),
             text: d.text,
+            paraIndex: typeof d.paraIndex === "number" ? d.paraIndex : null,
+            start: typeof d.start === "number" ? d.start : null,
+            end: typeof d.end === "number" ? d.end : null,
+            pdfAnchor: d.pdfAnchor ? JSON.stringify(d.pdfAnchor) : null,
             styleKind: String(d.styleKind ?? "underline"),
             styleColor: String(d.styleColor ?? "orange"),
             note: typeof d.note === "string" ? d.note : null,
+            noteExtId: typeof d.noteExtId === "string" ? d.noteExtId : "",
+            aiQa: Array.isArray(d.aiQa) ? JSON.stringify(d.aiQa) : null,
+            tags: Array.isArray(d.tags) ? JSON.stringify(d.tags) : null,
+            cloze: Array.isArray(d.cloze) ? JSON.stringify(d.cloze) : null,
+            review: d.review ? JSON.stringify(d.review) : null,
           })
           .onDuplicateKeyUpdate({
             set: {
+              bookExtId: String(d.bookExtId ?? ""),
+              bookTitle: String(d.bookTitle ?? ""),
+              citationLevel: String(d.citationLevel ?? "content"),
+              chapterId: String(d.chapterId ?? ""),
+              chapterTitle: String(d.chapterTitle ?? ""),
+              text: d.text,
+              paraIndex: typeof d.paraIndex === "number" ? d.paraIndex : null,
+              start: typeof d.start === "number" ? d.start : null,
+              end: typeof d.end === "number" ? d.end : null,
+              pdfAnchor: d.pdfAnchor ? JSON.stringify(d.pdfAnchor) : null,
               note: typeof d.note === "string" ? d.note : null,
+              noteExtId: typeof d.noteExtId === "string" ? d.noteExtId : "",
               styleKind: String(d.styleKind ?? "underline"),
               styleColor: String(d.styleColor ?? "orange"),
+              aiQa: Array.isArray(d.aiQa) ? JSON.stringify(d.aiQa) : null,
+              tags: Array.isArray(d.tags) ? JSON.stringify(d.tags) : null,
+              cloze: Array.isArray(d.cloze) ? JSON.stringify(d.cloze) : null,
+              review: d.review ? JSON.stringify(d.review) : null,
             },
           });
       } else if (
@@ -1041,12 +1478,91 @@ v1.post(
         typeof d.extId === "string"
       ) {
         const patch: Record<string, unknown> = {};
-        if (typeof d.note === "string") patch.note = d.note;
+        if (d.bookExtId !== undefined) patch.bookExtId = d.bookExtId;
+        if (d.bookTitle !== undefined) patch.bookTitle = d.bookTitle;
+        if (d.chapterTitle !== undefined) patch.chapterTitle = d.chapterTitle;
+        if (d.text !== undefined) patch.text = d.text;
+        if (d.note === null || typeof d.note === "string") patch.note = d.note;
+        if (d.noteExtId === null || typeof d.noteExtId === "string")
+          patch.noteExtId = d.noteExtId ?? "";
         if (typeof d.styleKind === "string") patch.styleKind = d.styleKind;
         if (typeof d.styleColor === "string") patch.styleColor = d.styleColor;
         if (Array.isArray(d.aiQa)) patch.aiQa = JSON.stringify(d.aiQa);
         if (Array.isArray(d.tags)) patch.tags = JSON.stringify(d.tags);
         if (Array.isArray(d.cloze)) patch.cloze = JSON.stringify(d.cloze);
+        if (d.review === null) patch.review = null;
+        else if (d.review && typeof d.review === "object")
+          patch.review = JSON.stringify(d.review);
+
+        const citationTouched =
+          d.citationLevel !== undefined ||
+          d.chapterId !== undefined ||
+          d.paraIndex !== undefined ||
+          d.start !== undefined ||
+          d.end !== undefined ||
+          d.pdfAnchor !== undefined;
+        if (citationTouched) {
+          const rows = await getDb()
+            .select()
+            .from(mirrorHighlights)
+            .where(eq(mirrorHighlights.extId, d.extId))
+            .limit(1);
+          if (rows[0]) {
+            const current = rows[0];
+            const citation = resolveCitationPatch(
+              {
+                citationLevel: parseStoredCitationLevel(current.citationLevel),
+                chapterId: current.chapterId,
+                paraIndex: current.paraIndex,
+                start: current.start,
+                end: current.end,
+                pdfAnchor: parseStoredPdfAnchor(current.pdfAnchor),
+              },
+              {
+                citationLevel:
+                  typeof d.citationLevel === "string"
+                    ? parseStoredCitationLevel(d.citationLevel)
+                    : undefined,
+                chapterId:
+                  d.chapterId === null || typeof d.chapterId === "string"
+                    ? d.chapterId
+                    : undefined,
+                paraIndex:
+                  d.paraIndex === null || typeof d.paraIndex === "number"
+                    ? d.paraIndex
+                    : undefined,
+                start:
+                  d.start === null || typeof d.start === "number"
+                    ? d.start
+                    : undefined,
+                end:
+                  d.end === null || typeof d.end === "number"
+                    ? d.end
+                    : undefined,
+                pdfAnchor:
+                  d.pdfAnchor === null ||
+                  (d.pdfAnchor !== undefined && typeof d.pdfAnchor === "object")
+                    ? (d.pdfAnchor as ReturnType<typeof parseStoredPdfAnchor>)
+                    : undefined,
+              }
+            );
+            if (!citation.success) {
+              return c.json(
+                {
+                  error: "invalid_event_data",
+                  issues: [{ path: "data", message: citation.message }],
+                },
+                400
+              );
+            }
+            patch.citationLevel = citation.data.citationLevel;
+            patch.chapterId = citation.data.chapterId;
+            patch.paraIndex = citation.data.paraIndex;
+            patch.start = citation.data.start;
+            patch.end = citation.data.end;
+            patch.pdfAnchor = serializePdfAnchor(citation.data.pdfAnchor);
+          }
+        }
         if (Object.keys(patch).length)
           await getDb()
             .update(mirrorHighlights)
@@ -1059,7 +1575,38 @@ v1.post(
         await getDb()
           .delete(mirrorHighlights)
           .where(eq(mirrorHighlights.extId, d.extId));
+      } else if (
+        ev.type === "note.created" &&
+        typeof d.extId === "string" &&
+        typeof d.title === "string" &&
+        typeof d.content === "string"
+      ) {
+        await getDb()
+          .insert(mirrorNotes)
+          .values({ extId: d.extId, title: d.title, content: d.content })
+          .onDuplicateKeyUpdate({
+            set: { title: d.title, content: d.content },
+          });
+      } else if (ev.type === "note.updated" && typeof d.extId === "string") {
+        const notePatch: Record<string, unknown> = {};
+        if (typeof d.title === "string") notePatch.title = d.title;
+        if (typeof d.content === "string") notePatch.content = d.content;
+        if (typeof d.title === "string" && typeof d.content === "string") {
+          await getDb()
+            .insert(mirrorNotes)
+            .values({ extId: d.extId, title: d.title, content: d.content })
+            .onDuplicateKeyUpdate({ set: notePatch });
+        } else if (Object.keys(notePatch).length) {
+          await getDb()
+            .update(mirrorNotes)
+            .set(notePatch)
+            .where(eq(mirrorNotes.extId, d.extId));
+        }
       } else if (ev.type === "note.deleted" && typeof d.extId === "string") {
+        await getDb()
+          .update(mirrorHighlights)
+          .set({ noteExtId: "" })
+          .where(eq(mirrorHighlights.noteExtId, d.extId));
         await getDb().delete(mirrorNotes).where(eq(mirrorNotes.extId, d.extId));
       } else if (
         ev.type === "highlight.tagged" &&
@@ -1127,6 +1674,7 @@ v1.post(
         typeof d.title === "string" &&
         Array.isArray(d.chapters)
       ) {
+        mirrored = false;
         await getDb()
           .insert(mirrorBooks)
           .values({
@@ -1141,6 +1689,12 @@ v1.post(
           .onDuplicateKeyUpdate({
             set: { title: d.title, chapters: JSON.stringify(d.chapters) },
           });
+        mirrored = true;
+      } else if (ev.type === "book.deleted" && typeof d.extId === "string") {
+        mirrored = false;
+        await deleteAssociationsForBook(d.extId, "reader");
+        await getDb().delete(mirrorBooks).where(eq(mirrorBooks.extId, d.extId));
+        mirrored = true;
       } else if (
         ev.type === "translation.created" &&
         typeof d.extId === "string" &&
@@ -1192,10 +1746,27 @@ v1.post(
           .delete(mirrorMindmaps)
           .where(eq(mirrorMindmaps.extId, d.extId));
       }
-    } catch {
-      /* 镜像失败不影响事件分发 */
+    } catch (error) {
+      const cause =
+        error instanceof Error && "cause" in error ? error.cause : error;
+      const errorCode =
+        cause !== null &&
+        typeof cause === "object" &&
+        "code" in cause &&
+        typeof cause.code === "string"
+          ? cause.code
+          : undefined;
+      console.error("[api/v1/events] mirror failed", {
+        eventType: ev.type,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        ...(errorCode ? { errorCode } : {}),
+      });
     }
-    return c.json({ ok: true });
+    fanout(event);
+    return c.json({
+      ok: true,
+      ...(mirrored === undefined ? {} : { mirrored }),
+    });
   }
 );
 

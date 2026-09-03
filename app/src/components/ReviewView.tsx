@@ -11,6 +11,7 @@ import {
   type Rating,
 } from "@/lib/srs";
 import { emitEvent } from "@/lib/events";
+import { citationLevelOf } from "@/lib/citations";
 
 const RATING_STYLE: Record<Rating, string> = {
   1: "bg-destructive/10 text-destructive hover:bg-destructive/20",
@@ -41,7 +42,10 @@ export function ReviewView({ lib }: { lib: Library }) {
   const reviewCards = useMemo(
     () =>
       lib.highlights.filter(
-        h => h.review && (!studySetFilter || studySetFilter.has(h.bookId))
+        h =>
+          citationLevelOf(h) === "content" &&
+          h.review &&
+          (!studySetFilter || studySetFilter.has(h.bookId))
       ),
     [lib.highlights, studySetFilter]
   );

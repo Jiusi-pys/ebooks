@@ -5,19 +5,19 @@
 @layer base {
   :root {
     /* 暖纸编辑色系 */
-    --background: 34 26% 89%;          /* #ece4d9 暖米 */
-    --foreground: 34 13% 28%;          /* #4f483e 暖棕 */
-    --card: 36 56% 97%;                /* #fffbf5 米白 */
+    --background: 34 26% 89%; /* #ece4d9 暖米 */
+    --foreground: 34 13% 28%; /* #4f483e 暖棕 */
+    --card: 36 56% 97%; /* #fffbf5 米白 */
     --card-foreground: 34 13% 28%;
     --popover: 36 56% 97%;
     --popover-foreground: 34 13% 28%;
-    --primary: 17 96% 48%;             /* #f54001 焦橙 */
+    --primary: 17 96% 48%; /* #f54001 焦橙 */
     --primary-foreground: 36 56% 97%;
-    --secondary: 33 29% 93%;           /* #f4f0ea 奶油 */
+    --secondary: 33 29% 93%; /* #f4f0ea 奶油 */
     --secondary-foreground: 34 13% 28%;
     --muted: 33 22% 90%;
-    --muted-foreground: 33 13% 48%;    /* #8a7d6b */
-    --accent: 22 100% 82%;             /* #ffc198 浅橙 */
+    --muted-foreground: 33 13% 48%; /* #8a7d6b */
+    --accent: 22 100% 82%; /* #ffc198 浅橙 */
     --accent-foreground: 34 24% 24%;
     --destructive: 4 70% 44%;
     --destructive-foreground: 36 56% 97%;
@@ -45,8 +45,14 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: ui-sans-serif, -apple-system, "PingFang SC", "Hiragino Sans GB",
-      "Microsoft YaHei", "Source Han Sans SC", sans-serif;
+    font-family:
+      ui-sans-serif,
+      -apple-system,
+      "PingFang SC",
+      "Hiragino Sans GB",
+      "Microsoft YaHei",
+      "Source Han Sans SC",
+      sans-serif;
   }
   ::selection {
     background: #ffc198;
@@ -56,12 +62,14 @@
 
 /* 衬线阅读字体族 */
 .font-reading {
-  font-family: "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STSong",
-    "SimSun", Georgia, "Times New Roman", serif;
+  font-family:
+    "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STSong", "SimSun",
+    Georgia, "Times New Roman", serif;
 }
 .font-meta {
-  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
-    "Courier New", monospace;
+  font-family:
+    ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Courier New",
+    monospace;
 }
 
 /* 阅读正文排版（文字重排后的呈现层） */
@@ -148,7 +156,9 @@
 /* ---------- 阅读器主题与划线 ---------- */
 
 .reader-shell {
-  transition: background-color 0.25s ease, color 0.25s ease;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
 /* 双栏模式 */
@@ -180,6 +190,49 @@
 }
 .hl-clickable:hover {
   filter: brightness(0.94);
+}
+.hl-recall-hidden,
+.hl-clickable.hl-recall-hidden:hover {
+  filter: blur(5px);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.hl-citation {
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  border-bottom: 1px dashed #f54001;
+  box-shadow: inset 0 -0.34em 0 rgba(245, 64, 1, 0.14);
+}
+
+/* “关联”是文段对文段的独立关系，使用冷色与橙色引用明确区分。 */
+.hl-association {
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  border-bottom: 2px dotted #0369a1;
+  box-shadow: inset 0 -0.3em 0 rgba(14, 165, 233, 0.13);
+}
+
+.hl-citation.hl-association {
+  border-bottom: 2px dotted #0369a1;
+  box-shadow:
+    inset 0 -0.22em 0 rgba(14, 165, 233, 0.18),
+    inset 0 -0.48em 0 rgba(245, 64, 1, 0.13);
+}
+
+.association-ball {
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: #0369a1;
+  color: white;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 /* 批注标记：段尾小角标 */

@@ -1,10 +1,9 @@
-import { CheckSquare, Plus, StickyNote, Trash2 } from 'lucide-react';
-import type { Library } from '@/hooks/useLibrary';
-import { formatDate } from '@/lib/covers';
-import { extractLinks, plainExcerpt } from '@/components/MarkdownLite';
-import { BatchAction, BatchBar, SelectDot } from './BatchBar';
-import { useSelection } from '@/hooks/useSelection';
-import { emitEvent } from '@/lib/events';
+import { CheckSquare, Plus, StickyNote, Trash2 } from "lucide-react";
+import type { Library } from "@/hooks/useLibrary";
+import { formatDate } from "@/lib/covers";
+import { extractLinks, plainExcerpt } from "@/components/MarkdownLite";
+import { BatchAction, BatchBar, SelectDot } from "./BatchBar";
+import { useSelection } from "@/hooks/useSelection";
 
 export function NotesView({ lib }: { lib: Library }) {
   const sel = useSelection();
@@ -15,7 +14,6 @@ export function NotesView({ lib }: { lib: Library }) {
     if (confirm(`确定删除选中的 ${n} 篇笔记？`)) {
       for (const id of sel.selected) {
         void lib.removeNote(id);
-        emitEvent('note.deleted', { extId: id });
       }
       sel.exit();
     }
@@ -29,7 +27,9 @@ export function NotesView({ lib }: { lib: Library }) {
             <div className="font-meta text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
               笔记 · {lib.notes.length} 篇
             </div>
-            <h1 className="font-reading mt-2 text-[34px] font-bold tracking-wide">笔记</h1>
+            <h1 className="font-reading mt-2 text-[34px] font-bold tracking-wide">
+              笔记
+            </h1>
             {lib.notes.length > 0 && !sel.selecting && (
               <button
                 onClick={sel.start}
@@ -41,8 +41,8 @@ export function NotesView({ lib }: { lib: Library }) {
           </div>
           <button
             onClick={async () => {
-              const n = await lib.createNote('未命名笔记');
-              lib.navigate({ view: 'note', noteId: n.id });
+              const n = await lib.createNote("未命名笔记");
+              lib.navigate({ view: "note", noteId: n.id });
             }}
             className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
@@ -63,9 +63,13 @@ export function NotesView({ lib }: { lib: Library }) {
               return (
                 <button
                   key={n.id}
-                  onClick={() => (sel.selecting ? sel.toggle(n.id) : lib.navigate({ view: 'note', noteId: n.id }))}
+                  onClick={() =>
+                    sel.selecting
+                      ? sel.toggle(n.id)
+                      : lib.navigate({ view: "note", noteId: n.id })
+                  }
                   className={`group flex w-full items-baseline gap-5 border-b border-border/70 px-2 py-4 text-left transition-colors hover:bg-card/70 ${
-                    checked ? 'bg-accent/50' : ''
+                    checked ? "bg-accent/50" : ""
                   }`}
                 >
                   {sel.selecting ? (
@@ -74,7 +78,7 @@ export function NotesView({ lib }: { lib: Library }) {
                     </span>
                   ) : (
                     <span className="font-meta w-8 shrink-0 text-[11px] text-muted-foreground/50">
-                      {String(lib.notes.length - i).padStart(2, '0')}
+                      {String(lib.notes.length - i).padStart(2, "0")}
                     </span>
                   )}
                   <span className="min-w-0 flex-1">
@@ -82,7 +86,7 @@ export function NotesView({ lib }: { lib: Library }) {
                       {n.title}
                     </span>
                     <span className="mt-1 block truncate text-[12.5px] text-muted-foreground">
-                      {plainExcerpt(n.content) || '（空）'}
+                      {plainExcerpt(n.content) || "（空）"}
                     </span>
                   </span>
                   {links.length > 0 && (
@@ -104,10 +108,14 @@ export function NotesView({ lib }: { lib: Library }) {
         <BatchBar
           count={sel.selected.size}
           total={lib.notes.length}
-          onSelectAll={() => sel.selectAll(lib.notes.map((n) => n.id))}
+          onSelectAll={() => sel.selectAll(lib.notes.map(n => n.id))}
           onExit={sel.exit}
         >
-          <BatchAction disabled={sel.selected.size === 0} danger onClick={batchDelete}>
+          <BatchAction
+            disabled={sel.selected.size === 0}
+            danger
+            onClick={batchDelete}
+          >
             <Trash2 size={13} /> 删除
           </BatchAction>
         </BatchBar>

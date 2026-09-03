@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Languages,
+  Link2,
   ListPlus,
   MessageSquarePlus,
   Quote,
@@ -9,18 +10,24 @@ import {
   Highlighter,
   Type as TypeIcon,
 } from "lucide-react";
-import type { HighlightStyle } from "@/types";
+import type { HighlightStyle, Note } from "@/types";
 import { SWATCH_COLORS } from "@/lib/reading";
+import { ExpandableSelectionAction } from "./ExpandableSelectionAction";
+import { CitationNotePicker } from "./CitationNotePicker";
 
-type Mode = "menu" | "comment";
+type Mode = "menu" | "comment" | "cite";
 
 interface Props {
   top: number;
   left: number;
   onHighlight: (style: HighlightStyle) => void;
   onComment: (text: string, name: string) => void;
-  /** 打开三级引用浏览器（书 → 章节 → 文段） */
-  onOpenCiteBrowser: () => void;
+  notes: readonly Note[];
+  sourceText: string;
+  /** 将当前选中的文段引用到目标笔记。 */
+  onCite: (noteId: string | "new") => Promise<void> | void;
+  /** 将当前选区作为 A 端，选择另一处原文建立关联。 */
+  onAssociate: () => void;
   /** 打开划选即时翻译气泡 */
   onTranslate: () => void;
   /** 把当前选区作为段落级锚点加入自定义目录。 */
@@ -35,7 +42,10 @@ export function SelectionToolbar({
   left,
   onHighlight,
   onComment,
-  onOpenCiteBrowser,
+  notes,
+  sourceText,
+  onCite,
+  onAssociate,
   onTranslate,
   onAddToOutline,
   onAskAi,
@@ -91,40 +101,47 @@ export function SelectionToolbar({
           {styleRow("underline", "下划线", <Underline size={12} />)}
           {styleRow("background", "背景", <Highlighter size={12} />)}
           {styleRow("color", "字色", <TypeIcon size={12} />)}
-          <div className="mt-1.5 flex border-t border-border pt-1.5">
-            <button
+          <div
+            className="mt-1.5 grid grid-cols-3 gap-1 border-t border-border pt-1.5"
+            role="toolbar"
+            aria-label="选中文字后的操作"
+          >
+            <ExpandableSelectionAction
+              icon={<MessageSquarePlus size={14} />}
+              label="批注"
               onClick={() => setMode("comment")}
-              className="flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-[12px] text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              <MessageSquarePlus size={13} /> 批注
-            </button>
-            <button
-              onClick={() => {
-                onClose();
-                onOpenCiteBrowser();
-              }}
-              className="flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-[12px] text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              <Quote size={13} /> 引用
-            </button>
-            <button
+              className="w-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+            />
+            <ExpandableSelectionAction
+              icon={<Quote size={14} />}
+              label="引用"
+              onClick={() => setMode("cite")}
+              className="w-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+            />
+            <ExpandableSelectionAction
+              icon={<Link2 size={14} />}
+              label="关联"
+              onClick={onAssociate}
+              className="w-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+            />
+            <ExpandableSelectionAction
+              icon={<Languages size={14} />}
+              label="翻译"
               onClick={onTranslate}
-              className="flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-[12px] text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              <Languages size={13} /> 翻译
-            </button>
-            <button
+              className="w-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+            />
+            <ExpandableSelectionAction
+              icon={<ListPlus size={14} />}
+              label="目录"
               onClick={onAddToOutline}
-              className="flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-[12px] text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              <ListPlus size={13} /> 目录
-            </button>
-            <button
+              className="w-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+            />
+            <ExpandableSelectionAction
+              icon={<Sparkles size={14} />}
+              label="问 AI"
               onClick={onAskAi}
-              className="flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-[12px] font-medium text-primary hover:bg-accent/40"
-            >
-              <Sparkles size={13} /> 问 AI
-            </button>
+              className="w-full font-medium text-primary hover:bg-accent/40"
+            />
           </div>
         </div>
       )}
@@ -168,6 +185,15 @@ export function SelectionToolbar({
             </button>
           </div>
         </div>
+      )}
+
+      {mode === "cite" && (
+        <CitationNotePicker
+          notes={notes}
+          sourceText={sourceText}
+          onSelect={onCite}
+          onClose={() => setMode("menu")}
+        />
       )}
     </div>
   );

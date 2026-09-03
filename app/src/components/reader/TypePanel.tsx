@@ -1,6 +1,11 @@
-import { useEffect, useRef } from 'react';
-import type { TypeSettings } from '@/types';
-import { READER_FONTS, READER_THEMES } from '@/lib/reading';
+import { useEffect, useRef } from "react";
+import type { TypeSettings } from "@/types";
+import {
+  PAGE_MARGIN_MAX,
+  PAGE_MARGIN_MIN,
+  READER_FONTS,
+  READER_THEMES,
+} from "@/lib/reading";
 
 interface Props {
   value: TypeSettings;
@@ -8,7 +13,13 @@ interface Props {
   onClose: () => void;
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="mb-4">
       <div className="font-meta mb-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -42,10 +53,12 @@ function Slider({
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onChange={e => onChange(Number(e.target.value))}
         className="h-1 flex-1 cursor-pointer accent-[#f54001]"
       />
-      <span className="font-meta w-11 text-right text-[11px] text-muted-foreground">{format(value)}</span>
+      <span className="font-meta w-11 text-right text-[11px] text-muted-foreground">
+        {format(value)}
+      </span>
     </div>
   );
 }
@@ -57,11 +70,12 @@ export function TypePanel({ value, onChange, onClose }: Props) {
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
   }, [onClose]);
 
-  const set = (patch: Partial<TypeSettings>) => onChange({ ...value, ...patch });
+  const set = (patch: Partial<TypeSettings>) =>
+    onChange({ ...value, ...patch });
 
   return (
     <div
@@ -90,14 +104,14 @@ export function TypePanel({ value, onChange, onClose }: Props) {
       {/* 字体 */}
       <Row label="字体">
         <div className="grid grid-cols-4 gap-1.5">
-          {READER_FONTS.map((f) => (
+          {READER_FONTS.map(f => (
             <button
               key={f.id}
               onClick={() => set({ fontId: f.id })}
               className={`rounded-md border px-1 py-1.5 text-[12.5px] transition-colors ${
                 value.fontId === f.id
-                  ? 'border-primary bg-accent/40 text-foreground'
-                  : 'border-border text-muted-foreground hover:bg-secondary'
+                  ? "border-primary bg-accent/40 text-foreground"
+                  : "border-border text-muted-foreground hover:bg-secondary"
               }`}
               style={{ fontFamily: f.stack }}
             >
@@ -109,43 +123,75 @@ export function TypePanel({ value, onChange, onClose }: Props) {
 
       {/* 行距 / 字距 */}
       <Row label="行间距">
-        <Slider min={14} max={26} step={1} value={value.lineHeight * 10} onChange={(v) => set({ lineHeight: v / 10 })} format={(v) => (v / 10).toFixed(1)} />
+        <Slider
+          min={14}
+          max={26}
+          step={1}
+          value={value.lineHeight * 10}
+          onChange={v => set({ lineHeight: v / 10 })}
+          format={v => (v / 10).toFixed(1)}
+        />
       </Row>
       <Row label="字间距">
-        <Slider min={0} max={12} step={1} value={value.letterSpacing * 100} onChange={(v) => set({ letterSpacing: v / 100 })} format={(v) => `${v}%`} />
+        <Slider
+          min={0}
+          max={12}
+          step={1}
+          value={value.letterSpacing * 100}
+          onChange={v => set({ letterSpacing: v / 100 })}
+          format={v => `${v}%`}
+        />
+      </Row>
+      <Row label="页边距">
+        <Slider
+          min={PAGE_MARGIN_MIN}
+          max={PAGE_MARGIN_MAX}
+          step={4}
+          value={value.pageMargin}
+          onChange={v => set({ pageMargin: v })}
+          format={v => `${v}px`}
+        />
       </Row>
 
       {/* 粗细 + 单双栏 */}
       <div className="mb-4 grid grid-cols-2 gap-3">
         <div>
-          <div className="font-meta mb-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">粗细</div>
+          <div className="font-meta mb-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            粗细
+          </div>
           <div className="flex rounded-md border border-border">
             {([300, 400, 600] as const).map((w, i) => (
               <button
                 key={w}
                 onClick={() => set({ fontWeight: w })}
-                className={`flex-1 py-1.5 text-[12px] ${i > 0 ? 'border-l border-border' : ''} ${
-                  value.fontWeight === w ? 'bg-sidebar-accent font-medium' : 'text-muted-foreground hover:bg-secondary'
+                className={`flex-1 py-1.5 text-[12px] ${i > 0 ? "border-l border-border" : ""} ${
+                  value.fontWeight === w
+                    ? "bg-sidebar-accent font-medium"
+                    : "text-muted-foreground hover:bg-secondary"
                 }`}
                 style={{ fontWeight: w }}
               >
-                {w === 300 ? '细' : w === 400 ? '常' : '粗'}
+                {w === 300 ? "细" : w === 400 ? "常" : "粗"}
               </button>
             ))}
           </div>
         </div>
         <div>
-          <div className="font-meta mb-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">页面</div>
+          <div className="font-meta mb-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            页面
+          </div>
           <div className="flex rounded-md border border-border">
             {([1, 2] as const).map((c, i) => (
               <button
                 key={c}
                 onClick={() => set({ columns: c })}
-                className={`flex-1 py-1.5 text-[12px] ${i > 0 ? 'border-l border-border' : ''} ${
-                  value.columns === c ? 'bg-sidebar-accent font-medium' : 'text-muted-foreground hover:bg-secondary'
+                className={`flex-1 py-1.5 text-[12px] ${i > 0 ? "border-l border-border" : ""} ${
+                  value.columns === c
+                    ? "bg-sidebar-accent font-medium"
+                    : "text-muted-foreground hover:bg-secondary"
                 }`}
               >
-                {c === 1 ? '单页' : '双页'}
+                {c === 1 ? "单页" : "双页"}
               </button>
             ))}
           </div>
@@ -155,12 +201,14 @@ export function TypePanel({ value, onChange, onClose }: Props) {
       {/* 背景主题 */}
       <Row label="背景">
         <div className="flex gap-2">
-          {READER_THEMES.map((t) => (
+          {READER_THEMES.map(t => (
             <button
               key={t.id}
               onClick={() => set({ themeId: t.id })}
               className={`flex h-11 flex-1 flex-col items-center justify-center rounded-md border text-[11px] transition-all ${
-                value.themeId === t.id ? 'border-primary ring-1 ring-primary' : 'border-border'
+                value.themeId === t.id
+                  ? "border-primary ring-1 ring-primary"
+                  : "border-border"
               }`}
               style={{ background: t.bg, color: t.text }}
             >

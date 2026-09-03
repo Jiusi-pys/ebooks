@@ -12,8 +12,9 @@ import type { Book, OutlineItem, ReaderTheme } from "@/types";
 import {
   changeOutlineDepth,
   getBookOutline,
+  isUserOutlineItem,
   moveOutlineItem,
-  removeOutlineItem,
+  removeUserOutlineItem,
   renameOutlineItem,
 } from "@/lib/outline";
 
@@ -33,7 +34,17 @@ export function OutlinePanel({
   onChange,
 }: Props) {
   const [editing, setEditing] = useState(false);
+  const [activeItem, setActiveItem] = useState<{
+    bookId: string;
+    itemId: string;
+  } | null>(null);
   const outline = getBookOutline(book);
+  const selectedItem =
+    activeItem?.bookId === book.id
+      ? outline.find(candidate => candidate.id === activeItem.itemId)
+      : undefined;
+  const activeItemId =
+    selectedItem?.chapterId === activeChapterId ? selectedItem.id : null;
 
   const update = (next: OutlineItem[]) => onChange(next);
   const addGroup = () => {
@@ -45,6 +56,13 @@ export function OutlinePanel({
         depth: 0,
       },
     ]);
+  };
+
+  const removeItem = (id: string) => {
+    const next = removeUserOutlineItem(book, outline, id);
+    if (next === outline) return;
+    setActiveItem(current => (current?.itemId === id ? null : current));
+    update(next);
   };
 
   return (
@@ -83,8 +101,11 @@ export function OutlinePanel({
 
       <div className="flex-1 overflow-y-auto py-2">
         {outline.map((item, index) => {
-          const active =
-            item.chapterId === activeChapterId && item.paraIndex === undefined;
+          const userCreated = isUserOutlineItem(book, item);
+          const active = activeItemId
+            ? item.id === activeItemId
+            : item.chapterId === activeChapterId &&
+              item.paraIndex === undefined;
           return (
             <div
               key={item.id}
@@ -151,10 +172,12 @@ export function OutlinePanel({
                       <CornerUpLeft size={11} />
                     </IconButton>
                     <IconButton
-                      label="移除目录项"
-                      onClick={() =>
-                        update(removeOutlineItem(outline, item.id))
+                      label={
+                        userCreated ? "删除自定义目录项" : "原书目录不可删除"
                       }
+                      disabled={!userCreated}
+                      preventInputBlur={userCreated}
+                      onClick={() => removeItem(item.id)}
                     >
                       <Trash2 size={11} />
                     </IconButton>
@@ -164,7 +187,10 @@ export function OutlinePanel({
                 <button
                   type="button"
                   disabled={!item.chapterId}
-                  onClick={() => onNavigate(item)}
+                  onClick={() => {
+                    setActiveItem({ bookId: book.id, itemId: item.id });
+                    onNavigate(item);
+                  }}
                   className={`min-w-0 flex-1 truncate px-1 py-[7px] text-left text-[13px] ${
                     item.chapterId
                       ? "hover:text-foreground"
@@ -201,11 +227,13 @@ export function OutlinePanel({
 function IconButton({
   label,
   disabled,
+  preventInputBlur,
   onClick,
   children,
 }: {
   label: string;
   disabled?: boolean;
+  preventInputBlur?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -215,6 +243,9 @@ function IconButton({
       title={label}
       aria-label={label}
       disabled={disabled}
+      onPointerDown={event => {
+        if (preventInputBlur) event.preventDefault();
+      }}
       onClick={onClick}
       className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-20"
     >

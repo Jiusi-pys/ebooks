@@ -1,5 +1,6 @@
 import { openDB, type IDBPDatabase } from "idb";
 import type {
+  Association,
   Book,
   ChapterTranslation,
   Folder,
@@ -10,7 +11,7 @@ import type {
 } from "@/types";
 
 const DB_NAME = "shufang";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let dbp: Promise<IDBPDatabase> | null = null;
 
@@ -32,11 +33,19 @@ function db() {
           d.createObjectStore("mindMaps", { keyPath: "id" });
         }
         if (oldVersion < 4) {
-          // 原始 PDF 文件（ArrayBuffer），原版阅读模式按需加载渲染
+          // 原始 PDF 文件（ArrayBuffer 或 Blob），原版阅读模式按需加载渲染
           d.createObjectStore("files", { keyPath: "id" });
         }
         if (oldVersion < 5) {
           d.createObjectStore("studySets", { keyPath: "id" });
+        }
+        if (oldVersion < 6) {
+          const associations = d.createObjectStore("associations", {
+            keyPath: "id",
+          });
+          associations.createIndex("by-source-book", "source.bookId");
+          associations.createIndex("by-target-book", "target.bookId");
+          associations.createIndex("by-pair", "pairKey", { unique: true });
         }
       },
     });
@@ -58,28 +67,38 @@ export async function putBook(book: Book) {
 
 export async function deleteBook(id: string) {
   const d = await db();
-  await d.delete("books", id);
-  await d.delete("files", id).catch(() => undefined);
-  const keys = (await d.getAllKeysFromIndex(
-    "highlights",
-    "by-book",
-    id
-  )) as string[];
-  const tx = d.transaction("highlights", "readwrite");
-  for (const k of keys) await tx.store.delete(k);
-  await tx.done;
-  const sets = (await d.getAll("studySets")) as StudySet[];
-  const setTx = d.transaction("studySets", "readwrite");
+  const tx = d.transaction(
+    ["books", "files", "highlights", "studySets", "associations"],
+    "readwrite"
+  );
+  await tx.objectStore("books").delete(id);
+  await tx.objectStore("files").delete(id);
+
+  const highlightStore = tx.objectStore("highlights");
+  const highlightKeys = (await highlightStore
+    .index("by-book")
+    .getAllKeys(id)) as string[];
+  for (const key of highlightKeys) await highlightStore.delete(key);
+
+  const associationStore = tx.objectStore("associations");
+  const [sourceKeys, targetKeys] = await Promise.all([
+    associationStore.index("by-source-book").getAllKeys(id),
+    associationStore.index("by-target-book").getAllKeys(id),
+  ]);
+  for (const key of new Set([...sourceKeys, ...targetKeys]))
+    await associationStore.delete(key);
+
+  const sets = (await tx.objectStore("studySets").getAll()) as StudySet[];
   for (const set of sets) {
     if (set.bookIds.includes(id)) {
-      await setTx.store.put({
+      await tx.objectStore("studySets").put({
         ...set,
         bookIds: set.bookIds.filter(bookId => bookId !== id),
         updatedAt: Date.now(),
       });
     }
   }
-  await setTx.done;
+  await tx.done;
 }
 
 /* ---------- 原始文件（PDF 原版模式用） ---------- */
@@ -87,7 +106,17 @@ export async function deleteBook(id: string) {
 export interface StoredFile {
   id: string; // 与 book.id 相同
   type: "pdf";
-  data: ArrayBuffer;
+  /** 新导入使用 Blob 避免导入阶段再次读取整文件；兼容旧 ArrayBuffer。 */
+  data: ArrayBuffer | Blob;
+}
+
+/** Commit an imported book and its optional source PDF as one atomic unit. */
+export async function putImportedBook(book: Book, file?: StoredFile) {
+  const database = await db();
+  const tx = database.transaction(["books", "files"], "readwrite");
+  await tx.objectStore("books").put(book);
+  if (file) await tx.objectStore("files").put(file);
+  await tx.done;
 }
 
 export async function putFile(f: StoredFile) {
@@ -159,6 +188,7 @@ export async function deleteNote(id: string) {
   for (const h of all) {
     if (h.noteId === id) {
       h.noteId = undefined;
+      h.citation = undefined;
       await tx.store.put(h);
     }
   }
@@ -183,6 +213,68 @@ export async function putHighlight(h: Highlight) {
 
 export async function deleteHighlight(id: string) {
   await (await db()).delete("highlights", id);
+}
+
+/* ---------- 文段关联（独立于书摘与引用） ---------- */
+
+export async function getAllAssociations(
+  bookId?: string
+): Promise<Association[]> {
+  const d = await db();
+  let all: Association[];
+  if (bookId) {
+    const [source, target] = await Promise.all([
+      d.getAllFromIndex("associations", "by-source-book", bookId),
+      d.getAllFromIndex("associations", "by-target-book", bookId),
+    ]);
+    all = [
+      ...new Map(
+        ([...source, ...target] as Association[]).map(item => [item.id, item])
+      ).values(),
+    ];
+  } else {
+    all = (await d.getAll("associations")) as Association[];
+  }
+  return all.sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
+export async function putAssociation(association: Association) {
+  await (await db()).put("associations", association);
+}
+
+export interface AddAssociationIfAbsentResult {
+  association: Association;
+  created: boolean;
+}
+
+/**
+ * Return the association already owning this pair, or create the candidate.
+ *
+ * IndexedDB serializes readwrite transactions which overlap the same object
+ * store. Keeping the unique-index lookup and add in this transaction therefore
+ * makes concurrent callers converge on the record that was actually persisted.
+ */
+export async function addAssociationIfAbsent(
+  candidate: Association
+): Promise<AddAssociationIfAbsentResult> {
+  const database = await db();
+  const tx = database.transaction("associations", "readwrite");
+  const store = tx.objectStore("associations");
+  const existing = (await store.index("by-pair").get(candidate.pairKey)) as
+    Association | undefined;
+
+  if (existing) {
+    await tx.done;
+    return { association: existing, created: false };
+  }
+
+  await store.add(candidate);
+  await tx.done;
+  return { association: candidate, created: true };
+}
+
+export async function deleteAssociation(id: string) {
+  await (await db()).delete("associations", id);
 }
 
 /* ---------- 章节译文缓存 ---------- */

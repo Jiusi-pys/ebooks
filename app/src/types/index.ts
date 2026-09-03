@@ -5,6 +5,9 @@ export interface Chapter {
   paragraphs: string[];
 }
 
+export type BookFormat =
+  "pdf" | "epub" | "mobi" | "azw3" | "fb2" | "txt" | "builtin";
+
 /** 可编辑导航目录。扁平顺序配合 depth 表达层级，章节与正文锚点均可独立编排。 */
 export interface OutlineItem {
   id: string;
@@ -20,8 +23,8 @@ export interface Book {
   id: string;
   title: string;
   author: string;
-  format: "pdf" | "epub" | "builtin";
-  /** dataURL 封面缩略图（PDF 首页渲染 / EPUB 封面图） */
+  format: BookFormat;
+  /** dataURL 封面缩略图 */
   cover?: string;
   /** 无封面时使用的确定性配色索引 */
   coverTone: number;
@@ -34,7 +37,7 @@ export interface Book {
   /** 所属文件夹 id；缺省 = 未分类 */
   folderId?: string;
   /**
-   * 阅读模式：重排文本 / 原版 PDF 版面（仅 PDF 有效；EPUB 永远 reflow）。
+   * 阅读模式：重排文本 / 原版 PDF 版面（仅 PDF 有效；其他格式均为 reflow）。
    * 如同汉王阅读器：每个文件可自行选择是否重排，版式复杂的 PDF 适合原版。
    */
   readerMode?: "reflow" | "original";
@@ -77,6 +80,79 @@ export interface HighlightStyle {
   kind: HighlightKind;
   /** 预设色键：orange | yellow | green | blue | purple */
   color: string;
+}
+
+/** PDF 页内的归一化矩形；四个值均相对于当前页可视区域。 */
+export interface PdfAnchorRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** 原版 PDF 书摘的稳定页内定位信息。 */
+export interface PdfHighlightAnchor {
+  /** PDF 页码，从 1 开始。 */
+  page: number;
+  /** 多行选区会保存多个矩形。 */
+  rects: PdfAnchorRect[];
+}
+
+/** 可排版正文中的精确文段锚点。 */
+export interface TextPassageAnchor {
+  kind: "text";
+  bookId: string;
+  chapterId: string;
+  chapterTitle: string;
+  text: string;
+  paraIndex: number;
+  start: number;
+  end: number;
+}
+
+/** 原版 PDF 中的精确文段锚点。 */
+export interface PdfPassageAnchor {
+  kind: "pdf";
+  bookId: string;
+  chapterId: string;
+  chapterTitle: string;
+  text: string;
+  pdfAnchor: PdfHighlightAnchor;
+}
+
+/** “关联”两端均使用的稳定来源描述；与书摘、引用和笔记相互独立。 */
+export type PassageAnchor = TextPassageAnchor | PdfPassageAnchor;
+
+export type AssociationDirection = "bidirectional" | "source-to-target";
+
+/** 两个精确文段之间的独立关系。 */
+export interface Association {
+  id: string;
+  source: PassageAnchor;
+  target: PassageAnchor;
+  direction: AssociationDirection;
+  /** 可选的关系名称，例如“相似观点”或“反例”。 */
+  label?: string;
+  /** 不受标题或正文快照影响的去重键。 */
+  pairKey: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 引用来源层级：整本书、章节，或章节中的具体内容。 */
+export type CitationLevel = "book" | "chapter" | "content";
+
+/**
+ * 引用的结构化来源锚点。书籍级只保存 level；章节级再保存 chapterId；
+ * 内容级继续保存段落/字符或 PDF 几何位置，便于精确跳回原文。
+ */
+export interface CitationAnchor {
+  level: CitationLevel;
+  chapterId?: string;
+  paraIndex?: number;
+  start?: number;
+  end?: number;
+  pdfAnchor?: PdfHighlightAnchor;
 }
 
 export interface AiQA {
@@ -123,6 +199,8 @@ export interface Highlight {
   paraIndex?: number;
   start?: number;
   end?: number;
+  /** 原版 PDF 中的页码与页内几何锚点。 */
+  pdfAnchor?: PdfHighlightAnchor;
   style?: HighlightStyle;
   /** 批注/书摘的自定义名称（可选，便于引用时辨认） */
   name?: string;
@@ -130,6 +208,8 @@ export interface Highlight {
   note?: string;
   /** 被引用到的笔记 id（可选） */
   noteId?: string;
+  /** 引用层级及定位；旧数据缺省时按内容级引用兼容。 */
+  citation?: CitationAnchor;
   /** 针对该文段的 AI 问答记录 */
   aiQa?: AiQA[];
   /** 卡片标签（卡片盒筛选 / 自动组脑图） */
@@ -194,6 +274,8 @@ export interface Route {
   highlightId?: string;
   /** 原版 PDF 模式下用于定位的锚点文字（书摘 text） */
   anchorText?: string;
+  /** 从关联面板或图谱跳回的精确文段锚点。 */
+  passageAnchor?: PassageAnchor;
   /** 自定义目录的段落级跳转目标。 */
   outlineParaIndex?: number;
   /** 允许连续点击同一目录项时也重新执行定位。 */
@@ -207,6 +289,7 @@ export interface TypeSettings {
   fontSize: number; // px
   lineHeight: number; // 1.4 - 2.4
   letterSpacing: number; // em, 0 - 0.12
+  pageMargin: number; // px, text distance from the reading-page edge
   fontWeight: 300 | 400 | 600;
   columns: 1 | 2;
   themeId: string;

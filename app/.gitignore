@@ -30,7 +30,7 @@ dist-ssr
 *.db
 *.sqlite
 *.sqlite3
-db/migrations/*.sql
+# Drizzle migration SQL is source-controlled.
 # TypeScript cache
 *.tsbuildinfo
 # Build outputs

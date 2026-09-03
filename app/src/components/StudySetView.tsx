@@ -16,6 +16,7 @@ import type { Library } from "@/hooks/useLibrary";
 import type { StudySet } from "@/types";
 import { countNodes } from "@/lib/mind";
 import { formatDate } from "@/lib/covers";
+import { citationLevelOf } from "@/lib/citations";
 
 /** 学习集是跨文件夹的逻辑集合；同一本书可以同时加入多个学习集。 */
 export function StudySetView({ lib }: { lib: Library }) {
@@ -155,8 +156,9 @@ export function StudySetView({ lib }: { lib: Library }) {
 function setStats(lib: Library, studySet: StudySet, now: number) {
   const bookIds = new Set(studySet.bookIds);
   const books = lib.books.filter(book => bookIds.has(book.id));
-  const cards = lib.highlights.filter(highlight =>
-    bookIds.has(highlight.bookId)
+  const cards = lib.highlights.filter(
+    highlight =>
+      citationLevelOf(highlight) === "content" && bookIds.has(highlight.bookId)
   );
   const mindmaps = lib.mindMaps.filter(
     map => map.bookId && bookIds.has(map.bookId)
@@ -188,7 +190,11 @@ function StudySetDetail({
   const selectedIds = new Set(studySet.bookIds);
   const books = lib.books.filter(book => selectedIds.has(book.id));
   const cards = lib.highlights
-    .filter(highlight => selectedIds.has(highlight.bookId))
+    .filter(
+      highlight =>
+        citationLevelOf(highlight) === "content" &&
+        selectedIds.has(highlight.bookId)
+    )
     .sort((a, b) => b.createdAt - a.createdAt);
   const mindmaps = lib.mindMaps.filter(
     map => map.bookId && selectedIds.has(map.bookId)
@@ -389,7 +395,9 @@ function StudySetDetail({
                   <span className="font-meta shrink-0 text-[10px] text-muted-foreground">
                     {
                       lib.highlights.filter(
-                        highlight => highlight.bookId === book.id
+                        highlight =>
+                          citationLevelOf(highlight) === "content" &&
+                          highlight.bookId === book.id
                       ).length
                     }{" "}
                     卡片

@@ -16,6 +16,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import { getDb } from "../queries/connection";
 import { webhookSubscriptions } from "@db/schema";
 import { eq } from "drizzle-orm";
+import { sanitizeEventForWebhook } from "./webhook-event";
 
 export const EVENT_TYPES = [
   "book.imported",
@@ -24,6 +25,9 @@ export const EVENT_TYPES = [
   "highlight.created",
   "highlight.updated",
   "highlight.deleted",
+  "association.created",
+  "association.updated",
+  "association.deleted",
   "note.created",
   "note.updated",
   "note.deleted",
@@ -72,7 +76,8 @@ async function deliver(row: WebhookRow, event: ShufangEvent) {
     "User-Agent": "Shufang-Webhook/1.0",
   };
   if (row.secret) {
-    headers["X-Shufang-Signature"] = `sha256=${createHmac("sha256", row.secret).update(payload).digest("hex")}`;
+    headers["X-Shufang-Signature"] =
+      `sha256=${createHmac("sha256", row.secret).update(payload).digest("hex")}`;
   }
   try {
     const resp = await fetch(row.url, {
@@ -83,7 +88,10 @@ async function deliver(row: WebhookRow, event: ShufangEvent) {
     });
     if (resp.ok) {
       if (row.failCount > 0)
-        await getDb().update(webhookSubscriptions).set({ failCount: 0 }).where(eq(webhookSubscriptions.id, row.id));
+        await getDb()
+          .update(webhookSubscriptions)
+          .set({ failCount: 0 })
+          .where(eq(webhookSubscriptions.id, row.id));
     } else {
       throw new Error(`HTTP ${resp.status}`);
     }
@@ -99,6 +107,7 @@ async function deliver(row: WebhookRow, event: ShufangEvent) {
 
 /** 向所有订阅了该事件类型的活跃 WebHook 分发（不 await 完成，后台进行） */
 export function fanout(event: ShufangEvent): void {
+  const outboundEvent = sanitizeEventForWebhook(event);
   void (async () => {
     const rows = (await getDb()
       .select()
@@ -111,8 +120,9 @@ export function fanout(event: ShufangEvent): void {
       } catch {
         subscribed = [];
       }
-      if (subscribed.length > 0 && !subscribed.includes(event.type)) continue;
-      void deliver(row, event);
+      if (subscribed.length > 0 && !subscribed.includes(outboundEvent.type))
+        continue;
+      void deliver(row, outboundEvent);
     }
   })().catch(() => {});
 }

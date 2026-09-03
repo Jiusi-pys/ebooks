@@ -4,35 +4,41 @@ import {
   BookOpenText,
   ChevronLeft,
   ChevronRight,
-  Copy,
+  Languages,
   List,
   ListPlus,
   MessageSquarePlus,
   Quote,
+  RefreshCw,
   Sparkles,
   Tag,
   Trash2,
   Eye,
   PenLine,
   GitBranch,
+  Link2,
+  Unlink,
   X,
 } from "lucide-react";
 import { newReviewState } from "@/lib/srs";
 import type { Library } from "@/hooks/useLibrary";
 import type {
   Book,
+  CitationAnchor,
   Highlight,
   HighlightStyle,
+  Note,
   OutlineItem,
+  PassageAnchor,
+  TextPassageAnchor,
   TypeSettings,
 } from "@/types";
 import {
   fontStack,
   loadTypeSettings,
   locateHighlight,
-  quoteBlock,
+  readerPagePadding,
   saveTypeSettings,
-  segmentParagraph,
   swatch,
   themeById,
 } from "@/lib/reading";
@@ -47,6 +53,9 @@ import {
   type TranslationLang,
 } from "./reader/TranslationPopup";
 import { PdfCanvasViewer, type PdfSelectInfo } from "./reader/PdfCanvasViewer";
+import { PdfSelectionToolbar } from "./reader/PdfSelectionToolbar";
+import { BilingualReader } from "./reader/BilingualReader";
+import { inferTargetLanguage, type BilingualLanguage } from "@/lib/bilingual";
 import { SplitWorkspace } from "./reader/SplitWorkspace";
 import {
   MAIN_READER_PANE,
@@ -60,7 +69,25 @@ import {
 import { appendChild, createMindFromBook, newNode } from "@/lib/mind";
 import { getSplitBooks } from "@/lib/splitScope";
 import { addOutlineTarget, getBookOutline, outlineTitle } from "@/lib/outline";
+import {
+  resolvePdfReaderMode,
+  resolveReaderChapter,
+  supportsPdfReflow,
+} from "@/lib/pdfReaderState";
 import { OutlinePanel } from "./reader/OutlinePanel";
+import { appendCitationBlock, citationLevelOf } from "@/lib/citations";
+import { CitationNotePicker } from "./reader/CitationNotePicker";
+import {
+  isRecallHighlightConcealed,
+  revealRecallHighlight,
+} from "@/lib/recall";
+import { ExpandableSelectionAction } from "./reader/ExpandableSelectionAction";
+import { AssociationPicker } from "./reader/AssociationPicker";
+import { AssociationPopup } from "./reader/AssociationPopup";
+import {
+  passageAnchorFromHighlight,
+  passageAnchorKey,
+} from "@/lib/associations";
 
 interface SelInfo {
   paraIndex: number;
@@ -75,6 +102,19 @@ interface HlPopup {
   id: string;
   top: number;
   left: number;
+}
+
+interface AssociationPopupState {
+  anchor: PassageAnchor;
+  top: number;
+  left: number;
+}
+
+interface AssociationRange {
+  anchor: TextPassageAnchor;
+  associationIds: string[];
+  start: number;
+  end: number;
 }
 
 type PanelTab = "marks" | "notes" | "qa";
@@ -92,26 +132,98 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
   const [tab, setTab] = useState<PanelTab>("marks");
   const [toast, setToast] = useState("");
   const [pdfSel, setPdfSel] = useState<PdfSelectInfo | null>(null);
+  const [pdfCitationPopup, setPdfCitationPopup] = useState<HlPopup | null>(
+    null
+  );
   const [pdfAnchor, setPdfAnchor] = useState<string | null>(null);
+  const [pdfAnchorPage, setPdfAnchorPage] = useState<number | null>(null);
+  const [bilingualLanguage, setBilingualLanguage] =
+    useState<BilingualLanguage | null>(null);
   const [splitLayout, setSplitLayout] = useState<ReaderPane>(MAIN_READER_PANE);
   const [posture, setPosture] = useState<ReadingPosture>("read");
+  const [associationSource, setAssociationSource] =
+    useState<PassageAnchor | null>(null);
+  const [associationPopup, setAssociationPopup] =
+    useState<AssociationPopupState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const theme = themeById(type.themeId);
+  /** 原版 PDF 版面模式（保留排版逐页阅读） */
+  const isOriginal =
+    book.format === "pdf" && resolvePdfReaderMode(book) === "original";
   const chapterId =
     lib.route.chapterId || book.progress.chapterId || book.chapters[0]?.id;
-  const chapterIdx = Math.max(
-    0,
-    book.chapters.findIndex(c => c.id === chapterId)
+  const { chapter, chapterIndex: chapterIdx } = resolveReaderChapter(
+    book,
+    chapterId
   );
-  const chapter = book.chapters[chapterIdx];
-  /** 原版 PDF 版面模式（保留排版逐页阅读） */
-  const isOriginal = book.format === "pdf" && book.readerMode === "original";
 
   const bookHighlights = useMemo(
     () => lib.highlights.filter(h => h.bookId === book.id),
     [lib.highlights, book.id]
+  );
+  const contentHighlights = useMemo(
+    () => bookHighlights.filter(h => citationLevelOf(h) === "content"),
+    [bookHighlights]
+  );
+
+  const associationEndpoints = useMemo(() => {
+    const grouped = new Map<
+      string,
+      { anchor: PassageAnchor; associationIds: string[] }
+    >();
+    if (!chapter) return grouped;
+    for (const association of lib.associations) {
+      for (const anchor of [association.source, association.target]) {
+        if (anchor.bookId !== book.id || anchor.chapterId !== chapter.id)
+          continue;
+        const key = passageAnchorKey(anchor);
+        const existing = grouped.get(key);
+        if (existing) existing.associationIds.push(association.id);
+        else grouped.set(key, { anchor, associationIds: [association.id] });
+      }
+    }
+    return grouped;
+  }, [book.id, chapter, lib.associations]);
+
+  const associationRangesByPara = useMemo(() => {
+    const grouped = new Map<number, AssociationRange[]>();
+    if (!chapter) return grouped;
+    for (const { anchor, associationIds } of associationEndpoints.values()) {
+      if (anchor.kind !== "text") continue;
+      const paragraph = chapter.paragraphs[anchor.paraIndex];
+      if (paragraph === undefined) continue;
+      let start = anchor.start;
+      let end = anchor.end;
+      if (paragraph.slice(start, end) !== anchor.text) {
+        const fallback = paragraph.indexOf(anchor.text);
+        if (fallback < 0) continue;
+        start = fallback;
+        end = fallback + anchor.text.length;
+      }
+      const ranges = grouped.get(anchor.paraIndex) ?? [];
+      ranges.push({ anchor, associationIds, start, end });
+      grouped.set(anchor.paraIndex, ranges);
+    }
+    return grouped;
+  }, [associationEndpoints, chapter]);
+
+  const pdfAssociationDecorations = useMemo(
+    () =>
+      Array.from(associationEndpoints.entries()).flatMap(
+        ([key, { anchor, associationIds }]) =>
+          anchor.kind === "pdf"
+            ? [
+                {
+                  key,
+                  anchor: anchor.pdfAnchor,
+                  count: associationIds.length,
+                },
+              ]
+            : []
+      ),
+    [associationEndpoints]
   );
 
   /** 当前章节书摘 → 按段落归组定位 */
@@ -122,6 +234,8 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     >();
     if (!chapter) return map;
     for (const h of lib.highlights) {
+      if (citationLevelOf(h) !== "content") continue;
+      if (h.bookId !== book.id) continue;
       if (h.chapterId !== chapter.id) continue;
       const loc = locateHighlight(chapter, h);
       if (!loc) continue;
@@ -130,7 +244,7 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
       map.set(loc.paraIndex, arr);
     }
     return map;
-  }, [lib.highlights, chapter]);
+  }, [lib.highlights, book.id, chapter]);
 
   const aiTarget = aiTargetId
     ? (lib.highlights.find(h => h.id === aiTargetId) ?? null)
@@ -147,6 +261,7 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     scrollRef.current?.scrollTo({ top: 0 });
     setSel(null);
     setHlPopup(null);
+    setPdfCitationPopup(null);
     if (chapter) lib.saveProgress(book.id, chapter.id, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter?.id]);
@@ -168,6 +283,46 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lib.route.highlightId, chapter?.id]);
 
+  // 关联跳转：优先使用独立文段锚点，不要求目标先成为书摘。
+  useEffect(() => {
+    const anchor = lib.route.passageAnchor;
+    if (
+      !anchor ||
+      anchor.kind !== "text" ||
+      anchor.bookId !== book.id ||
+      anchor.chapterId !== chapter?.id
+    )
+      return;
+    const key = passageAnchorKey(anchor);
+    requestAnimationFrame(() => {
+      const elements = wrapRef.current?.querySelectorAll<HTMLElement>(
+        "[data-association-anchor-keys]"
+      );
+      const targets = Array.from(elements ?? []).filter(element => {
+        try {
+          const keys = JSON.parse(
+            element.dataset.associationAnchorKeys ?? "[]"
+          ) as unknown;
+          return Array.isArray(keys) && keys.includes(key);
+        } catch {
+          return false;
+        }
+      });
+      const fallback = wrapRef.current?.querySelector<HTMLElement>(
+        `[data-pi="${anchor.paraIndex}"]`
+      );
+      const element = targets[0] ?? fallback;
+      element?.scrollIntoView({ block: "center", behavior: "smooth" });
+      const flashTargets =
+        targets.length > 0 ? targets : element ? [element] : [];
+      for (const target of flashTargets) target.classList.add("anchor-flash");
+      window.setTimeout(() => {
+        for (const target of flashTargets)
+          target.classList.remove("anchor-flash");
+      }, 2400);
+    });
+  }, [book.id, chapter?.id, lib.route.passageAnchor]);
+
   // 自定义目录：可精确跳到章节内的正文段落。
   useEffect(() => {
     const paraIndex = lib.route.outlineParaIndex;
@@ -183,12 +338,24 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
   // 原版模式：「回到原文」→ 按书摘文字定位 PDF 页
   useEffect(() => {
     if (!isOriginal) return;
+    const associationAnchor = lib.route.passageAnchor;
+    if (
+      associationAnchor?.kind === "pdf" &&
+      associationAnchor.bookId === book.id
+    ) {
+      setPdfAnchor(associationAnchor.text);
+      setPdfAnchorPage(associationAnchor.pdfAnchor.page);
+      return;
+    }
     const hid = lib.route.highlightId;
     if (!hid) return;
     const h = lib.highlights.find(x => x.id === hid);
-    if (h) setPdfAnchor(h.text);
+    if (h) {
+      setPdfAnchor(h.text);
+      setPdfAnchorPage(h.pdfAnchor?.page ?? null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lib.route.highlightId, isOriginal]);
+  }, [book.id, lib.route.highlightId, lib.route.passageAnchor, isOriginal]);
 
   const pdfSaveTimer = useRef<number | null>(null);
   /** 原版模式进度：页码 / 总页数 → 沿用 progress.ratio */
@@ -220,20 +387,27 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
         paraIndex: 0,
         start: 0,
         end: info.text.length,
+        pdfAnchor: { page: info.page, rects: info.rects },
         ...extra,
       });
       emitEvent("highlight.created", {
         extId: h.id,
         bookExtId: book.id,
         bookTitle: book.title,
+        chapterId: chapter.id,
         chapterTitle,
         text: h.text,
+        paraIndex: h.paraIndex,
+        start: h.start,
+        end: h.end,
+        pdfAnchor: h.pdfAnchor,
         styleKind: h.style?.kind ?? "underline",
         styleColor: h.style?.color ?? "orange",
         note: h.note,
       });
       window.getSelection()?.removeAllRanges();
       setPdfSel(null);
+      return h;
     },
     [chapter, book.id, book.title, lib]
   );
@@ -257,6 +431,130 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     setToast(msg);
     window.setTimeout(() => setToast(""), 1800);
   }, []);
+
+  const beginAssociation = useCallback((source: PassageAnchor) => {
+    setAssociationPopup(null);
+    setHlPopup(null);
+    setPdfCitationPopup(null);
+    setSel(null);
+    setPdfSel(null);
+    window.getSelection()?.removeAllRanges();
+    setAssociationSource(source);
+  }, []);
+
+  const beginSelectionAssociation = useCallback(() => {
+    if (!sel || !chapter) return;
+    beginAssociation({
+      kind: "text",
+      bookId: book.id,
+      chapterId: chapter.id,
+      chapterTitle: chapter.title,
+      text: sel.text,
+      paraIndex: sel.paraIndex,
+      start: sel.start,
+      end: sel.end,
+    });
+  }, [beginAssociation, book.id, chapter, sel]);
+
+  const beginPdfAssociation = useCallback(() => {
+    if (!pdfSel || !chapter) return;
+    beginAssociation({
+      kind: "pdf",
+      bookId: book.id,
+      chapterId: chapter.id,
+      chapterTitle: `${chapter.title} · 第 ${pdfSel.page} 页`,
+      text: pdfSel.text,
+      pdfAnchor: { page: pdfSel.page, rects: pdfSel.rects },
+    });
+  }, [beginAssociation, book.id, chapter, pdfSel]);
+
+  const beginHighlightAssociation = useCallback(
+    (highlight: Highlight) => {
+      const anchor = passageAnchorFromHighlight(highlight);
+      if (!anchor) {
+        showToast("这条旧书摘缺少精确位置，请重新选择原文后关联");
+        return;
+      }
+      beginAssociation(anchor);
+    },
+    [beginAssociation, showToast]
+  );
+
+  const saveAssociation = useCallback(
+    async (
+      target: PassageAnchor,
+      direction: import("@/types").AssociationDirection,
+      label: string
+    ) => {
+      if (!associationSource) return;
+      await lib.addAssociation(associationSource, target, {
+        direction,
+        label,
+      });
+      setAssociationSource(null);
+      showToast(
+        direction === "bidirectional" ? "双向关联已建立" : "单向关联已建立"
+      );
+    },
+    [associationSource, lib, showToast]
+  );
+
+  const navigateAssociation = useCallback(
+    async (anchor: PassageAnchor) => {
+      setAssociationPopup(null);
+      setAssociationSource(null);
+      const targetBook = lib.books.find(item => item.id === anchor.bookId);
+      if (targetBook?.format === "pdf") {
+        const readerMode = anchor.kind === "pdf" ? "original" : "reflow";
+        const switched = await lib.setReaderMode(anchor.bookId, readerMode);
+        if (!switched) showToast("未找到 PDF 原始文件，可能无法精确定位");
+      }
+      lib.navigate({
+        view: "reader",
+        bookId: anchor.bookId,
+        chapterId: anchor.chapterId,
+        passageAnchor: anchor,
+      });
+    },
+    [lib, showToast]
+  );
+
+  const openAssociationPopup = useCallback(
+    (anchor: PassageAnchor, top: number, left: number) => {
+      setHlPopup(null);
+      setAssociationPopup({
+        anchor,
+        top: Math.max(8, Math.min(window.innerHeight - 390, top)),
+        left: Math.max(180, Math.min(window.innerWidth - 180, left)),
+      });
+    },
+    []
+  );
+
+  const addPdfMark = useCallback(
+    async (style: HighlightStyle) => {
+      if (!pdfSel) return;
+      const saved = await createFromPdf(pdfSel, { style });
+      if (saved) showToast("PDF 划线已保存");
+    },
+    [createFromPdf, pdfSel, showToast]
+  );
+
+  const addPdfComment = useCallback(
+    async (note: string, name: string) => {
+      if (!pdfSel) return;
+      const saved = await createFromPdf(pdfSel, {
+        style: { kind: "background", color: "yellow" },
+        note,
+        ...(name ? { name } : {}),
+      });
+      if (saved) {
+        setTab("notes");
+        showToast("PDF 批注已保存");
+      }
+    },
+    [createFromPdf, pdfSel, showToast]
+  );
 
   /* ---------- 划选 ---------- */
 
@@ -324,8 +622,12 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
         extId: h.id,
         bookExtId: book.id,
         bookTitle: book.title,
+        chapterId: chapter.id,
         chapterTitle: chapter.title,
         text: h.text,
+        paraIndex: h.paraIndex,
+        start: h.start,
+        end: h.end,
         styleKind: h.style?.kind ?? "underline",
         styleColor: h.style?.color ?? "orange",
         note: h.note,
@@ -428,8 +730,12 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
         extId: h.id,
         bookExtId: book.id,
         bookTitle: book.title,
+        chapterId: chapter.id,
         chapterTitle: chapter.title,
         text: h.text,
+        paraIndex: h.paraIndex,
+        start: h.start,
+        end: h.end,
         styleKind: "background",
         styleColor: "blue",
         note: translation,
@@ -451,48 +757,142 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     [translationSel, chapter, book.id, book.title, lib, showToast]
   );
 
-  /** 三级引用：从任意书/章节/文段创建书摘并引用到笔记 */
+  /** 把指定原文锚点建立为结构化引用，并同步笔记与图谱关系。 */
   const citePassage = useCallback(
-    async (t: CitationTarget, noteId: string | "new") => {
-      const h = await lib.addHighlight({
-        bookId: t.bookId,
-        chapterId: t.chapterId,
-        chapterTitle: t.chapterTitle,
-        text: t.text,
-        paraIndex: t.paraIndex,
-        start: 0,
-        end: t.text.length,
-        style: { kind: "underline", color: "orange" },
+    async (
+      t: CitationTarget,
+      noteId: string | "new",
+      existing?: Highlight
+    ): Promise<Highlight> => {
+      let note: Note;
+      let createdNote = false;
+      const level = t.level;
+      const chapterId = t.chapterId ?? "";
+      const chapterTitle = t.chapterTitle ?? "整本书";
+      const sourceText =
+        t.text ?? (level === "chapter" ? chapterTitle : t.bookTitle);
+      const citation: CitationAnchor =
+        level === "book"
+          ? { level }
+          : level === "chapter"
+            ? { level, chapterId }
+            : {
+                level,
+                chapterId,
+                paraIndex: t.paraIndex,
+                start: t.start ?? 0,
+                end: t.end ?? sourceText.length,
+                pdfAnchor: t.pdfAnchor,
+              };
+      if (noteId === "new") {
+        const title =
+          level === "book"
+            ? `《${t.bookTitle}》引用`
+            : level === "chapter"
+              ? `《${t.bookTitle}》· ${chapterTitle}`
+              : `《${t.bookTitle}》书摘`;
+        note = await lib.createNote(title);
+        createdNote = true;
+      } else {
+        const existingNote = lib.notes.find(item => item.id === noteId);
+        if (!existingNote) throw new Error("目标笔记不存在，请重新选择");
+        note = existingNote;
+      }
+
+      if (existing?.noteId && existing.noteId !== note.id) {
+        await lib.unlinkCitation(existing.id);
+      }
+
+      let h: Highlight;
+      if (existing) {
+        h = {
+          ...existing,
+          noteId: note.id,
+          citation,
+        };
+        await lib.updateHighlight(h);
+      } else {
+        const duplicate = lib.highlights.find(
+          item =>
+            item.bookId === t.bookId &&
+            citationLevelOf(item) === level &&
+            item.chapterId === chapterId &&
+            item.paraIndex === t.paraIndex &&
+            item.text === sourceText &&
+            item.noteId === note.id
+        );
+        if (duplicate) {
+          h = { ...duplicate, citation };
+          await lib.updateHighlight(h);
+        } else {
+          h = await lib.addHighlight({
+            bookId: t.bookId,
+            chapterId,
+            chapterTitle,
+            text: sourceText,
+            paraIndex: t.paraIndex,
+            start: level === "content" ? (t.start ?? 0) : undefined,
+            end: level === "content" ? (t.end ?? sourceText.length) : undefined,
+            pdfAnchor: t.pdfAnchor,
+            // Citation-only anchors are visible through the dedicated citation
+            // decoration and disappear completely when the relation is removed.
+            style: { kind: "none", color: "orange" },
+            noteId: note.id,
+            citation,
+          });
+          emitEvent("highlight.created", {
+            extId: h.id,
+            bookExtId: t.bookId,
+            bookTitle: t.bookTitle,
+            chapterId,
+            chapterTitle,
+            text: h.text,
+            citationLevel: level,
+            paraIndex: h.paraIndex,
+            start: h.start,
+            end: h.end,
+            pdfAnchor: h.pdfAnchor,
+            styleKind: "none",
+            styleColor: "orange",
+            noteExtId: note.id,
+          });
+        }
+      }
+
+      const content = appendCitationBlock(note.content, {
+        level,
+        bookTitle: t.bookTitle,
+        chapterTitle,
+        text: sourceText,
       });
-      emitEvent("highlight.created", {
+      if (content !== note.content) {
+        await lib.saveNote({
+          ...note,
+          content,
+        });
+      }
+
+      emitEvent("highlight.updated", {
         extId: h.id,
         bookExtId: t.bookId,
         bookTitle: t.bookTitle,
-        chapterTitle: t.chapterTitle,
+        chapterId,
+        chapterTitle,
         text: h.text,
-        styleKind: "underline",
-        styleColor: "orange",
+        noteExtId: note.id,
+        citationLevel: level,
+        paraIndex: h.paraIndex,
+        start: h.start,
+        end: h.end,
+        pdfAnchor: h.pdfAnchor,
       });
-      const block = quoteBlock(t.bookTitle, t.chapterTitle, t.text);
-      if (noteId === "new") {
-        const note = await lib.createNote(`《${t.bookTitle}》书摘`);
-        await lib.saveNote({ ...note, content: block });
-        await lib.updateHighlight({ ...h, noteId: note.id });
-        emitEvent("note.created", { extId: note.id, title: note.title });
-        showToast(`已引用《${t.bookTitle}》的文段到新笔记`);
-      } else {
-        const note = lib.notes.find(n => n.id === noteId);
-        if (!note) return;
-        await lib.saveNote({
-          ...note,
-          content: note.content.replace(/\s*$/, "\n\n") + block,
-        });
-        await lib.updateHighlight({ ...h, noteId });
-        emitEvent("note.updated", { extId: noteId, title: note.title });
-        showToast(`已引用到「${note.title}」`);
-      }
-      emitEvent("highlight.updated", { extId: h.id });
+      showToast(
+        createdNote
+          ? `已引用到新笔记「${note.title}」`
+          : `已引用到「${note.title}」`
+      );
       setShowCite(false);
+      return h;
     },
     [lib, showToast]
   );
@@ -661,6 +1061,10 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
   /** PDF：切换 重排 / 原版 阅读方式 */
   const toggleReaderMode = async () => {
     const target = isOriginal ? "reflow" : "original";
+    if (target === "reflow" && !supportsPdfReflow(book.chapters)) {
+      showToast("此 PDF 没有可用的完整文字层，仅支持原版版面");
+      return;
+    }
     const ok = await lib.setReaderMode(book.id, target);
     if (!ok) {
       showToast("未找到原始 PDF 文件，无法切换");
@@ -683,17 +1087,41 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     );
   };
 
+  const toggleBilingual = () => {
+    if (bilingualLanguage) {
+      setBilingualLanguage(null);
+      return;
+    }
+    setPosture("read");
+    setSel(null);
+    setTranslationSel(null);
+    setHlPopup(null);
+    setShowType(false);
+    setShowCite(false);
+    setBilingualLanguage(inferTargetLanguage(chapter.paragraphs));
+  };
+
   const paneCount = countReaderPanes(splitLayout);
   const visibleSplitLayout =
-    posture === "read" && !aiTarget ? splitLayout : MAIN_READER_PANE;
+    posture === "read" && !aiTarget && !bilingualLanguage
+      ? splitLayout
+      : MAIN_READER_PANE;
 
-  const panelMarks = bookHighlights.filter(
-    h => (h.style?.kind ?? "underline") !== "none"
+  const panelMarks = contentHighlights.filter(
+    h => (h.style?.kind ?? "underline") !== "none" || !!h.noteId
   );
-  const panelNotes = bookHighlights.filter(h => h.note);
-  const panelQa = bookHighlights.filter(h => (h.aiQa?.length ?? 0) > 0);
+  const panelNotes = contentHighlights.filter(h => h.note);
+  const panelQa = contentHighlights.filter(h => (h.aiQa?.length ?? 0) > 0);
   const popupHl = hlPopup
     ? (lib.highlights.find(h => h.id === hlPopup.id) ?? null)
+    : null;
+  const popupAnchor = popupHl ? passageAnchorFromHighlight(popupHl) : null;
+  const popupAssociationCount = popupAnchor
+    ? (associationEndpoints.get(passageAnchorKey(popupAnchor))?.associationIds
+        .length ?? 0)
+    : 0;
+  const pdfCitationHighlight = pdfCitationPopup
+    ? (lib.highlights.find(h => h.id === pdfCitationPopup.id) ?? null)
     : null;
 
   return (
@@ -723,7 +1151,7 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
           scopeLabel={
             activeStudySet ? `学习集：${activeStudySet.name}` : "全书架"
           }
-          showMainSplitControls={!showCite && !showType}
+          showMainSplitControls={!showCite && !showType && !bilingualLanguage}
           onSplit={splitPane}
           onChange={(paneId, target) =>
             setSplitLayout(current =>
@@ -779,6 +1207,29 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                     {isOriginal ? "原版" : "重排"}
                   </button>
                 )}
+                {book.format !== "pdf" && (
+                  <button
+                    type="button"
+                    aria-pressed={!!bilingualLanguage}
+                    onClick={toggleBilingual}
+                    className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] transition-colors ${
+                      bilingualLanguage
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : ""
+                    }`}
+                    style={
+                      bilingualLanguage
+                        ? undefined
+                        : { borderColor: theme.border, color: theme.muted }
+                    }
+                    title="原文与译文双向同步阅读"
+                  >
+                    <Languages size={12} />
+                    {bilingualLanguage
+                      ? `双语 · ${bilingualLanguage === "中文" ? "中" : "EN"}`
+                      : "双语"}
+                  </button>
+                )}
                 <div
                   className="flex overflow-hidden rounded-full border"
                   style={{ borderColor: theme.border }}
@@ -794,6 +1245,7 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                       key={mode}
                       onClick={() => {
                         setPosture(mode);
+                        if (mode !== "read") setBilingualLanguage(null);
                         setHlPopup(null);
                         setSel(null);
                       }}
@@ -897,69 +1349,150 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                     )}
                     onProgress={onPdfProgress}
                     onSelectText={setPdfSel}
+                    onSelectionClear={() => setPdfSel(null)}
+                    highlights={contentHighlights}
+                    associationAnchors={pdfAssociationDecorations}
+                    onAssociationClick={(key, x, y) => {
+                      const endpoint = associationEndpoints.get(key);
+                      if (endpoint)
+                        openAssociationPopup(endpoint.anchor, y + 10, x);
+                    }}
+                    onHighlightClick={(highlight, x, y) => {
+                      setTab(highlight.note ? "notes" : "marks");
+                      if (highlight.noteId) {
+                        setPdfCitationPopup({
+                          id: highlight.id,
+                          top: y + 10,
+                          left: x,
+                        });
+                      } else {
+                        showToast(
+                          highlight.note || highlight.name || "已选中 PDF 划线"
+                        );
+                      }
+                    }}
+                    anchorPage={pdfAnchorPage}
                     anchorText={pdfAnchor}
                     onAnchorConsumed={() => {
                       setPdfAnchor(null);
-                      lib.navigate({ view: "reader", bookId: book.id });
+                      setPdfAnchorPage(null);
+                      lib.navigate({
+                        view: "reader",
+                        bookId: book.id,
+                        chapterId: chapter.id,
+                        studySetId: activeStudySet?.id,
+                      });
                     }}
                   />
 
                   {/* 原版模式划选弹层 */}
                   {pdfSel && (
+                    <PdfSelectionToolbar
+                      top={pdfSel.y < 190 ? pdfSel.y + 28 : pdfSel.y - 158}
+                      left={pdfSel.x}
+                      onHighlight={addPdfMark}
+                      onComment={addPdfComment}
+                      onAssociate={beginPdfAssociation}
+                      notes={lib.notes}
+                      sourceText={pdfSel.text}
+                      onCite={async noteId => {
+                        await citePassage(
+                          {
+                            level: "content",
+                            bookId: book.id,
+                            bookTitle: book.title,
+                            chapterId: chapter.id,
+                            chapterTitle: `${chapter.title} · 第 ${pdfSel.page} 页`,
+                            paraIndex: 0,
+                            start: 0,
+                            end: pdfSel.text.length,
+                            text: pdfSel.text,
+                            pdfAnchor: {
+                              page: pdfSel.page,
+                              rects: pdfSel.rects,
+                            },
+                          },
+                          noteId
+                        );
+                        window.getSelection()?.removeAllRanges();
+                        setPdfSel(null);
+                      }}
+                      onCopy={async () => {
+                        await navigator.clipboard.writeText(pdfSel.text);
+                        window.getSelection()?.removeAllRanges();
+                        setPdfSel(null);
+                        showToast("已复制");
+                      }}
+                      onClose={() => {
+                        window.getSelection()?.removeAllRanges();
+                        setPdfSel(null);
+                      }}
+                    />
+                  )}
+
+                  {pdfCitationHighlight && pdfCitationPopup && (
                     <div
-                      className="float-pop fixed z-50 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-border bg-card p-1 shadow-xl"
+                      role="dialog"
+                      aria-label="管理 PDF 引用"
+                      className="fixed z-[60] w-[280px] -translate-x-1/2 rounded-lg border border-border bg-popover p-3 shadow-xl"
                       style={{
-                        left: pdfSel.x,
-                        top: Math.max(8, pdfSel.y - 46),
+                        left: Math.max(
+                          150,
+                          Math.min(
+                            window.innerWidth - 150,
+                            pdfCitationPopup.left
+                          )
+                        ),
+                        top: Math.max(
+                          8,
+                          Math.min(
+                            window.innerHeight - 150,
+                            pdfCitationPopup.top
+                          )
+                        ),
                       }}
                     >
-                      <button
-                        onClick={() => {
-                          void createFromPdf(pdfSel, {
-                            style: { kind: "underline", color: "orange" },
-                          });
-                          showToast("已划线");
-                        }}
-                        className="rounded-full px-2.5 py-1 text-[12px] hover:bg-accent"
-                      >
-                        划线
-                      </button>
-                      <button
-                        onClick={() => {
-                          const note = window.prompt("批注内容");
-                          if (note != null && note.trim()) {
-                            void createFromPdf(pdfSel, {
-                              style: { kind: "background", color: "yellow" },
-                              note: note.trim(),
-                            });
-                            showToast("批注已保存");
-                            setTab("notes");
-                          }
-                        }}
-                        className="rounded-full px-2.5 py-1 text-[12px] hover:bg-accent"
-                      >
-                        批注
-                      </button>
-                      <button
-                        onClick={() => {
-                          void navigator.clipboard.writeText(pdfSel.text);
-                          window.getSelection()?.removeAllRanges();
-                          setPdfSel(null);
-                          showToast("已复制");
-                        }}
-                        className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] hover:bg-accent"
-                      >
-                        <Copy size={11} /> 复制
-                      </button>
-                      <button
-                        onClick={() => {
-                          window.getSelection()?.removeAllRanges();
-                          setPdfSel(null);
-                        }}
-                        className="rounded-full p-1 text-muted-foreground hover:bg-accent"
-                      >
-                        <X size={12} />
-                      </button>
+                      <div className="font-meta flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary">
+                        <Quote size={11} /> 已引用
+                      </div>
+                      <p className="font-reading mt-1.5 line-clamp-3 text-[12px] leading-5 text-muted-foreground">
+                        「{pdfCitationHighlight.text}」
+                      </p>
+                      <div className="mt-2.5 flex justify-end gap-2 border-t border-border pt-2 text-[11.5px]">
+                        {pdfCitationHighlight.noteId && (
+                          <button
+                            type="button"
+                            className="rounded-md px-2 py-1 text-primary hover:bg-primary/10"
+                            onClick={() => {
+                              lib.navigate({
+                                view: "note",
+                                noteId: pdfCitationHighlight.noteId,
+                              });
+                              setPdfCitationPopup(null);
+                            }}
+                          >
+                            打开笔记
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="rounded-md px-2 py-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          onClick={async () => {
+                            await lib.unlinkCitation(pdfCitationHighlight.id);
+                            setPdfCitationPopup(null);
+                            showToast("引用已删除，图谱关系已同步更新");
+                          }}
+                        >
+                          取消引用
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-md px-2 py-1 text-muted-foreground hover:bg-secondary"
+                          onClick={() => setPdfCitationPopup(null)}
+                        >
+                          关闭
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -969,6 +1502,25 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                     </div>
                   )}
                 </div>
+              ) : bilingualLanguage ? (
+                <BilingualReader
+                  book={book}
+                  chapterId={chapter.id}
+                  theme={theme}
+                  type={type}
+                  initialTargetLanguage={bilingualLanguage}
+                  onTargetLanguageChange={setBilingualLanguage}
+                  onNavigateChapter={nextChapterId => {
+                    const index = book.chapters.findIndex(
+                      item => item.id === nextChapterId
+                    );
+                    if (index >= 0) gotoChapter(index);
+                  }}
+                  onProgress={(progressChapterId, ratio) =>
+                    lib.saveProgress(book.id, progressChapterId, ratio)
+                  }
+                  className="flex-1"
+                />
               ) : (
                 <div
                   ref={scrollRef}
@@ -977,8 +1529,11 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                 >
                   <div
                     ref={wrapRef}
-                    className="relative mx-auto px-8 pb-28 pt-12"
-                    style={{ maxWidth: type.columns === 2 ? 1080 : 680 }}
+                    className="relative mx-auto pb-28 pt-12"
+                    style={{
+                      maxWidth: type.columns === 2 ? 1080 : 680,
+                      paddingInline: readerPagePadding(type.pageMargin),
+                    }}
                     onMouseUp={onMouseUp}
                   >
                     <h1 className="font-reading mb-2 text-center text-[26px] font-bold tracking-wide">
@@ -1002,14 +1557,18 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                     >
                       {chapter.paragraphs.map((p, i) => (
                         <Paragraph
-                          key={i}
+                          key={`${chapter.id}:${i}:${posture === "recall" ? "recall" : "normal"}`}
                           index={i}
                           text={p}
                           ranges={rangesByPara.get(i) ?? []}
+                          associationRanges={
+                            associationRangesByPara.get(i) ?? []
+                          }
                           recall={posture === "recall"}
                           onSegmentClick={(hid, top, left) =>
                             setHlPopup({ id: hid, top, left })
                           }
+                          onAssociationClick={openAssociationPopup}
                         />
                       ))}
                     </div>
@@ -1060,7 +1619,26 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                       left={sel.left}
                       onHighlight={addMark}
                       onComment={addComment}
-                      onOpenCiteBrowser={() => setShowCite(true)}
+                      onAssociate={beginSelectionAssociation}
+                      notes={lib.notes}
+                      sourceText={sel.text}
+                      onCite={async noteId => {
+                        await citePassage(
+                          {
+                            level: "content",
+                            bookId: book.id,
+                            bookTitle: book.title,
+                            chapterId: chapter.id,
+                            chapterTitle: chapter.title,
+                            paraIndex: sel.paraIndex,
+                            start: sel.start,
+                            end: sel.end,
+                            text: sel.text,
+                          },
+                          noteId
+                        );
+                        clearSelection();
+                      }}
                       onTranslate={openTranslation}
                       onAddToOutline={() => void addSelectionToOutline()}
                       onAskAi={() => askAiOn()}
@@ -1142,7 +1720,32 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                       }}
                       onAddToMindMap={() => void addToMindMap(popupHl)}
                       onAddToOutline={() => void addHighlightToOutline(popupHl)}
-                      onCitePassage={citePassage}
+                      associationCount={popupAssociationCount}
+                      onAssociate={() => beginHighlightAssociation(popupHl)}
+                      onCite={async noteId => {
+                        await citePassage(
+                          {
+                            level: "content",
+                            bookId: popupHl.bookId,
+                            bookTitle: book.title,
+                            chapterId: popupHl.chapterId,
+                            chapterTitle: popupHl.chapterTitle,
+                            paraIndex: popupHl.paraIndex ?? 0,
+                            start: popupHl.start,
+                            end: popupHl.end,
+                            text: popupHl.text,
+                            pdfAnchor: popupHl.pdfAnchor,
+                          },
+                          noteId,
+                          popupHl
+                        );
+                        setHlPopup(null);
+                      }}
+                      onUnlinkCitation={async () => {
+                        await lib.unlinkCitation(popupHl.id);
+                        showToast("引用已删除，图谱关系已同步更新");
+                        setHlPopup(null);
+                      }}
                       onAskAi={() => askAiOn(popupHl)}
                       onDelete={() => {
                         lib.removeHighlight(popupHl.id);
@@ -1154,8 +1757,6 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                       }}
                       onClose={() => setHlPopup(null)}
                       notes={lib.notes}
-                      books={lib.books}
-                      currentBookId={book.id}
                     />
                   )}
 
@@ -1327,6 +1928,39 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
           </div>
         </div>
       ) : null}
+
+      {associationPopup && (
+        <AssociationPopup
+          position="fixed"
+          top={associationPopup.top}
+          left={associationPopup.left}
+          current={associationPopup.anchor}
+          associations={lib.associations}
+          books={lib.books}
+          onNavigate={navigateAssociation}
+          onDelete={async associationId => {
+            await lib.removeAssociation(associationId);
+            showToast("关联已删除，图谱关系已同步更新");
+          }}
+          onAdd={() => beginAssociation(associationPopup.anchor)}
+          onClose={() => setAssociationPopup(null)}
+        />
+      )}
+
+      {associationSource && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/20 p-4 backdrop-blur-[1px]"
+          onMouseDown={() => setAssociationSource(null)}
+        >
+          <AssociationPicker
+            books={lib.books}
+            highlights={lib.highlights}
+            source={associationSource}
+            onSelect={saveAssociation}
+            onClose={() => setAssociationSource(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1389,78 +2023,219 @@ function MarkCard({
   );
 }
 
-/** 段落：按书摘分段渲染 */
-function Paragraph({
+/** 段落：把书摘与独立关联端点叠加渲染，重叠时两种语义都保留。 */
+export function Paragraph({
   index,
   text,
   ranges,
+  associationRanges,
   recall,
   onSegmentClick,
+  onAssociationClick,
 }: {
   index: number;
   text: string;
   ranges: { h: Highlight; start: number; end: number }[];
+  associationRanges: AssociationRange[];
   recall: boolean;
   onSegmentClick: (highlightId: string, top: number, left: number) => void;
+  onAssociationClick: (
+    anchor: PassageAnchor,
+    top: number,
+    left: number
+  ) => void;
 }) {
   const wrapRef = useRef<HTMLParagraphElement>(null);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
-  const segs = segmentParagraph(text, ranges);
   const hasNote = ranges.some(r => r.h.note);
+  const segments = useMemo(() => {
+    const highlightRanges = ranges.filter(
+      range =>
+        range.start >= 0 && range.end > range.start && range.start < text.length
+    );
+    const linkedRanges = associationRanges.filter(
+      range =>
+        range.start >= 0 && range.end > range.start && range.start < text.length
+    );
+    const boundaries = new Set<number>([0, text.length]);
+    for (const range of [...highlightRanges, ...linkedRanges]) {
+      boundaries.add(Math.min(text.length, range.start));
+      boundaries.add(Math.min(text.length, range.end));
+    }
+    const sorted = Array.from(boundaries).sort((left, right) => left - right);
+    return sorted.slice(0, -1).flatMap((start, segmentIndex) => {
+      const end = sorted[segmentIndex + 1];
+      if (end <= start) return [];
+      const highlightRange = highlightRanges.find(
+        range => range.start <= start && range.end >= end
+      );
+      const highlight = highlightRange?.h;
+      const associations = linkedRanges.filter(
+        range => range.start <= start && range.end >= end
+      );
+      return [
+        {
+          start,
+          end,
+          text: text.slice(start, end),
+          highlight,
+          endingHighlight: highlightRange?.end === end,
+          associations,
+          endingAssociations: associations.filter(range => range.end === end),
+        },
+      ];
+    });
+  }, [associationRanges, ranges, text]);
 
   return (
     <p ref={wrapRef} data-pi={index}>
-      {segs.map((s, i) => {
-        if (!s.highlight) return <span key={i}>{s.text}</span>;
-        const h = s.highlight;
-        const style = h.style ?? {
+      {segments.map(segment => {
+        const h = segment.highlight;
+        const firstAssociation = segment.associations[0];
+        if (!h && !firstAssociation)
+          return <span key={segment.start}>{segment.text}</span>;
+        const isConcealed = h
+          ? isRecallHighlightConcealed(recall, revealed, h.id)
+          : false;
+        const reveal = () => {
+          if (h) setRevealed(current => revealRecallHighlight(current, h.id));
+        };
+        const style = h?.style ?? {
           kind: "underline" as const,
-          color: "orange",
+          color: "blue",
         };
         const c = swatch(style.color);
-        const cls =
-          style.kind === "underline"
+        const highlightClass = !h
+          ? ""
+          : style.kind === "underline"
             ? "hl-underline"
             : style.kind === "background"
               ? "hl-background"
               : style.kind === "color"
                 ? "hl-color"
                 : "";
+        const associationAnchorKeys = Array.from(
+          new Set(
+            segment.associations.map(relation =>
+              passageAnchorKey(relation.anchor)
+            )
+          )
+        );
+        const openAssociation = (
+          event: React.MouseEvent<HTMLElement>,
+          selected?: AssociationRange
+        ) => {
+          const relation =
+            selected ?? segment.endingAssociations[0] ?? firstAssociation;
+          if (!relation) return;
+          const rect = event.currentTarget.getBoundingClientRect();
+          onAssociationClick(
+            relation.anchor,
+            rect.bottom + 6,
+            rect.left + rect.width / 2
+          );
+        };
         return (
           <span
-            key={i}
-            className={`hl-clickable ${cls} ${recall && !revealed.has(h.id) ? "select-none blur-[5px]" : ""}`}
+            key={segment.start}
+            role={isConcealed ? "button" : undefined}
+            tabIndex={isConcealed ? 0 : undefined}
+            aria-label={isConcealed ? "揭示被遮盖的摘录" : undefined}
+            data-association-anchor-keys={
+              associationAnchorKeys.length > 0
+                ? JSON.stringify(associationAnchorKeys)
+                : undefined
+            }
+            data-recall-state={
+              recall ? (isConcealed ? "concealed" : "revealed") : undefined
+            }
+            className={`hl-clickable ${highlightClass} ${h?.noteId ? "hl-citation" : ""} ${firstAssociation ? "hl-association" : ""} ${isConcealed ? "hl-recall-hidden" : ""}`}
             style={
               {
-                "--hl-solid": recall ? "transparent" : c.solid,
-                "--hl-soft": recall ? "transparent" : c.soft,
+                "--hl-solid": isConcealed ? "transparent" : c.solid,
+                "--hl-soft": isConcealed ? "transparent" : c.soft,
               } as React.CSSProperties
             }
-            title={recall && !revealed.has(h.id) ? "点击揭示摘录" : undefined}
+            title={
+              isConcealed
+                ? "点击揭示摘录"
+                : recall
+                  ? "已揭示摘录"
+                  : firstAssociation
+                    ? "已建立内容关联，点击关联图标管理"
+                    : h?.noteId
+                      ? "已引用到笔记，点击管理"
+                      : undefined
+            }
+            onMouseDown={e => {
+              if (!isConcealed) return;
+              // Reveal before the enclosing selection handler runs. This also
+              // prevents a click from becoming a tiny accidental text drag.
+              e.preventDefault();
+              reveal();
+            }}
+            onKeyDown={e => {
+              if (!isConcealed || (e.key !== "Enter" && e.key !== " ")) return;
+              e.preventDefault();
+              reveal();
+            }}
             onClick={e => {
               if (recall) {
-                setRevealed(current => new Set(current).add(h.id));
+                reveal();
                 return;
               }
-              const wrap = wrapRef.current?.closest(".relative");
-              const wrect = wrap?.getBoundingClientRect();
-              const rect = (e.target as HTMLElement).getBoundingClientRect();
-              if (wrect) {
+              if (h) {
+                const wrap = wrapRef.current?.closest(".relative");
+                const wrect = wrap?.getBoundingClientRect();
+                const rect = (e.target as HTMLElement).getBoundingClientRect();
+                if (!wrect) return;
                 onSegmentClick(
                   h.id,
                   rect.bottom - wrect.top + 6,
                   rect.left - wrect.left + rect.width / 2
                 );
-              }
+              } else openAssociation(e);
             }}
           >
-            {s.text}
-            {(h.note || (h.aiQa?.length ?? 0) > 0) && style.kind === "none" && (
-              <Sparkles
-                size={11}
+            {segment.text}
+            {h?.noteId && segment.endingHighlight && (
+              <Quote
+                aria-label="引用标记"
+                size={10}
                 className="mb-0.5 ml-0.5 inline text-primary"
               />
             )}
+            {h &&
+              segment.endingHighlight &&
+              (h.note || (h.aiQa?.length ?? 0) > 0) &&
+              style.kind === "none" && (
+                <Sparkles
+                  size={11}
+                  className="mb-0.5 ml-0.5 inline text-primary"
+                />
+              )}
+            {segment.endingAssociations.map(relation => {
+              const associationCount = new Set(relation.associationIds).size;
+              const relationKey = passageAnchorKey(relation.anchor);
+              return (
+                <button
+                  key={relationKey}
+                  type="button"
+                  data-association-anchor-key={relationKey}
+                  className="association-ball ml-0.5 inline-flex align-middle"
+                  aria-label={`管理 ${associationCount} 条内容关联`}
+                  title={`${associationCount} 条内容关联`}
+                  onMouseDown={event => event.preventDefault()}
+                  onClick={event => {
+                    event.stopPropagation();
+                    openAssociation(event, relation);
+                  }}
+                >
+                  <Link2 size={9} />
+                  {associationCount > 1 ? associationCount : null}
+                </button>
+              );
+            })}
           </span>
         );
       })}
@@ -1474,14 +2249,12 @@ function Paragraph({
   );
 }
 
-/** 点击已有书摘的弹层：查看/编辑批注（可命名）、标签、挖空、加入复习、引用（三级浏览器）、问 AI、删除 */
-function HighlightPopup({
+/** 点击已有书摘的弹层：批注、复习、独立关联、引用、AI 与删除。 */
+export function HighlightPopup({
   h,
   top,
   left,
   notes,
-  books,
-  currentBookId,
   onEditNote,
   onEditName,
   onEditTags,
@@ -1489,7 +2262,10 @@ function HighlightPopup({
   onToggleReview,
   onAddToMindMap,
   onAddToOutline,
-  onCitePassage,
+  associationCount,
+  onAssociate,
+  onCite,
+  onUnlinkCitation,
   onAskAi,
   onDelete,
   onClose,
@@ -1498,8 +2274,6 @@ function HighlightPopup({
   top: number;
   left: number;
   notes: import("@/types").Note[];
-  books: Book[];
-  currentBookId: string;
   onEditNote: (text: string) => void;
   onEditName: (name: string) => void;
   onEditTags: (tags: string[]) => void;
@@ -1507,7 +2281,10 @@ function HighlightPopup({
   onToggleReview: () => void;
   onAddToMindMap: () => void;
   onAddToOutline: () => void;
-  onCitePassage: (t: CitationTarget, noteId: string | "new") => void;
+  associationCount: number;
+  onAssociate: () => void;
+  onCite: (noteId: string | "new") => Promise<void> | void;
+  onUnlinkCitation: () => Promise<void> | void;
   onAskAi: () => void;
   onDelete: () => void;
   onClose: () => void;
@@ -1687,76 +2464,101 @@ function HighlightPopup({
 
       {citing ? (
         <div className="relative mt-2 border-t border-border pt-1.5">
-          <div className="relative" style={{ height: 320 }}>
-            <div className="absolute inset-0">
-              <CiteBrowser
-                books={books}
-                currentBookId={currentBookId}
-                notes={notes}
-                onSelect={onCitePassage}
-                onClose={() => setCiting(false)}
-              />
-            </div>
-          </div>
+          <CitationNotePicker
+            notes={notes}
+            sourceText={h.text}
+            onSelect={onCite}
+            onClose={() => setCiting(false)}
+            embedded
+          />
         </div>
       ) : (
-        <div className="mt-2.5 flex flex-wrap border-t border-border pt-2 text-[12px]">
-          <button
-            onClick={() => setEditing(true)}
-            className="flex flex-1 items-center justify-center gap-1 rounded py-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <MessageSquarePlus size={12} /> {h.note ? "改批注" : "批注"}
-          </button>
-          <button
-            onClick={() => setTagging(v => !v)}
-            className={`flex flex-1 items-center justify-center gap-1 rounded py-1 hover:bg-secondary ${
-              tagging
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Tag size={12} /> 标签
-          </button>
-          <button
-            onClick={onToggleReview}
-            className={`flex flex-1 items-center justify-center gap-1 rounded py-1 hover:bg-secondary ${
-              inReview
-                ? "font-medium text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {inReview ? "移出复习" : "加入复习"}
-          </button>
-          <button
-            onClick={onAddToMindMap}
-            className="flex flex-1 items-center justify-center gap-1 rounded py-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <GitBranch size={12} /> 脑图
-          </button>
-          <button
-            onClick={onAddToOutline}
-            className="flex flex-1 items-center justify-center gap-1 rounded py-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <ListPlus size={12} /> 目录
-          </button>
-          <button
-            onClick={() => setCiting(true)}
-            className="flex flex-1 items-center justify-center gap-1 rounded py-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <Quote size={12} /> 引用
-          </button>
-          <button
-            onClick={onAskAi}
-            className="flex flex-1 items-center justify-center gap-1 rounded py-1 font-medium text-primary hover:bg-accent/40"
-          >
-            <Sparkles size={12} /> 问 AI
-          </button>
-          <button
-            onClick={onDelete}
-            className="flex flex-1 items-center justify-center gap-1 rounded py-1 text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 size={12} />
-          </button>
+        <div
+          className="mt-2.5 space-y-1 border-t border-border pt-2"
+          role="toolbar"
+          aria-label="已有书摘的操作"
+        >
+          <div className="flex items-center justify-center gap-1">
+            <ExpandableSelectionAction
+              icon={<MessageSquarePlus size={14} />}
+              label={h.note ? "改批注" : "批注"}
+              onClick={() => setEditing(true)}
+              className="text-muted-foreground hover:bg-secondary hover:text-foreground"
+            />
+            <ExpandableSelectionAction
+              icon={<Tag size={14} />}
+              label="标签"
+              aria-pressed={tagging}
+              onClick={() => setTagging(v => !v)}
+              className={
+                tagging
+                  ? "bg-secondary text-primary"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              }
+            />
+            <ExpandableSelectionAction
+              icon={<RefreshCw size={14} />}
+              label={inReview ? "移出复习" : "加入复习"}
+              aria-pressed={inReview}
+              onClick={onToggleReview}
+              className={
+                inReview
+                  ? "bg-primary/10 font-medium text-primary"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              }
+            />
+            <ExpandableSelectionAction
+              icon={<GitBranch size={14} />}
+              label="脑图"
+              onClick={onAddToMindMap}
+              className="text-muted-foreground hover:bg-secondary hover:text-foreground"
+            />
+          </div>
+          <div className="flex items-center justify-center gap-1">
+            <ExpandableSelectionAction
+              icon={<ListPlus size={14} />}
+              label="目录"
+              onClick={onAddToOutline}
+              className="text-muted-foreground hover:bg-secondary hover:text-foreground"
+            />
+            <ExpandableSelectionAction
+              icon={<Link2 size={14} />}
+              label={associationCount ? `关联 ${associationCount}` : "关联"}
+              onClick={onAssociate}
+              className={
+                associationCount
+                  ? "bg-sky-500/10 text-sky-700"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              }
+            />
+            {h.noteId ? (
+              <ExpandableSelectionAction
+                icon={<Unlink size={14} />}
+                label="取消引用"
+                onClick={() => void onUnlinkCitation()}
+                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              />
+            ) : (
+              <ExpandableSelectionAction
+                icon={<Quote size={14} />}
+                label="引用"
+                onClick={() => setCiting(true)}
+                className="text-muted-foreground hover:bg-secondary hover:text-foreground"
+              />
+            )}
+            <ExpandableSelectionAction
+              icon={<Sparkles size={14} />}
+              label="问 AI"
+              onClick={onAskAi}
+              className="font-medium text-primary hover:bg-accent/40"
+            />
+            <ExpandableSelectionAction
+              icon={<Trash2 size={14} />}
+              label="删除"
+              onClick={onDelete}
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            />
+          </div>
         </div>
       )}
     </div>

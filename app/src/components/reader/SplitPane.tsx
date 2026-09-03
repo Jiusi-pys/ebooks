@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 import { BookOpen, Columns2, X } from "lucide-react";
 import type { Book, ReaderTheme, TypeSettings } from "@/types";
-import { fontStack } from "@/lib/reading";
+import { fontStack, readerPagePadding } from "@/lib/reading";
+import {
+  resolvePdfReaderMode,
+  resolveReaderChapter,
+} from "@/lib/pdfReaderState";
 import type { SplitDirection } from "@/lib/splitLayout";
 import { PdfCanvasViewer } from "./PdfCanvasViewer";
 
@@ -36,15 +40,17 @@ export function SplitPane({
   type: TypeSettings;
 }) {
   const book = books.find(b => b.id === value.bookId) ?? books[0];
-  const chapter =
-    book?.chapters.find(c => c.id === value.chapterId) ?? book?.chapters[0];
+  const chapter = book
+    ? resolveReaderChapter(book, value.chapterId).chapter
+    : undefined;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [chapter?.id, book?.id]);
 
-  const isOriginal = book?.format === "pdf" && book.readerMode === "original";
+  const isOriginal =
+    book?.format === "pdf" && resolvePdfReaderMode(book) === "original";
 
   return (
     <section
@@ -151,7 +157,10 @@ export function SplitPane({
         </div>
       ) : (
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-          <article className="mx-auto max-w-[620px] px-7 pb-20 pt-8">
+          <article
+            className="mx-auto max-w-[620px] pb-20 pt-8"
+            style={{ paddingInline: readerPagePadding(type.pageMargin) }}
+          >
             <div
               className="font-meta mb-1.5 text-[10px] uppercase tracking-[0.18em]"
               style={{ color: theme.muted }}
