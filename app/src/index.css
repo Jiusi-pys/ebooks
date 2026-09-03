@@ -1,0 +1,219 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* 暖纸编辑色系 */
+    --background: 34 26% 89%;          /* #ece4d9 暖米 */
+    --foreground: 34 13% 28%;          /* #4f483e 暖棕 */
+    --card: 36 56% 97%;                /* #fffbf5 米白 */
+    --card-foreground: 34 13% 28%;
+    --popover: 36 56% 97%;
+    --popover-foreground: 34 13% 28%;
+    --primary: 17 96% 48%;             /* #f54001 焦橙 */
+    --primary-foreground: 36 56% 97%;
+    --secondary: 33 29% 93%;           /* #f4f0ea 奶油 */
+    --secondary-foreground: 34 13% 28%;
+    --muted: 33 22% 90%;
+    --muted-foreground: 33 13% 48%;    /* #8a7d6b */
+    --accent: 22 100% 82%;             /* #ffc198 浅橙 */
+    --accent-foreground: 34 24% 24%;
+    --destructive: 4 70% 44%;
+    --destructive-foreground: 36 56% 97%;
+    --border: 33 20% 82%;
+    --input: 33 20% 80%;
+    --ring: 17 96% 48%;
+    --radius: 0.5rem;
+    --sidebar-background: 33 25% 91%;
+    --sidebar-foreground: 34 13% 28%;
+    --sidebar-primary: 17 96% 48%;
+    --sidebar-primary-foreground: 36 56% 97%;
+    --sidebar-accent: 33 30% 86%;
+    --sidebar-accent-foreground: 34 13% 28%;
+    --sidebar-border: 33 18% 83%;
+    --sidebar-ring: 17 96% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply antialiased;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: ui-sans-serif, -apple-system, "PingFang SC", "Hiragino Sans GB",
+      "Microsoft YaHei", "Source Han Sans SC", sans-serif;
+  }
+  ::selection {
+    background: #ffc198;
+    color: #3d3629;
+  }
+}
+
+/* 衬线阅读字体族 */
+.font-reading {
+  font-family: "Source Han Serif SC", "Noto Serif SC", "Songti SC", "STSong",
+    "SimSun", Georgia, "Times New Roman", serif;
+}
+.font-meta {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
+    "Courier New", monospace;
+}
+
+/* 阅读正文排版（文字重排后的呈现层） */
+.reader-body {
+  text-align: justify;
+  text-justify: inter-ideograph;
+  hanging-punctuation: first allow-end;
+}
+.reader-body p {
+  text-indent: 2em;
+  margin: 0;
+}
+.reader-body p + p {
+  margin-top: 0.4em;
+}
+
+/* 笔记 markdown-lite 渲染 */
+.note-render h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 0.6em 0 0.4em;
+}
+.note-render h2 {
+  font-size: 1.2em;
+  font-weight: 700;
+  margin: 0.8em 0 0.35em;
+}
+.note-render p {
+  margin: 0.45em 0;
+  line-height: 1.9;
+}
+.note-render ul,
+.note-render ol {
+  margin: 0.45em 0;
+  padding-left: 1.4em;
+  line-height: 1.9;
+}
+.note-render ul li {
+  list-style: disc;
+}
+.note-render ol li {
+  list-style: decimal;
+}
+.note-render blockquote {
+  border-left: 3px solid #f54001;
+  padding-left: 0.9em;
+  margin: 0.6em 0;
+  color: #8a7d6b;
+}
+
+/* 双链 pill */
+.wikilink {
+  display: inline;
+  color: #f54001;
+  font-weight: 500;
+  background: rgba(245, 64, 1, 0.08);
+  border-radius: 4px;
+  padding: 0 3px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wikilink:hover {
+  background: rgba(245, 64, 1, 0.18);
+}
+.wikilink.wikilink-missing {
+  color: #8a7d6b;
+  background: rgba(138, 125, 107, 0.12);
+  border-bottom: 1px dashed #8a7d6b;
+}
+
+/* 细滚动条 */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(79, 72, 62, 0.22);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- 阅读器主题与划线 ---------- */
+
+.reader-shell {
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* 双栏模式 */
+.reader-body.cols-2 {
+  column-count: 2;
+  column-gap: 3.5em;
+  column-rule: 1px solid rgba(128, 118, 96, 0.18);
+}
+
+/* 划线渲染 */
+.hl-underline {
+  background-image: linear-gradient(var(--hl-solid), var(--hl-solid));
+  background-repeat: no-repeat;
+  background-size: 100% 2px;
+  background-position: 0 96%;
+  padding-bottom: 2px;
+}
+.hl-background {
+  background-color: var(--hl-soft);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.hl-color {
+  color: var(--hl-solid);
+}
+.hl-clickable {
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.hl-clickable:hover {
+  filter: brightness(0.94);
+}
+
+/* 批注标记：段尾小角标 */
+.hl-note-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #f54001;
+  color: #fffbf5;
+  font-size: 10px;
+  vertical-align: text-bottom;
+  cursor: pointer;
+}
+
+/* 定位闪烁动画 */
+@keyframes anchor-flash {
+  0%,
+  40% {
+    background-color: rgba(245, 64, 1, 0.25);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.anchor-flash {
+  animation: anchor-flash 2.2s ease-out;
+  border-radius: 4px;
+}
+
+/* 浮动气泡通用 */
+.float-pop {
+  box-shadow: 0 8px 30px -8px rgba(62, 49, 32, 0.35);
+}
