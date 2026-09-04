@@ -1,7 +1,12 @@
-import type { Chapter } from "@/types";
+import type { BookMetadata, Chapter } from "@/types";
 import type { ImportBookFormat } from "./bookFormats";
+// Keep every parser eager: an open production tab must not request a removed
+// hashed parser chunk after the app is rebuilt in place.
 import { parseEpub } from "./parseEpub";
+import { parseFb2 } from "./parseFb2";
+import { parseMobi } from "./parseMobi";
 import { parsePdf } from "./parsePdf";
+import { parseTxt } from "./parseTxt";
 
 export interface ParsedBook {
   title: string;
@@ -10,6 +15,8 @@ export interface ParsedBook {
   chapters: Chapter[];
   /** 原始 PDF 总页数；其他格式为 undefined。 */
   pageCount?: number;
+  /** 从书籍文件安全提取并归一化的可编辑书目元数据。 */
+  metadata?: BookMetadata;
 }
 
 export interface ParseBookOptions {
@@ -32,17 +39,11 @@ export async function parseBookFile(
     case "epub":
       return parseEpub(file, onProgress);
     case "mobi":
-    case "azw3": {
-      const { parseMobi } = await import("./parseMobi");
+    case "azw3":
       return parseMobi(file, format, onProgress);
-    }
-    case "fb2": {
-      const { parseFb2 } = await import("./parseFb2");
+    case "fb2":
       return parseFb2(file, onProgress);
-    }
-    case "txt": {
-      const { parseTxt } = await import("./parseTxt");
+    case "txt":
       return parseTxt(file, onProgress);
-    }
   }
 }

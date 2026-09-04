@@ -3,6 +3,7 @@ import {
   serial,
   varchar,
   text,
+  longtext,
   timestamp,
   boolean,
   int,
@@ -16,9 +17,9 @@ export const bookDigests = mysqlTable("book_digests", {
   title: varchar("title", { length: 255 }).notNull(),
   author: varchar("author", { length: 255 }).notNull().default(""),
   /** 本地扫描出的结构 JSON：章节目录、字数、首尾段摘录 */
-  structure: text("structure").notNull(),
+  structure: longtext("structure").notNull(),
   /** 模型基于结构生成的全书导读 */
-  overview: text("overview"),
+  overview: longtext("overview"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -41,3 +42,18 @@ export const webhookSubscriptions = mysqlTable("webhook_subscriptions", {
 });
 
 export type WebhookSubscription = typeof webhookSubscriptions.$inferSelect;
+
+/**
+ * Single local owner account. Usernames are encrypted by the application and
+ * passwords are stored only as salted, memory-hard hashes.
+ */
+export const appUsers = mysqlTable("app_users", {
+  id: int("id").primaryKey(),
+  usernameEncrypted: varchar("username_encrypted", { length: 512 }).notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  credentialVersion: int("credential_version").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type AppUser = typeof appUsers.$inferSelect;

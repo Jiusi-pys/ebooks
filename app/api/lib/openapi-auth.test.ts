@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Hono } from "hono";
 import { resolveConfiguredApiKey } from "./openapi-auth";
 
 describe("machine API key authentication", () => {
@@ -16,13 +17,13 @@ describe("machine API key authentication", () => {
     expect(validKey("short")).toBe(false);
   });
 
-  it("falls back to APP_SECRET when OPEN_API_KEY is blank", () => {
+  it("never reuses APP_SECRET when OPEN_API_KEY is blank", () => {
     expect(
       resolveConfiguredApiKey({
         OPEN_API_KEY: "   ",
         APP_SECRET: " fallback-secret ",
       })
-    ).toBe("fallback-secret");
+    ).toBe("");
     expect(
       resolveConfiguredApiKey({
         OPEN_API_KEY: "machine-secret",
@@ -32,12 +33,21 @@ describe("machine API key authentication", () => {
     expect(resolveConfiguredApiKey({})).toBe("");
   });
 
-  it("uses APP_SECRET in the real validator when the dedicated key is empty", async () => {
+  it("disables machine routes when the dedicated key is empty", async () => {
     vi.stubEnv("OPEN_API_KEY", "");
     vi.stubEnv("APP_SECRET", "fallback-secret");
     vi.resetModules();
-    const { validKey } = await import("./openapi-auth");
-    expect(validKey("fallback-secret")).toBe(true);
-    expect(validKey("")).toBe(false);
+    const { requireApiKey, validKey } = await import("./openapi-auth");
+    const router = new Hono();
+    router.use("/*", requireApiKey);
+    router.get("/books", c => c.json({ ok: true }));
+    const response = await router.request("http://reader.test/books", {
+      headers: { "x-api-key": "fallback-secret" },
+    });
+    expect(validKey("fallback-secret")).toBe(false);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      error: "machine_api_unavailable",
+    });
   });
 });

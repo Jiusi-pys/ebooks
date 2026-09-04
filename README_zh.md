@@ -12,11 +12,14 @@
 - PDF 支持原版与重排阅读、文字划线/批注，以及文档或页面渲染失败后的可见错误与重试。
 - 支持横向、纵向及嵌套分屏，可组成可调尺寸的 2、3、4 窗口；学习集内仅选择该学习集的书，书架阅读默认继续打开当前书。
 - 可排版书籍支持中文/English 同步双语对照阅读。
+- 可排版书籍可切换上下连续滚动或左右翻页，并支持滚轮、键盘与页面按钮。
 - 支持划线、批注、标签、挖空，以及书籍、章节、精确文段三级引用。
 - 可把不同书籍中的精确文段建立单向或双向“关联”，并在关系图中查看。
 - 书架文件夹与逻辑学习集相互独立；文件夹图标、书籍封面、目录和阅读排版均可自定义。
+- 可编辑书名、贡献者、出版社、出版日期、语言、标识符、系列、标签、简介、版次和版权等书库元数据，并同步至 MySQL 镜像；不会改写原始电子书文件。
 - 支持可编辑脑图、复习卡片、回忆模式和间隔复习队列。
 - 默认通过本机 ChatGPT 登录调用 Codex，也可在 AI 后台选择 DeepSeek API。
+- 左右阅读侧栏均可在固定显示与自动隐藏间切换；沉浸模式会隐藏两侧栏和工具栏；账户面板可修改 MySQL 用户名和密码。
 
 ## 架构与数据存储
 
@@ -81,7 +84,7 @@ npm run db:migrate
 npm run dev
 ```
 
-访问 <http://127.0.0.1:3000/>，使用 `app/.env` 中的 `APP_ID` 与 `APP_SECRET` 登录。
+访问 <http://127.0.0.1:3000/>。用户表为空时，先用 `app/.env` 中的 `APP_ID` 与 `APP_SECRET` 登录一次，再设置自定义用户名和新密码。此后每次登录只查询 MySQL，初始凭据不再有效。用户名加密存储，密码只保存带随机盐的 scrypt 强哈希。
 
 ## MySQL 配置
 
@@ -116,6 +119,8 @@ SHOW VARIABLES LIKE 'max_allowed_packet';
 ```dotenv
 APP_ID=reader
 APP_SECRET=请替换为至少32字节的随机值
+APP_DATA_SECRET=请使用独立的至少32字节随机值
+APP_SESSION_SECRET=请使用另一个至少32字节的随机值
 HOST=127.0.0.1
 PORT=3000
 PUBLIC_ORIGIN=
@@ -149,20 +154,26 @@ DEEPSEEK_TIMEOUT_MS=180000
 openssl rand -hex 32
 ```
 
-| 变量                    | 用途                                                  |
-| ----------------------- | ----------------------------------------------------- |
-| `APP_ID`                | 浏览器本地登录账号；生产模式必填                      |
-| `APP_SECRET`            | 登录密码及 HMAC 会话签名密钥；生产模式必填            |
-| `DATABASE_URL`          | MySQL 连接 URI；生产启动和 Drizzle 命令必填           |
-| `HOST` / `PORT`         | 生产服务监听地址与端口，默认 `127.0.0.1:3000`         |
-| `PUBLIC_ORIGIN`         | TLS 反向代理后的完整外部 Origin，不允许包含路径       |
-| `SESSION_TTL_SECONDS`   | 会话时长，实际范围限制为 300–604800 秒                |
-| `SESSION_COOKIE_SECURE` | 强制会话 Cookie 使用 `Secure` 属性                    |
-| `OPEN_API_KEY`          | `/api/v1/*` 机器客户端密钥；空值时回退到 `APP_SECRET` |
-| `CODEX_*`               | Codex 可执行文件、默认模型/强度和超时时间             |
-| `DEEPSEEK_*`            | 可选的 DeepSeek 密钥和超时时间                        |
+| 变量                    | 用途                                               |
+| ----------------------- | -------------------------------------------------- |
+| `APP_ID`                | 一次性首次登录账号；仅用户表为空时需要             |
+| `APP_SECRET`            | 一次性初始密码；不再用于新用户名密文               |
+| `APP_DATA_SECRET`       | 独立用户名加密密钥（至少 32 字节）                 |
+| `APP_SESSION_SECRET`    | 独立会话签名密钥（至少 32 字节）；本地使用时可留空 |
+| `DATABASE_URL`          | MySQL 连接 URI；生产启动和 Drizzle 命令必填        |
+| `HOST` / `PORT`         | 生产服务监听地址与端口，默认 `127.0.0.1:3000`      |
+| `PUBLIC_ORIGIN`         | TLS 反向代理后的完整外部 Origin，不允许包含路径    |
+| `SESSION_TTL_SECONDS`   | 会话时长，实际范围限制为 300–604800 秒             |
+| `SESSION_COOKIE_SECURE` | 强制会话 Cookie 使用 `Secure` 属性                 |
+| `OPEN_API_KEY`          | `/api/v1/*` 机器客户端密钥；空值时禁用机器接口     |
+| `CODEX_*`               | Codex 可执行文件、默认模型/强度和超时时间          |
+| `DEEPSEEK_*`            | 可选的 DeepSeek 密钥和超时时间                     |
 
 单机使用时保持 `HOST=127.0.0.1`。如果 HTTPS 在反向代理处终止，应把 `PUBLIC_ORIGIN` 设置为浏览器实际访问的 Origin，例如 `https://books.example.com`，并启用安全 Cookie。应用不会使用客户端可伪造的 `X-Forwarded-*` 请求头进行同源判断。
+
+`APP_DATA_SECRET` 或 `APP_SESSION_SECRET` 留空时，服务会分别生成强随机密钥并持久化到 `app/.runtime/data-secret` 与 `app/.runtime/session-secret`。必须持久化或备份这两个被 Git 忽略的文件：丢失会话密钥会使现有会话失效；账户迁移后丢失数据密钥会导致加密用户名无法恢复。生产环境和容器部署应显式配置两个密钥，或把整个 `.runtime` 目录挂载到持久卷。手动配置时少于 32 字节会拒绝启动。
+
+已有安装升级时，先保留原 `APP_SECRET`，配置并持久化 `APP_DATA_SECRET`，重启后退出并重新登录一次。数据库登录成功后会自动使用新数据密钥重加密用户名；完成后才能轮换或删除初始密码。`OPEN_API_KEY` 必须与登录凭据分开；留空时受保护的机器接口返回 `503` 并保持禁用。
 
 ## 使用 ChatGPT 登录 Codex（不使用 OpenAI API Key）
 
@@ -215,7 +226,7 @@ npm run build
 npm run start
 ```
 
-`npm run start` 通过 `cross-env` 跨平台设置 `NODE_ENV=production`。生产模式缺少 `APP_ID`、`APP_SECRET` 或 `DATABASE_URL` 时会直接拒绝启动。
+`npm run start` 通过 `cross-env` 跨平台设置 `NODE_ENV=production`。生产模式缺少 `DATABASE_URL` 时会直接拒绝启动；用户表为空时还必须配置 `APP_ID` 与 `APP_SECRET` 才能完成首次登录。
 
 ### 可选容器构建
 
@@ -235,6 +246,8 @@ docker run --rm --name shufang \
 ## 开放 API
 
 访问 `GET /api/v1/` 可以查看机器可读的接口目录。资源接口要求请求头 `X-API-Key: <OPEN_API_KEY>` 或 `Authorization: Bearer <OPEN_API_KEY>`。当前 API 覆盖书籍与章节、书摘、复习卡、文段关联、笔记、文件夹、译文、脑图、事件和 WebHook。浏览器写入事件时也可使用已签名的应用会话与同源校验。
+
+`OPEN_API_KEY` 为空时机器访问被禁用，不会回退使用 `APP_SECRET`。
 
 ## 文件支持限制
 

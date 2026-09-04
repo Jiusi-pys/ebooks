@@ -1,6 +1,7 @@
 import { initFb2File } from "@lingo-reader/fb2-parser";
 import type { ParsedBook } from "./parseBook";
 import { coverResourceToDataUrl, extractHtmlBookChapters } from "./ebookText";
+import { mirrorSafeBookField } from "./parseMetadataField";
 
 const MAX_FB2_BYTES = 128 * 1024 * 1024;
 
@@ -97,9 +98,12 @@ export async function parseFb2(
     onProgress?.("读取 FB2 书目信息", 0.1);
     parser = await initFb2File(normalizedFb2File(file, bytes));
     const metadata = parser.getMetadata();
-    const title =
-      metadata.title?.trim() || metadata.bookName?.trim() || fileTitle(file);
-    const author = metadata.author ? authorName(metadata.author) : "";
+    const title = mirrorSafeBookField(
+      metadata.title?.trim() || metadata.bookName?.trim() || fileTitle(file)
+    );
+    const author = mirrorSafeBookField(
+      metadata.author ? authorName(metadata.author) : ""
+    );
 
     let cover: string | undefined;
     try {

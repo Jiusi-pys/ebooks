@@ -23,6 +23,7 @@ function snapshot(paragraphs = ["正文"]): BookMirrorSnapshot {
     title: "分块测试",
     author: "作者",
     format: "epub",
+    metadata: { version: 1, publisher: "测试出版社" },
     chapters: [{ id: "chapter-1", title: "第一章", paragraphs }],
   };
 }
@@ -133,7 +134,12 @@ describe("book mirror chunk protocol", () => {
     });
 
     expect(protocol.chunks.length).toBeGreaterThan(2);
-    const events = [protocol.start, ...protocol.chunks, protocol.complete];
+    const events = [
+      protocol.start,
+      ...protocol.chunks,
+      protocol.complete,
+      protocol.metadataUpdate,
+    ].filter(event => event !== undefined);
     for (const event of events) {
       expect(
         new TextEncoder().encode(JSON.stringify(event)).byteLength
@@ -145,6 +151,10 @@ describe("book mirror chunk protocol", () => {
     expect(protocol.start.data).toMatchObject({
       chunkCount: protocol.chunks.length,
       chapterCount: 1,
+    });
+    expect(protocol.metadataUpdate).toMatchObject({
+      type: "book.updated",
+      data: { metadata: { version: 1, publisher: "测试出版社" } },
     });
   });
 

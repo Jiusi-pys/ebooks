@@ -8,12 +8,19 @@ function context(overrides: Partial<TrpcContext> = {}): TrpcContext {
     req: new Request("http://reader.test/api/trpc/ping"),
     resHeaders: new Headers(),
     session: null,
+    authStoreUnavailable: false,
     sameOrigin: false,
     ...overrides,
   };
 }
 
 describe("tRPC authentication middleware", () => {
+  it("fails closed when the credential store is unavailable", async () => {
+    await expect(
+      appRouter.createCaller(context({ authStoreUnavailable: true })).ping()
+    ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+  });
+
   it("rejects an anonymous caller", async () => {
     await expect(
       appRouter.createCaller(context()).ping()
@@ -26,7 +33,13 @@ describe("tRPC authentication middleware", () => {
     const result = await appRouter
       .createCaller(
         context({
-          session: { userId: "owner", issuedAt: 1, expiresAt: 2 },
+          session: {
+            userId: "owner",
+            issuedAt: 1,
+            expiresAt: 2,
+            setupRequired: false,
+            credentialVersion: 1,
+          },
         })
       )
       .ping();
@@ -39,9 +52,33 @@ describe("tRPC authentication middleware", () => {
         req: new Request("http://reader.test/api/trpc/ping", {
           method: "POST",
         }),
-        session: { userId: "owner", issuedAt: 1, expiresAt: 2 },
+        session: {
+          userId: "owner",
+          issuedAt: 1,
+          expiresAt: 2,
+          setupRequired: false,
+          credentialVersion: 1,
+        },
       })
     );
     await expect(caller.ping()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("rejects a first-run setup session", async () => {
+    await expect(
+      appRouter
+        .createCaller(
+          context({
+            session: {
+              userId: "bootstrap",
+              issuedAt: 1,
+              expiresAt: 2,
+              setupRequired: true,
+              credentialVersion: 0,
+            },
+          })
+        )
+        .ping()
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 });

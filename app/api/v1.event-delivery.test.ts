@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-interface ReceiptRow {
+interface ReceiptRow extends Record<string, unknown> {
   deliveryId: string;
   eventType: string;
   payloadHash: string;
@@ -27,16 +27,23 @@ vi.mock("./queries/connection", () => {
   const createOperations = (insideTransaction: boolean) => ({
     select: () => ({
       from: (table: unknown) => {
+        let limit: number | undefined;
+        const rows = () => {
+          const values =
+            table === state.receiptTable ? [...state.receipts.values()] : [];
+          return limit === undefined ? values : values.slice(0, limit);
+        };
         const builder = {
           where: () => builder,
-          limit: async (count: number) =>
-            table === state.receiptTable
-              ? [...state.receipts.values()].slice(0, count)
-              : [],
+          limit: (count: number) => {
+            limit = count;
+            return builder;
+          },
+          for: async () => rows(),
           then: (
             resolve: (value: Record<string, unknown>[]) => unknown,
             reject: (reason: unknown) => unknown
-          ) => Promise.resolve([]).then(resolve, reject),
+          ) => Promise.resolve(rows()).then(resolve, reject),
         };
         return builder;
       },
@@ -133,7 +140,7 @@ vi.mock("./lib/openapi-auth", () => ({
 }));
 
 vi.mock("./lib/webhooks", () => ({
-  EVENT_TYPES: ["note.created"],
+  EVENT_TYPES: ["note.created", "mindmap.created"],
   fanout: (event: Record<string, unknown>) => state.events.push(event),
 }));
 
@@ -158,7 +165,12 @@ function noteEvent(content = "Body") {
     body: JSON.stringify({
       deliveryId: DELIVERY_ID,
       type: "note.created",
-      data: { extId: "note-1", title: "Title", content },
+      data: {
+        extId: "note-1",
+        title: "Title",
+        content,
+        updatedAt: 1_788_480_000_000,
+      },
     }),
   } satisfies RequestInit;
 }
@@ -295,5 +307,39 @@ describe("browser event delivery receipts", () => {
     expect(retry.status).toBe(200);
     expect(state.noteWrites).toBe(1);
     expect(state.events).toHaveLength(1);
+  });
+
+  it("accepts a bookless mind map as explicit unmirrored fanout", async () => {
+    const request = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        deliveryId: DELIVERY_ID,
+        type: "mindmap.created",
+        data: {
+          extId: "map-1",
+          title: "Blank map",
+          bookExtId: "",
+          bookTitle: "",
+          root: { id: "root", text: "Root", children: [] },
+        },
+      }),
+    } satisfies RequestInit;
+
+    const first = await v1.request("/events", request);
+    const retry = await v1.request("/events", request);
+
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({ ok: true, mirrored: false });
+    expect(await retry.json()).toMatchObject({
+      ok: true,
+      mirrored: false,
+      duplicate: true,
+    });
+    expect(state.events).toHaveLength(1);
+    expect(state.events[0]).toMatchObject({
+      type: "mindmap.created",
+      data: { bookExtId: "" },
+    });
   });
 });

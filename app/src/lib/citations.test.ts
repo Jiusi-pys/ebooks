@@ -9,6 +9,7 @@ import {
   removeCitationBlocks,
   renameCitationBookTitle,
   renameCitationBookTitles,
+  rewriteCitationBlock,
 } from "./citations";
 
 const citation = {
@@ -146,6 +147,57 @@ describe("structured citations", () => {
     ).toBe("开头\n\n手写 [[旧书名]]");
   });
 
+  it("rewrites a changed descriptor and appends it when the old block is absent", () => {
+    const next = {
+      level: "chapter" as const,
+      bookTitle: "孟子",
+      chapterTitle: "梁惠王上",
+    };
+    const rewritten = rewriteCitationBlock(
+      `手写 [[论语]]\n\n${citationBlock(citation)}`,
+      citation,
+      next
+    );
+    expect(rewritten).toContain("手写 [[论语]]");
+    expect(rewritten).not.toContain("学而不思则罔");
+    expect(rewritten).toContain("> 章节引用：[[孟子]] → 梁惠王上");
+
+    const appended = rewriteCitationBlock("已有笔记", citation, next);
+    expect(rewriteCitationBlock(appended, citation, next)).toBe(appended);
+  });
+
+  it("upgrades one legacy block to a stable marker without duplicating it", () => {
+    const legacy = citationBlock(citation);
+    const first = appendCitationBlock(legacy, {
+      ...citation,
+      highlightId: "highlight-1",
+    });
+    expect(first.match(/shufang-citation-id:/g)).toHaveLength(1);
+    expect(first.match(/具体内容/g)).toHaveLength(1);
+
+    const second = appendCitationBlock(first, {
+      ...citation,
+      highlightId: "highlight-2",
+    });
+    expect(second).toContain("shufang-citation-id:highlight%2D1");
+    expect(second).toContain("shufang-citation-id:highlight%2D2");
+    expect(second.match(/具体内容/g)).toHaveLength(2);
+  });
+
+  it("removes duplicate markers for one highlight but preserves its peer", () => {
+    const first = { ...citation, highlightId: "highlight-1" };
+    const second = { ...citation, highlightId: "highlight-2" };
+    const content = [
+      citationBlock(first),
+      citationBlock(first),
+      citationBlock(second),
+    ].join("\n\n");
+    const cleaned = removeCitationBlock(content, first);
+
+    expect(cleaned).not.toContain("shufang-citation-id:highlight%2D1");
+    expect(cleaned).toContain("shufang-citation-id:highlight%2D2");
+  });
+
   it("distinguishes a citation-only anchor from an enriched highlight", () => {
     const base = {
       id: "citation-1",
@@ -167,6 +219,7 @@ describe("structured citations", () => {
       )
     ).toEqual({
       level: "chapter",
+      highlightId: "citation-1",
       bookTitle: "论语",
       chapterTitle: "第一章",
       text: "原文",

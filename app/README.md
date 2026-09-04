@@ -4,7 +4,7 @@
 
 ## 已实现能力
 
-- 导入并阅读 PDF、EPUB、MOBI/AZW/AZW3、FB2 与 TXT；支持 PDF 原版与重排模式、分屏对照和章节翻译。
+- 导入并阅读 PDF、EPUB、MOBI/AZW/AZW3、FB2 与 TXT；支持 PDF 原版与重排模式、上下连续/左右翻页、分屏对照和章节翻译。
 - 划线、批注、标签、分级引用、文段间双向/单向关联、全局关系图，以及独立于书架文件夹、支持跨文件夹选书的学习集。
 - 可编辑脑图 / 大纲、章节 AI 提炼、摘录卡加入脑图并回跳原文。
 - 间隔复习、手动挖空，以及“阅读 / 沉浸 / 回忆”三态阅读。
@@ -14,7 +14,7 @@
 
 ## 本地运行与登录
 
-需要 Node.js 22.13 或更高版本。先复制配置文件，并设置强随机的 `APP_ID`、`APP_SECRET` 和 MySQL `DATABASE_URL`；缺少任何一项时生产服务会拒绝启动。
+需要 Node.js 22.13 或更高版本。先复制配置文件，并设置强随机的 `APP_ID`、`APP_SECRET`、独立的 `APP_DATA_SECRET` 与 MySQL `DATABASE_URL`。用户表建立后，前两个初始凭据可以退役。
 
 ```powershell
 # Windows PowerShell（npm.cmd 可绕过 npm.ps1 执行策略）
@@ -32,7 +32,9 @@ npm run db:migrate
 npm run dev
 ```
 
-`npm run start` 已使用 `cross-env`，在 Windows、Linux 和 macOS 均可启动构建后的生产服务。浏览器打开后必须用 `.env` 中的应用凭据登录；会话保存在带 `HttpOnly`、`SameSite=Strict` 属性的签名 Cookie 中，修改请求还会校验同源信息。
+`npm run start` 已使用 `cross-env`，在 Windows、Linux 和 macOS 均可启动构建后的生产服务。用户表为空时，用 `.env` 中的初始凭据登录并立即设置自定义用户名和新密码；此后每次登录只从 MySQL 读取并核验账户。用户名由独立的 `APP_DATA_SECRET` 加密，密码仅保存带随机盐的 scrypt 强哈希，会话由 `APP_SESSION_SECRET` 签名。任一独立密钥留空时，本地应用会在 `.runtime/` 生成对应密钥；生产或容器部署必须显式配置它们，或持久化整个 `.runtime` 目录。旧安装应保留原 `APP_SECRET`，配置数据密钥后重新登录一次完成自动重加密，再退役初始密码。会话保存在带 `HttpOnly`、`SameSite=Strict` 属性的签名 Cookie 中，修改请求还会校验同源信息。
+
+开放机器 API 必须单独配置 `OPEN_API_KEY`；留空时受保护的 `/api/v1/*` 资源接口返回 503，不会回退使用登录密码。
 
 若 HTTPS 在反向代理处终止，请把浏览器实际访问的完整源配置为 `PUBLIC_ORIGIN`，例如 `PUBLIC_ORIGIN=https://books.example.com`（只包含协议、主机和可选端口）。应用不会信任客户端可伪造的 `X-Forwarded-*` 请求头；未配置时，同源校验仍以直连请求 URL 为准。HTTPS `PUBLIC_ORIGIN` 也会让会话 Cookie 自动带上 `Secure`。
 

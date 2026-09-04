@@ -1,4 +1,4 @@
-import type { Chapter } from "@/types";
+import type { BookMetadata, Chapter } from "@/types";
 import { dispatchAppAuthRequired } from "./auth-events";
 
 export const BACKEND_BODY_LIMIT_BYTES = 50 * 1024 * 1024;
@@ -183,6 +183,7 @@ export interface BookMirrorSnapshot {
   format: string;
   folder?: string;
   contentHash?: string;
+  metadata?: BookMetadata;
   chapters: Pick<Chapter, "id" | "title" | "paragraphs">[];
 }
 
@@ -192,6 +193,7 @@ export interface BookMirrorProtocol {
   chunks: MirrorEventEnvelope[];
   start: MirrorEventEnvelope;
   complete: MirrorEventEnvelope;
+  metadataUpdate?: MirrorEventEnvelope;
 }
 
 function eventBytes(event: MirrorEventEnvelope): number {
@@ -352,10 +354,23 @@ export function createBookMirrorProtocol(
     type: "book.import.completed",
     data: common,
   };
+  const metadataUpdate = snapshot.metadata
+    ? {
+        deliveryId: createMirrorDeliveryId(),
+        type: "book.updated",
+        data: {
+          extId: snapshot.extId,
+          title: snapshot.title,
+          author: snapshot.author,
+          metadata: snapshot.metadata,
+        },
+      }
+    : undefined;
   assertProtocolEventSize(start, maxRequestBytes);
   assertProtocolEventSize(complete, maxRequestBytes);
+  if (metadataUpdate) assertProtocolEventSize(metadataUpdate, maxRequestBytes);
   for (const chunk of chunks) assertProtocolEventSize(chunk, maxRequestBytes);
-  return { uploadId, encodedBytes, chunks, start, complete };
+  return { uploadId, encodedBytes, chunks, start, complete, metadataUpdate };
 }
 
 export type BookMirrorPhase =
@@ -455,6 +470,7 @@ export async function syncBookMirror(
       });
     }
     await deliver(protocol.complete);
+    if (protocol.metadataUpdate) await deliver(protocol.metadataUpdate);
     options.onProgress?.({
       phase: "completed",
       sentChunks,

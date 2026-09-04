@@ -5,6 +5,48 @@ export interface Chapter {
   paragraphs: string[];
 }
 
+export type BookContributorRole =
+  | "author"
+  | "editor"
+  | "translator"
+  | "illustrator"
+  | "other";
+
+export interface BookContributor {
+  name: string;
+  role: BookContributorRole;
+}
+
+export interface BookIdentifier {
+  /** Common schemes include ISBN, DOI, ASIN and UUID. */
+  scheme: string;
+  value: string;
+}
+
+/**
+ * Editable catalogue metadata. This updates the library record and MySQL
+ * mirror; it does not rewrite the original EPUB/PDF/MOBI file.
+ */
+export interface BookMetadata {
+  version: 1;
+  subtitle?: string;
+  contributors?: BookContributor[];
+  publisher?: string;
+  /** Precision-preserving ISO date: YYYY, YYYY-MM or YYYY-MM-DD. */
+  publishedDate?: string;
+  /** BCP 47 language tags, in display priority order. */
+  languages?: string[];
+  identifiers?: BookIdentifier[];
+  series?: string;
+  seriesIndex?: number;
+  subjects?: string[];
+  description?: string;
+  edition?: string;
+  rights?: string;
+  /** Personal library rating, from 0 to 5. */
+  rating?: number;
+}
+
 export type BookFormat =
   "pdf" | "epub" | "mobi" | "azw3" | "fb2" | "txt" | "builtin";
 
@@ -32,6 +74,10 @@ export interface Book {
   coverTone: number;
   chapters: Chapter[];
   createdAt: number;
+  /** Most recent time the reader was opened; separate from publication data. */
+  lastOpenedAt?: number;
+  /** Optional extended catalogue metadata; title/author stay top-level for compatibility. */
+  metadata?: BookMetadata;
   /** 阅读进度 */
   progress: { chapterId: string; ratio: number };
   /** 正文内容哈希（用于 AI 全书导读缓存） */
@@ -306,6 +352,8 @@ export interface TypeSettings {
   pageMargin: number; // px, text distance from the reading-page edge
   fontWeight: 300 | 400 | 600;
   columns: 1 | 2;
+  /** 重排正文的阅读方式：纵向连续滚动或横向逐页翻阅。 */
+  pageTurnMode: "vertical" | "horizontal";
   themeId: string;
 }
 

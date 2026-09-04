@@ -20,15 +20,23 @@ extensions are outside the current web scope.
   vertical nesting. Study-set splits are scoped to the set; bookshelf splits
   default to the current book.
 - Use synchronized Chinese/English bilingual reading for reflowable books.
+- Switch reflowable books between continuous vertical scrolling and horizontal
+  page turning with wheel, keyboard, and on-screen navigation.
 - Highlight, annotate, tag, create cloze deletions, and cite at book, chapter,
   or exact-passage level.
 - Link precise passages across books with directional or bidirectional
   associations and inspect the resulting graph.
 - Organize storage folders separately from logical study sets; customize folder
   icons, book covers, outlines, and reader typography.
+- Edit catalogue metadata such as title, contributors, publisher, publication
+  date, languages, identifiers, series, subjects, description, edition, and
+  rights, and mirror it to MySQL without rewriting the source ebook file.
 - Create editable mind maps, review cards, and spaced-repetition queues.
 - Use Codex through a local ChatGPT login, or select the optional DeepSeek API
   provider from the AI settings panel.
+- Pin or auto-hide both reading sidebars; immersive mode hides both sidebars
+  and the reader toolbar. Manage the MySQL-backed local username and password
+  from the account panel.
 
 ## Architecture and Data Storage
 
@@ -99,8 +107,12 @@ npm run db:migrate
 npm run dev
 ```
 
-Open <http://127.0.0.1:3000/> and sign in with the `APP_ID` and `APP_SECRET`
-from `app/.env`.
+Open <http://127.0.0.1:3000/>. On an empty user table, sign in once with the
+`APP_ID` and `APP_SECRET` from `app/.env`, then choose a username and a new
+password. Every later login is verified against MySQL; the bootstrap credentials
+are no longer accepted. Usernames are encrypted at rest and passwords are stored
+only as salted scrypt hashes. Production deployments must also keep the
+independent `APP_DATA_SECRET` stable.
 
 ## MySQL Setup
 
@@ -143,6 +155,8 @@ password before putting them in `DATABASE_URL`.
 ```dotenv
 APP_ID=reader
 APP_SECRET=replace-with-at-least-32-random-bytes
+APP_DATA_SECRET=replace-with-an-independent-32-byte-secret
+APP_SESSION_SECRET=replace-with-an-independent-32-byte-secret
 HOST=127.0.0.1
 PORT=3000
 PUBLIC_ORIGIN=
@@ -178,14 +192,16 @@ openssl rand -hex 32
 
 | Variable                | Purpose                                                                    |
 | ----------------------- | -------------------------------------------------------------------------- |
-| `APP_ID`                | Local browser login name; required in production                           |
-| `APP_SECRET`            | Login password and HMAC session-signing secret; required in production     |
+| `APP_ID`                | One-time bootstrap login name; needed only while `app_users` is empty      |
+| `APP_SECRET`            | One-time bootstrap password; not used for new username encryption          |
+| `APP_DATA_SECRET`       | Independent username-encryption key (minimum 32 bytes)                     |
+| `APP_SESSION_SECRET`    | Independent session-signing key (minimum 32 bytes); optional for local use |
 | `DATABASE_URL`          | MySQL connection URI; required in production and by Drizzle commands       |
 | `HOST` / `PORT`         | Production bind address and port; defaults to `127.0.0.1:3000`             |
 | `PUBLIC_ORIGIN`         | Exact external origin behind a trusted TLS proxy, with no path             |
 | `SESSION_TTL_SECONDS`   | Session lifetime, clamped to 300–604800 seconds                            |
 | `SESSION_COOKIE_SECURE` | Force the session cookie's `Secure` flag                                   |
-| `OPEN_API_KEY`          | Key for `/api/v1/*` machine clients; falls back to `APP_SECRET` when blank |
+| `OPEN_API_KEY`          | Key for `/api/v1/*` machine clients; blank disables the machine API        |
 | `CODEX_*`               | Codex executable, default model/effort, and timeouts                       |
 | `DEEPSEEK_*`            | Optional DeepSeek key and timeout                                          |
 
@@ -193,6 +209,21 @@ Keep `HOST=127.0.0.1` for a single-machine installation. If TLS terminates at a
 reverse proxy, set `PUBLIC_ORIGIN` to the browser-visible origin, for example
 `https://books.example.com`, and enable secure cookies. The application does not
 trust client-supplied `X-Forwarded-*` headers for origin validation.
+
+When `APP_DATA_SECRET` or `APP_SESSION_SECRET` is blank, the server generates a
+strong key in `app/.runtime/data-secret` or `app/.runtime/session-secret` and
+reuses it on later starts. Persist or back up both ignored files. Losing the
+session key signs users out; losing the data key after account migration makes
+the encrypted username unrecoverable. Production and container deployments
+should configure both values explicitly or mount the entire `.runtime`
+directory on durable storage. Values shorter than 32 bytes are rejected.
+
+Upgrading an existing installation: keep the old `APP_SECRET`, configure and
+persist `APP_DATA_SECRET`, restart, then sign out and sign in once. A successful
+database login automatically re-encrypts the username with the new data key;
+after that migration, the bootstrap secret may be rotated or removed. Keep
+`OPEN_API_KEY` separate from login credentials; when blank, protected machine
+routes return `503` and remain disabled.
 
 ## Codex with ChatGPT Login (No OpenAI API Key)
 
@@ -263,7 +294,8 @@ npm run start
 ```
 
 `npm run start` sets `NODE_ENV=production` cross-platform. Production startup
-fails fast when `APP_ID`, `APP_SECRET`, or `DATABASE_URL` is missing.
+fails fast when `DATABASE_URL` is missing. `APP_ID` and `APP_SECRET` are also
+needed only for the first login while the user table is empty.
 
 ### Optional container build
 
@@ -292,6 +324,8 @@ routes require either `X-API-Key: <OPEN_API_KEY>` or
 highlights, review cards, associations, notes, folders, translations, mind maps,
 events, and webhooks. Browser event writes may instead use the signed application
 session and same-origin checks.
+If `OPEN_API_KEY` is blank, machine access is disabled rather than falling back
+to `APP_SECRET`.
 
 ## Supported-file Limits
 

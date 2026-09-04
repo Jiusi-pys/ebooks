@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { bookDigests } from "@db/schema";
@@ -12,17 +13,8 @@ import {
   getAiStatus,
 } from "./lib/ai-provider";
 import { env } from "./lib/env";
-
-interface CachedDigest {
-  contentHash: string;
-  title: string;
-  author: string;
-  structure: string;
-  overview: string | null;
-}
-
-/** 本地无 MySQL 时仍允许 Codex 功能运行；缓存保留到服务重启。 */
-const memoryDigests = new Map<string, CachedDigest>();
+import { getMemoryDigest, setMemoryDigest } from "./lib/digest-cache";
+import { saveDigestIfReferenced } from "./lib/book-digest-lifecycle";
 
 const targetLanguageSchema = z.enum([
   "中文",
@@ -292,16 +284,16 @@ export const aiRouter = createRouter({
   getDigest: publicQuery
     .input(z.object({ contentHash: z.string().length(64) }))
     .query(async ({ input }) => {
-      if (!env.databaseUrl) return memoryDigests.get(input.contentHash) ?? null;
+      if (!env.databaseUrl) return getMemoryDigest(input.contentHash);
       try {
         const rows = await getDb()
           .select()
           .from(bookDigests)
           .where(eq(bookDigests.contentHash, input.contentHash))
           .limit(1);
-        return rows[0] ?? memoryDigests.get(input.contentHash) ?? null;
+        return rows[0] ?? getMemoryDigest(input.contentHash);
       } catch {
-        return memoryDigests.get(input.contentHash) ?? null;
+        return getMemoryDigest(input.contentHash);
       }
     }),
 
@@ -312,34 +304,45 @@ export const aiRouter = createRouter({
         contentHash: z.string().length(64),
         title: z.string().min(1).max(255),
         author: z.string().max(255).default(""),
-        structure: z.string().min(1),
-        overview: z.string().default(""),
+        structure: z.string().min(1).max(200_000),
+        overview: z.string().max(20_000).default(""),
       })
     )
     .mutation(async ({ input }) => {
-      memoryDigests.set(input.contentHash, {
+      const digest = {
         contentHash: input.contentHash,
         title: input.title,
         author: input.author,
         structure: input.structure,
         overview: input.overview || null,
-      });
-      if (!env.databaseUrl) return { ok: true, storage: "memory" as const };
-      try {
-        await getDb()
-          .insert(bookDigests)
-          .values(input)
-          .onDuplicateKeyUpdate({
-            set: {
-              structure: input.structure,
-              overview: input.overview,
-              title: input.title,
-              author: input.author,
-            },
-          });
-        return { ok: true, storage: "database" as const };
-      } catch {
+      };
+      if (!env.databaseUrl) {
+        setMemoryDigest(digest);
         return { ok: true, storage: "memory" as const };
       }
+      let persisted = false;
+      try {
+        persisted = await getDb().transaction(transaction =>
+          saveDigestIfReferenced(transaction, digest)
+        );
+      } catch (cause) {
+        console.error("[ai.saveDigest] database write failed", {
+          errorName: cause instanceof Error ? cause.name : "UnknownError",
+        });
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "全书导读未能写入数据库，请稍后重试",
+          cause,
+        });
+      }
+      if (!persisted) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "书籍已被删除，未保存过期的全书导读",
+        });
+      }
+      // The in-process cache becomes visible only after the durable write.
+      setMemoryDigest(digest);
+      return { ok: true, storage: "database" as const };
     }),
 });

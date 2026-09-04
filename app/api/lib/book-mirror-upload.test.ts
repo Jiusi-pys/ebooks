@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { mirrorBooks, mirrorBookUploadChunks } from "@db/mirror-schema";
+import {
+  mirrorBooks,
+  mirrorBookTombstones,
+  mirrorBookUploadChunks,
+} from "@db/mirror-schema";
 import {
   assembleBookMirrorUpload,
   bookImportChunkSchema,
@@ -104,12 +108,26 @@ function fakeDatabase(rows: UploadRow[] = []) {
       },
     }),
     select: () => ({
-      from: () => {
+      from: (table: unknown) => {
+        let limit: number | undefined;
+        const rows = () =>
+          table === mirrorBookTombstones
+            ? []
+            : limit === undefined
+              ? currentRows
+              : currentRows.slice(0, limit);
         const builder = {
           where: () => builder,
-          limit: async (count: number) => currentRows.slice(0, count),
+          limit: (count: number) => {
+            limit = count;
+            return builder;
+          },
           orderBy: () => builder,
-          for: async () => currentRows,
+          for: async () => rows(),
+          then: (
+            resolve: (value: UploadRow[]) => unknown,
+            reject: (reason: unknown) => unknown
+          ) => Promise.resolve(rows()).then(resolve, reject),
         };
         return builder;
       },

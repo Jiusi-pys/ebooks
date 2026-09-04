@@ -23,9 +23,14 @@ import {
 } from "@/lib/bookFormats";
 import { toggleSidebarMode, type SidebarMode } from "@/lib/sidebarMode";
 import { citationLevelOf } from "@/lib/citations";
+import { recentBooks } from "@/lib/bookMetadata";
 import type { Route } from "@/types";
 import { BookCover } from "./BookCover";
 import { ImportModeDialog } from "./ImportModeDialog";
+import {
+  AccountSettingsDialog,
+  type AccountUpdateInput,
+} from "./AccountSettingsDialog";
 
 const NAV = [
   { view: "library" as const, label: "书架", icon: LibraryBig },
@@ -49,6 +54,7 @@ interface SidebarProps {
   onRequestClose: () => void;
   onInteractionStart: () => void;
   onInteractionEnd: () => void;
+  onUpdateProfile: (input: AccountUpdateInput) => Promise<void>;
   onLogout: () => Promise<void>;
 }
 
@@ -64,12 +70,14 @@ export function Sidebar({
   onRequestClose,
   onInteractionStart,
   onInteractionEnd,
+  onUpdateProfile,
   onLogout,
 }: SidebarProps) {
   const { route, navigate, books, notes, highlights, mindMaps, studySets } =
     lib;
   const [pendingPdfs, setPendingPdfs] = useState<File[] | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
 
   const go = (next: Route) => {
     navigate(next);
@@ -96,6 +104,7 @@ export function Sidebar({
     studyset: studySets.length,
   };
   const dateLine = `${today.getFullYear()} 年 ${today.getMonth() + 1} 月 ${today.getDate()} 日`;
+  const readingBooks = recentBooks(books);
 
   return (
     <aside
@@ -212,7 +221,7 @@ export function Sidebar({
         <div className="font-meta px-2.5 pb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
           在读 · Reading
         </div>
-        {books.slice(0, 6).map(b => (
+        {readingBooks.map(b => (
           <button
             key={b.id}
             onClick={() => {
@@ -271,14 +280,20 @@ export function Sidebar({
           <span className="app-icon-tile h-8 w-8 rounded-[10px] text-primary">
             <UserRound size={15} aria-hidden="true" />
           </span>
-          <span className="min-w-0 flex-1">
+          <button
+            type="button"
+            className="min-w-0 flex-1 text-left"
+            onClick={() => setAccountSettingsOpen(true)}
+            aria-label="打开账户设置"
+            title="账户设置"
+          >
             <span className="block truncate text-[11px] font-medium">
               {userId}
             </span>
             <span className="font-meta block text-[9px] uppercase tracking-wider text-muted-foreground">
               Local account
             </span>
-          </span>
+          </button>
           <button
             type="button"
             className="app-icon-button h-8 w-8 rounded-[10px]"
@@ -303,6 +318,12 @@ export function Sidebar({
           setPendingPdfs(null);
           void lib.importFiles(files, modes);
         }}
+      />
+      <AccountSettingsDialog
+        open={accountSettingsOpen}
+        username={userId}
+        onOpenChange={setAccountSettingsOpen}
+        onUpdate={onUpdateProfile}
       />
     </aside>
   );

@@ -6,7 +6,7 @@
  *   GET    /api/v1/books                书目列表（?folder= 过滤）
  *   POST   /api/v1/books                注册书籍（含章节正文）→ book.imported
  *   GET    /api/v1/books/:extId         书籍详情（不含正文）
- *   PATCH  /api/v1/books/:extId         重命名 / 移文件夹 → book.updated
+ *   PATCH  /api/v1/books/:extId         更新书目元数据 / 移文件夹 → book.updated
  *   DELETE /api/v1/books/:extId         删除 → book.deleted
  *   GET    /api/v1/books/:extId/chapters      章节目录
  *   GET    /api/v1/books/:extId/chapters/:idx 章节正文
@@ -47,17 +47,19 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { createHash, randomUUID } from "node:crypto";
-import { eq, lt, or } from "drizzle-orm";
+import { eq, lt, or, sql } from "drizzle-orm";
 import { zValidator } from "@hono/zod-validator";
 import { getDb } from "./queries/connection";
 import { bookDigests, webhookSubscriptions } from "@db/schema";
 import {
   mirrorBooks,
+  mirrorBookTombstones,
   mirrorBookUploadChunks,
   mirrorEventReceipts,
   mirrorHighlights,
   mirrorAssociations,
   mirrorNotes,
+  mirrorNoteTombstones,
   mirrorFolders,
   mirrorTranslations,
   mirrorMindmaps,
@@ -75,6 +77,12 @@ import {
   validateCitationCreate,
 } from "./lib/highlight-citation";
 import { normalizeReaderMirrorEvent } from "./lib/mirror-event";
+import {
+  bookMetadataSchema,
+  parseStoredBookMetadata,
+  serializeBookMetadata,
+  type ValidatedBookMetadata,
+} from "./lib/book-metadata";
 import { requireBrowserMutation } from "./auth";
 import {
   BookMirrorUploadError,
@@ -83,6 +91,16 @@ import {
   putBookMirrorChunk,
   startBookMirrorUpload,
 } from "./lib/book-mirror-upload";
+import { deleteMemoryDigest } from "./lib/digest-cache";
+import {
+  deleteDigestIfUnreferenced,
+  saveDigestIfReferenced,
+} from "./lib/book-digest-lifecycle";
+import {
+  rewriteBookCitationNotes,
+  syncHighlightCitationNotes,
+  type ChangedMirrorNote,
+} from "./lib/book-citation-note-sync";
 import {
   associationDbValues,
   associationFromRow,
@@ -104,10 +122,19 @@ type DatabaseExecutor = Pick<
   "select" | "insert" | "update" | "delete"
 >;
 
+interface DeletedMirrorAssociation {
+  extId: string;
+}
+
+interface DeletedMirrorHighlight {
+  extId: string;
+  bookTitle: string;
+}
+
 /* 统一错误格式：业务错误一律 JSON */
 v1.onError((err, c) => {
   console.error("[v1]", err.message);
-  return c.json({ error: "internal", message: err.message.slice(0, 300) }, 500);
+  return c.json({ error: "internal", message: "请求处理失败" }, 500);
 });
 
 /* ---------- 接口目录（公开，方便发现） ---------- */
@@ -116,7 +143,7 @@ v1.get("/", c =>
   c.json({
     name: "書房开放 API",
     version: "1.0",
-    auth: "请求头 X-API-Key: <OPEN_API_KEY>（未配置时回退 APP_SECRET）",
+    auth: "请求头 X-API-Key: <OPEN_API_KEY>（未配置时机器接口禁用）",
     eventTypes: EVENT_TYPES,
     webhookSignature: "X-Shufang-Signature: sha256=<hmac(secret, body)>",
     endpoints: [
@@ -173,18 +200,54 @@ const chapterSchema = z.object({
 const bookBody = z.object({
   extId: z.string().min(1).max(64),
   title: z.string().min(1).max(255),
-  author: z.string().max(255).default(""),
+  author: z.string().max(255).optional(),
+  // Optional for compatibility with older Hermes/OpenClaw clients. An omitted
+  // value must never erase metadata already edited in the browser.
+  metadata: bookMetadataSchema.optional(),
   format: z.string().max(16).default("unknown"),
   folder: z.string().max(255).default(""),
   contentHash: z.string().max(64).default(""),
   chapters: z.array(chapterSchema).max(500),
 });
 
+class ConflictingBookAuthorError extends Error {
+  constructor() {
+    super("author must match metadata contributors with role=author");
+    this.name = "ConflictingBookAuthorError";
+  }
+}
+
+function authorFromMetadata(metadata: ValidatedBookMetadata): string | null {
+  const names = (metadata.contributors ?? [])
+    .filter(contributor => contributor.role === "author")
+    .map(contributor => contributor.name);
+  return names.length > 0 ? names.join("；") : null;
+}
+
+function canonicalBookAuthor(
+  author: string | undefined,
+  metadata: ValidatedBookMetadata | undefined,
+  existingAuthor = ""
+): string {
+  if (!metadata) return author ?? existingAuthor;
+  const structured = authorFromMetadata(metadata);
+  if (structured !== null) {
+    if (author !== undefined && author !== structured) {
+      throw new ConflictingBookAuthorError();
+    }
+    return structured;
+  }
+  // A supplied metadata object is a complete v1 snapshot. No author
+  // contributors means the structured author list was intentionally cleared.
+  return author ?? "";
+}
+
 function bookJson(b: typeof mirrorBooks.$inferSelect, withChapters = false) {
   return {
     extId: b.extId,
     title: b.title,
     author: b.author,
+    metadata: parseStoredBookMetadata(b.metadata ?? "{}"),
     format: b.format,
     folder: b.folder,
     contentHash: b.contentHash,
@@ -204,26 +267,135 @@ v1.get("/books", async c => {
 
 v1.post("/books", zValidator("json", bookBody), async c => {
   const b = c.req.valid("json");
-  await getDb()
-    .insert(mirrorBooks)
-    .values({ ...b, chapters: JSON.stringify(b.chapters) })
-    .onDuplicateKeyUpdate({
-      set: {
-        title: b.title,
-        author: b.author,
-        format: b.format,
-        folder: b.folder,
-        contentHash: b.contentHash,
-        chapters: JSON.stringify(b.chapters),
-      },
+  let author = "";
+  let changedNotes: ChangedMirrorNote[] = [];
+  const invalidatedDigestHashes = new Set<string>();
+  try {
+    await runMirrorEventTransaction(getDb(), async transaction => {
+      // Tombstones are permanent for a stable external id. This prevents a
+      // delayed REST retry from resurrecting a book after the user deleted it.
+      const tombstones = await transaction
+        .select({ extId: mirrorBookTombstones.extId })
+        .from(mirrorBookTombstones)
+        .where(eq(mirrorBookTombstones.extId, b.extId))
+        .limit(1)
+        .for("update");
+      if (tombstones.length > 0) {
+        throw new BookMirrorUploadError(
+          "book_deleted",
+          "book was deleted after this import was queued"
+        );
+      }
+      const existing = await transaction
+        .select({
+          title: mirrorBooks.title,
+          author: mirrorBooks.author,
+          contentHash: mirrorBooks.contentHash,
+        })
+        .from(mirrorBooks)
+        .where(eq(mirrorBooks.extId, b.extId))
+        .limit(1)
+        .for("update");
+      author = canonicalBookAuthor(
+        b.author,
+        b.metadata,
+        existing[0]?.author ?? ""
+      );
+      changedNotes =
+        existing[0] && existing[0].title !== b.title
+          ? await rewriteBookCitationNotes(
+              transaction,
+              b.extId,
+              existing[0].title,
+              b.title
+            )
+          : [];
+      const serializedMetadata = b.metadata
+        ? serializeBookMetadata(b.metadata)
+        : undefined;
+      await transaction
+        .insert(mirrorBooks)
+        .values({
+          extId: b.extId,
+          title: b.title,
+          author,
+          metadata: serializedMetadata ?? serializeBookMetadata({ version: 1 }),
+          format: b.format,
+          folder: b.folder,
+          contentHash: b.contentHash,
+          chapters: JSON.stringify(b.chapters),
+        })
+        .onDuplicateKeyUpdate({
+          set: {
+            title: b.title,
+            author,
+            ...(serializedMetadata ? { metadata: serializedMetadata } : {}),
+            format: b.format,
+            folder: b.folder,
+            contentHash: b.contentHash,
+            chapters: JSON.stringify(b.chapters),
+          },
+        });
+      if (existing[0] && existing[0].title !== b.title) {
+        await transaction
+          .update(mirrorHighlights)
+          .set({ bookTitle: b.title })
+          .where(eq(mirrorHighlights.bookExtId, b.extId));
+        await transaction
+          .update(mirrorTranslations)
+          .set({ bookTitle: b.title })
+          .where(eq(mirrorTranslations.bookExtId, b.extId));
+        await transaction
+          .update(mirrorMindmaps)
+          .set({ bookTitle: b.title })
+          .where(eq(mirrorMindmaps.bookExtId, b.extId));
+      }
+      const previousHash = existing[0]?.contentHash;
+      if (
+        previousHash &&
+        previousHash !== b.contentHash &&
+        (await deleteDigestIfUnreferenced(transaction, previousHash))
+      ) {
+        invalidatedDigestHashes.add(previousHash);
+      }
+      if (
+        existing[0] &&
+        b.contentHash &&
+        (existing[0].title !== b.title || existing[0].author !== author)
+      ) {
+        await transaction
+          .delete(bookDigests)
+          .where(eq(bookDigests.contentHash, b.contentHash));
+        invalidatedDigestHashes.add(b.contentHash);
+      }
     });
+  } catch (error) {
+    if (error instanceof BookMirrorUploadError) {
+      return c.json(
+        { error: error.code, message: error.message },
+        error.status
+      );
+    }
+    if (error instanceof ConflictingBookAuthorError) {
+      return c.json(
+        { error: "conflicting_author", message: error.message },
+        400
+      );
+    }
+    throw error;
+  }
+  for (const contentHash of invalidatedDigestHashes) {
+    deleteMemoryDigest(contentHash);
+  }
+  fanoutChangedNotes(changedNotes, "api");
   fanout({
     type: "book.imported",
     source: "api",
     data: {
       extId: b.extId,
       title: b.title,
-      author: b.author,
+      author,
+      ...(b.metadata ? { metadata: b.metadata } : {}),
       format: b.format,
       folder: b.folder,
       contentHash: b.contentHash,
@@ -242,50 +414,222 @@ async function findBook(extId: string) {
   return rows[0] ?? null;
 }
 
+async function updateBookMirrorFields(
+  database: DatabaseExecutor,
+  extId: string,
+  patch: {
+    title?: string;
+    author?: string;
+    folder?: string;
+    metadata?: string;
+  }
+) {
+  const books = await database
+    .select({
+      title: mirrorBooks.title,
+      author: mirrorBooks.author,
+      metadata: mirrorBooks.metadata,
+      contentHash: mirrorBooks.contentHash,
+    })
+    .from(mirrorBooks)
+    .where(eq(mirrorBooks.extId, extId))
+    .limit(1)
+    .for("update");
+  const book = books[0];
+  if (!book) return null;
+
+  const canonicalPatch = { ...patch };
+  if (patch.metadata !== undefined) {
+    const metadata = parseStoredBookMetadata(patch.metadata);
+    canonicalPatch.author = canonicalBookAuthor(
+      patch.author,
+      metadata,
+      book.author
+    );
+  } else if (patch.author !== undefined) {
+    const structuredAuthor = authorFromMetadata(
+      parseStoredBookMetadata(book.metadata ?? "{}")
+    );
+    if (structuredAuthor !== null && patch.author !== structuredAuthor) {
+      throw new ConflictingBookAuthorError();
+    }
+  }
+
+  const changedNotes =
+    canonicalPatch.title !== undefined && canonicalPatch.title !== book.title
+      ? await rewriteBookCitationNotes(
+          database,
+          extId,
+          book.title,
+          canonicalPatch.title
+        )
+      : [];
+  await database
+    .update(mirrorBooks)
+    .set(canonicalPatch)
+    .where(eq(mirrorBooks.extId, extId));
+
+  if (canonicalPatch.title !== undefined) {
+    // These display snapshots are denormalized for external readers. Keep every
+    // dependent row aligned with the catalogue title in the same transaction.
+    await database
+      .update(mirrorHighlights)
+      .set({ bookTitle: canonicalPatch.title })
+      .where(eq(mirrorHighlights.bookExtId, extId));
+    await database
+      .update(mirrorTranslations)
+      .set({ bookTitle: canonicalPatch.title })
+      .where(eq(mirrorTranslations.bookExtId, extId));
+    await database
+      .update(mirrorMindmaps)
+      .set({ bookTitle: canonicalPatch.title })
+      .where(eq(mirrorMindmaps.bookExtId, extId));
+  }
+
+  const digestInvalidated =
+    !!book.contentHash &&
+    ((canonicalPatch.title !== undefined &&
+      canonicalPatch.title !== book.title) ||
+      (canonicalPatch.author !== undefined &&
+        canonicalPatch.author !== book.author));
+  if (digestInvalidated) {
+    await database
+      .delete(bookDigests)
+      .where(eq(bookDigests.contentHash, book.contentHash));
+  }
+  return {
+    patch: canonicalPatch,
+    changedNotes,
+    invalidatedDigestHash: digestInvalidated ? book.contentHash : null,
+  };
+}
+
 async function deleteBookMirrorResourcesWith(
   database: DatabaseExecutor,
-  bookExtId: string
+  bookExtId: string,
+  options: { tombstoneIfAbsent?: boolean } = {}
 ) {
-  const predicate = or(
-    eq(mirrorAssociations.sourceBookExtId, bookExtId),
-    eq(mirrorAssociations.targetBookExtId, bookExtId)
-  );
+  // Lock the tombstone key range first. Imports take the same lock before
+  // creating either a staging manifest or a live book, so delete/import races
+  // have one durable winner.
+  await database
+    .select({ extId: mirrorBookTombstones.extId })
+    .from(mirrorBookTombstones)
+    .where(eq(mirrorBookTombstones.extId, bookExtId))
+    .limit(1)
+    .for("update");
   const books = await database
-    .select()
+    .select({
+      extId: mirrorBooks.extId,
+      title: mirrorBooks.title,
+      contentHash: mirrorBooks.contentHash,
+    })
     .from(mirrorBooks)
     .where(eq(mirrorBooks.extId, bookExtId))
-    .limit(1);
-  const associations = await database
-    .select()
-    .from(mirrorAssociations)
-    .where(predicate);
+    .limit(1)
+    .for("update");
+  const book = books[0];
+  const uploads = await database
+    .select({
+      title: mirrorBookUploadChunks.title,
+      contentHash: mirrorBookUploadChunks.contentHash,
+    })
+    .from(mirrorBookUploadChunks)
+    .where(eq(mirrorBookUploadChunks.bookExtId, bookExtId))
+    .for("update");
+  if (!book && uploads.length === 0) {
+    if (options.tombstoneIfAbsent) {
+      await database
+        .insert(mirrorBookTombstones)
+        .values({ extId: bookExtId })
+        .onDuplicateKeyUpdate({ set: { deletedAt: new Date() } });
+    }
+    return {
+      resourceFound: false,
+      tombstoneWritten: Boolean(options.tombstoneIfAbsent),
+      book: null,
+      title: "",
+      associations: [] as DeletedMirrorAssociation[],
+      changedNotes: [] as ChangedMirrorNote[],
+      deletedDigestHashes: [] as string[],
+    };
+  }
 
-  await database.delete(mirrorAssociations).where(predicate);
+  await database
+    .insert(mirrorBookTombstones)
+    .values({ extId: bookExtId })
+    .onDuplicateKeyUpdate({ set: { deletedAt: new Date() } });
+
+  let changedNotes: ChangedMirrorNote[] = [];
+  let associations: DeletedMirrorAssociation[] = [];
+  if (book) {
+    changedNotes = await rewriteBookCitationNotes(
+      database,
+      bookExtId,
+      book.title
+    );
+    const predicate = or(
+      eq(mirrorAssociations.sourceBookExtId, bookExtId),
+      eq(mirrorAssociations.targetBookExtId, bookExtId)
+    );
+    associations = await database
+      .select({ extId: mirrorAssociations.extId })
+      .from(mirrorAssociations)
+      .where(predicate);
+    await database.delete(mirrorAssociations).where(predicate);
+  }
+
   await database
     .delete(mirrorBookUploadChunks)
     .where(eq(mirrorBookUploadChunks.bookExtId, bookExtId));
-  await database
-    .delete(mirrorHighlights)
-    .where(eq(mirrorHighlights.bookExtId, bookExtId));
-  await database
-    .delete(mirrorTranslations)
-    .where(eq(mirrorTranslations.bookExtId, bookExtId));
-  await database
-    .delete(mirrorMindmaps)
-    .where(eq(mirrorMindmaps.bookExtId, bookExtId));
-  await database.delete(mirrorBooks).where(eq(mirrorBooks.extId, bookExtId));
+  if (book) {
+    await database
+      .delete(mirrorHighlights)
+      .where(eq(mirrorHighlights.bookExtId, bookExtId));
+    await database
+      .delete(mirrorTranslations)
+      .where(eq(mirrorTranslations.bookExtId, bookExtId));
+    await database
+      .delete(mirrorMindmaps)
+      .where(eq(mirrorMindmaps.bookExtId, bookExtId));
+    await database.delete(mirrorBooks).where(eq(mirrorBooks.extId, bookExtId));
+  }
 
-  return { book: books[0] ?? null, associations };
+  const candidateDigestHashes = new Set(
+    [book?.contentHash, ...uploads.map(upload => upload.contentHash)].filter(
+      (contentHash): contentHash is string => Boolean(contentHash)
+    )
+  );
+  const deletedDigestHashes: string[] = [];
+  for (const contentHash of candidateDigestHashes) {
+    if (await deleteDigestIfUnreferenced(database, contentHash)) {
+      deletedDigestHashes.push(contentHash);
+    }
+  }
+
+  return {
+    resourceFound: true,
+    tombstoneWritten: true,
+    book: book ?? null,
+    title: book?.title ?? uploads.find(upload => upload.title)?.title ?? "",
+    associations,
+    changedNotes,
+    deletedDigestHashes,
+  };
 }
 
 async function deleteBookMirrorResources(bookExtId: string) {
-  return getDb().transaction(tx =>
+  const deleted = await runMirrorEventTransaction(getDb(), tx =>
     deleteBookMirrorResourcesWith(tx, bookExtId)
   );
+  for (const contentHash of deleted.deletedDigestHashes) {
+    deleteMemoryDigest(contentHash);
+  }
+  return deleted;
 }
 
 function fanoutDeletedAssociations(
-  associations: (typeof mirrorAssociations.$inferSelect)[],
+  associations: DeletedMirrorAssociation[],
   source: "api" | "reader"
 ) {
   for (const row of associations) {
@@ -294,6 +638,15 @@ function fanoutDeletedAssociations(
       source,
       data: { extId: row.extId },
     });
+  }
+}
+
+function fanoutChangedNotes(
+  notes: ChangedMirrorNote[],
+  source: "api" | "reader"
+) {
+  for (const note of notes) {
+    fanout({ type: "note.updated", source, data: { ...note } });
   }
 }
 
@@ -309,19 +662,49 @@ v1.patch(
     "json",
     z.object({
       title: z.string().min(1).max(255).optional(),
+      author: z.string().max(255).optional(),
       folder: z.string().max(255).optional(),
+      metadata: bookMetadataSchema.optional(),
     })
   ),
   async c => {
     const extId = c.req.param("extId");
-    const b = await findBook(extId);
-    if (!b) return c.json({ error: "not_found" }, 404);
     const patch = c.req.valid("json");
-    await getDb()
-      .update(mirrorBooks)
-      .set(patch)
-      .where(eq(mirrorBooks.extId, extId));
-    fanout({ type: "book.updated", source: "api", data: { extId, ...patch } });
+    const { metadata, ...plainPatch } = patch;
+    const storedPatch = {
+      ...plainPatch,
+      ...(metadata ? { metadata: serializeBookMetadata(metadata) } : {}),
+    };
+    let updated: Awaited<ReturnType<typeof updateBookMirrorFields>>;
+    try {
+      updated = await runMirrorEventTransaction(getDb(), transaction =>
+        updateBookMirrorFields(transaction, extId, storedPatch)
+      );
+    } catch (error) {
+      if (error instanceof ConflictingBookAuthorError) {
+        return c.json(
+          { error: "conflicting_author", message: error.message },
+          400
+        );
+      }
+      throw error;
+    }
+    if (!updated) return c.json({ error: "not_found" }, 404);
+    if (updated.invalidatedDigestHash) {
+      deleteMemoryDigest(updated.invalidatedDigestHash);
+    }
+    fanoutChangedNotes(updated.changedNotes, "api");
+    fanout({
+      type: "book.updated",
+      source: "api",
+      data: {
+        extId,
+        ...patch,
+        ...(updated.patch.author !== undefined
+          ? { author: updated.patch.author }
+          : {}),
+      },
+    });
     return c.json({ ok: true });
   }
 );
@@ -329,14 +712,15 @@ v1.patch(
 v1.delete("/books/:extId", async c => {
   const extId = c.req.param("extId");
   const deleted = await deleteBookMirrorResources(extId);
-  if (!deleted.book) return c.json({ error: "not_found" }, 404);
+  if (!deleted.resourceFound) return c.json({ error: "not_found" }, 404);
   // WebHooks are deliberately emitted only after the database transaction has
   // committed, so consumers never observe deletion that later rolls back.
+  fanoutChangedNotes(deleted.changedNotes, "api");
   fanoutDeletedAssociations(deleted.associations, "api");
   fanout({
     type: "book.deleted",
     source: "api",
-    data: { extId, title: deleted.book.title },
+    data: { extId, title: deleted.title },
   });
   return c.json({ ok: true });
 });
@@ -405,7 +789,7 @@ const highlightBody = z
   .object({
     ...citationCreateShape,
     extId: z.string().min(1).max(64),
-    bookExtId: z.string().max(64).default(""),
+    bookExtId: z.string().min(1).max(64),
     bookTitle: z.string().max(255).default(""),
     chapterTitle: z.string().max(255).default(""),
     text: z.string().min(1).max(20000),
@@ -414,6 +798,7 @@ const highlightBody = z
       .default("underline"),
     styleColor: z.string().max(32).default("orange"),
     note: z.string().max(20000).optional(),
+    name: z.string().max(255).nullable().optional(),
     noteExtId: z.string().max(64).default(""),
     aiQa: z
       .array(
@@ -436,6 +821,7 @@ const highlightPatchBody = z
     chapterTitle: z.string().max(255).optional(),
     text: z.string().min(1).max(20000).optional(),
     note: z.string().max(20000).nullable().optional(),
+    name: z.string().max(255).nullable().optional(),
     styleKind: z.enum(["underline", "background", "color", "none"]).optional(),
     styleColor: z.string().max(32).optional(),
     noteExtId: z.string().max(64).nullable().optional(),
@@ -460,6 +846,7 @@ function highlightJson(h: typeof mirrorHighlights.$inferSelect) {
     pdfAnchor: parseStoredPdfAnchor(h.pdfAnchor) ?? undefined,
     style: { kind: h.styleKind, color: h.styleColor },
     note: h.note ?? undefined,
+    name: h.name ?? undefined,
     noteExtId: h.noteExtId || undefined,
     aiQa: h.aiQa ? (JSON.parse(h.aiQa) as unknown[]) : [],
     tags: h.tags ? (JSON.parse(h.tags) as string[]) : [],
@@ -480,12 +867,18 @@ v1.get("/highlights", async c => {
 
 v1.post("/highlights", zValidator("json", highlightBody), async c => {
   const h = c.req.valid("json");
-  await getDb()
-    .insert(mirrorHighlights)
-    .values({
+  const result = await runMirrorEventTransaction(getDb(), async transaction => {
+    const canonicalBookTitle = await lockCanonicalBookTitle(
+      transaction,
+      h.bookExtId
+    );
+    if (canonicalBookTitle === null) {
+      return { kind: "book_not_found" as const };
+    }
+    const stored = {
       extId: h.extId,
       bookExtId: h.bookExtId,
-      bookTitle: h.bookTitle,
+      bookTitle: canonicalBookTitle,
       citationLevel: h.citationLevel,
       chapterId: h.chapterId,
       chapterTitle: h.chapterTitle,
@@ -497,41 +890,42 @@ v1.post("/highlights", zValidator("json", highlightBody), async c => {
       styleKind: h.styleKind,
       styleColor: h.styleColor,
       note: h.note ?? null,
-      noteExtId: h.noteExtId,
+      name: h.name ?? null,
+      noteExtId: h.noteExtId || null,
       aiQa: h.aiQa ? JSON.stringify(h.aiQa) : null,
       tags: h.tags ? JSON.stringify(h.tags) : null,
       cloze: h.cloze ? JSON.stringify(h.cloze) : null,
       review: h.review ? JSON.stringify(h.review) : null,
-    })
-    .onDuplicateKeyUpdate({
-      set: {
-        bookExtId: h.bookExtId,
-        bookTitle: h.bookTitle,
-        citationLevel: h.citationLevel,
-        chapterId: h.chapterId,
-        chapterTitle: h.chapterTitle,
-        text: h.text,
-        paraIndex: h.paraIndex ?? null,
-        start: h.start ?? null,
-        end: h.end ?? null,
-        pdfAnchor: serializePdfAnchor(h.pdfAnchor),
-        styleKind: h.styleKind,
-        styleColor: h.styleColor,
-        note: h.note ?? null,
-        noteExtId: h.noteExtId,
-        aiQa: h.aiQa ? JSON.stringify(h.aiQa) : null,
-        tags: h.tags ? JSON.stringify(h.tags) : null,
-        cloze: h.cloze ? JSON.stringify(h.cloze) : null,
-        review: h.review ? JSON.stringify(h.review) : null,
-      },
-    });
+    };
+    const rows = await transaction
+      .select()
+      .from(mirrorHighlights)
+      .where(eq(mirrorHighlights.extId, h.extId))
+      .limit(1)
+      .for("update");
+    const previous = rows[0];
+    await transaction
+      .insert(mirrorHighlights)
+      .values(stored)
+      .onDuplicateKeyUpdate({ set: stored });
+    const changedNotes = await syncHighlightCitationNotes(
+      transaction,
+      previous ?? { ...stored, noteExtId: null },
+      stored
+    );
+    return { kind: "ok" as const, canonicalBookTitle, changedNotes };
+  });
+  if (result.kind === "book_not_found") {
+    return c.json({ error: "book_not_found" }, 404);
+  }
+  fanoutChangedNotes(result.changedNotes, "api");
   fanout({
     type: "highlight.created",
     source: "api",
     data: {
       extId: h.extId,
       bookExtId: h.bookExtId,
-      bookTitle: h.bookTitle,
+      bookTitle: result.canonicalBookTitle,
       citationLevel: h.citationLevel,
       chapterId: h.chapterId || undefined,
       chapterTitle: h.chapterTitle,
@@ -542,6 +936,7 @@ v1.post("/highlights", zValidator("json", highlightBody), async c => {
       pdfAnchor: h.pdfAnchor,
       noteExtId: h.noteExtId || undefined,
       note: h.note,
+      name: h.name ?? undefined,
     },
   });
   return c.json({ ok: true, extId: h.extId }, 201);
@@ -552,79 +947,141 @@ v1.patch(
   zValidator("json", highlightPatchBody),
   async c => {
     const extId = c.req.param("extId");
-    const rows = await getDb()
-      .select()
-      .from(mirrorHighlights)
-      .where(eq(mirrorHighlights.extId, extId))
-      .limit(1);
-    if (!rows[0]) return c.json({ error: "not_found" }, 404);
     const body = c.req.valid("json");
-    const current = rows[0];
-    const citation = resolveCitationPatch(
-      {
-        citationLevel: parseStoredCitationLevel(current.citationLevel),
-        chapterId: current.chapterId,
-        paraIndex: current.paraIndex,
-        start: current.start,
-        end: current.end,
-        pdfAnchor: parseStoredPdfAnchor(current.pdfAnchor),
-      },
-      body
+    const result = await runMirrorEventTransaction(
+      getDb(),
+      async transaction => {
+        const rows = await transaction
+          .select()
+          .from(mirrorHighlights)
+          .where(eq(mirrorHighlights.extId, extId))
+          .limit(1)
+          .for("update");
+        const current = rows[0];
+        if (!current) return { kind: "not_found" as const };
+
+        const nextBookExtId = body.bookExtId ?? current.bookExtId;
+        const canonicalBookTitle = await lockCanonicalBookTitle(
+          transaction,
+          nextBookExtId
+        );
+        if (canonicalBookTitle === null) {
+          return { kind: "book_not_found" as const };
+        }
+
+        const citation = resolveCitationPatch(
+          {
+            citationLevel: parseStoredCitationLevel(current.citationLevel),
+            chapterId: current.chapterId,
+            paraIndex: current.paraIndex,
+            start: current.start,
+            end: current.end,
+            pdfAnchor: parseStoredPdfAnchor(current.pdfAnchor),
+          },
+          body
+        );
+        if (!citation.success) {
+          return {
+            kind: "invalid_citation" as const,
+            message: citation.message,
+          };
+        }
+
+        const patch: Record<string, unknown> = {};
+        if (body.bookExtId !== undefined) patch.bookExtId = body.bookExtId;
+        patch.bookTitle = canonicalBookTitle;
+        if (body.chapterTitle !== undefined)
+          patch.chapterTitle = body.chapterTitle;
+        if (body.text !== undefined) patch.text = body.text;
+        if (body.note !== undefined) patch.note = body.note;
+        if (body.name !== undefined) patch.name = body.name;
+        if (body.styleKind !== undefined) patch.styleKind = body.styleKind;
+        if (body.styleColor !== undefined) patch.styleColor = body.styleColor;
+        if (body.noteExtId !== undefined)
+          patch.noteExtId = body.noteExtId || null;
+        const citationTouched =
+          body.citationLevel !== undefined ||
+          body.chapterId !== undefined ||
+          body.paraIndex !== undefined ||
+          body.start !== undefined ||
+          body.end !== undefined ||
+          body.pdfAnchor !== undefined;
+        if (citationTouched) {
+          patch.citationLevel = citation.data.citationLevel;
+          patch.chapterId = citation.data.chapterId;
+          patch.paraIndex = citation.data.paraIndex;
+          patch.start = citation.data.start;
+          patch.end = citation.data.end;
+          patch.pdfAnchor = serializePdfAnchor(citation.data.pdfAnchor);
+        }
+        if (body.tags !== undefined) patch.tags = JSON.stringify(body.tags);
+        if (body.cloze !== undefined) patch.cloze = JSON.stringify(body.cloze);
+        if (body.review !== undefined)
+          patch.review = body.review ? JSON.stringify(body.review) : null;
+        if (Object.keys(patch).length) {
+          await transaction
+            .update(mirrorHighlights)
+            .set(patch)
+            .where(eq(mirrorHighlights.extId, extId));
+        }
+
+        const changedNotes = await syncHighlightCitationNotes(
+          transaction,
+          current,
+          {
+            extId: current.extId,
+            noteExtId:
+              body.noteExtId !== undefined
+                ? body.noteExtId || null
+                : current.noteExtId,
+            citationLevel: citationTouched
+              ? citation.data.citationLevel
+              : current.citationLevel,
+            bookTitle: canonicalBookTitle,
+            chapterTitle: body.chapterTitle ?? current.chapterTitle,
+            text: body.text ?? current.text,
+          }
+        );
+        return {
+          kind: "ok" as const,
+          citation,
+          citationTouched,
+          changedNotes,
+          bookExtId: nextBookExtId,
+          bookTitle: canonicalBookTitle,
+        };
+      }
     );
-    if (!citation.success) {
+    if (result.kind === "not_found") {
+      return c.json({ error: "not_found" }, 404);
+    }
+    if (result.kind === "invalid_citation") {
       return c.json(
-        { error: "invalid_citation", message: citation.message },
+        { error: "invalid_citation", message: result.message },
         400
       );
     }
-    const patch: Record<string, unknown> = {};
-    if (body.bookExtId !== undefined) patch.bookExtId = body.bookExtId;
-    if (body.bookTitle !== undefined) patch.bookTitle = body.bookTitle;
-    if (body.chapterTitle !== undefined) patch.chapterTitle = body.chapterTitle;
-    if (body.text !== undefined) patch.text = body.text;
-    if (body.note !== undefined) patch.note = body.note;
-    if (body.styleKind !== undefined) patch.styleKind = body.styleKind;
-    if (body.styleColor !== undefined) patch.styleColor = body.styleColor;
-    if (body.noteExtId !== undefined) patch.noteExtId = body.noteExtId ?? "";
-    const citationTouched =
-      body.citationLevel !== undefined ||
-      body.chapterId !== undefined ||
-      body.paraIndex !== undefined ||
-      body.start !== undefined ||
-      body.end !== undefined ||
-      body.pdfAnchor !== undefined;
-    if (citationTouched) {
-      patch.citationLevel = citation.data.citationLevel;
-      patch.chapterId = citation.data.chapterId;
-      patch.paraIndex = citation.data.paraIndex;
-      patch.start = citation.data.start;
-      patch.end = citation.data.end;
-      patch.pdfAnchor = serializePdfAnchor(citation.data.pdfAnchor);
+    if (result.kind === "book_not_found") {
+      return c.json({ error: "book_not_found" }, 404);
     }
-    if (body.tags !== undefined) patch.tags = JSON.stringify(body.tags);
-    if (body.cloze !== undefined) patch.cloze = JSON.stringify(body.cloze);
-    if (body.review !== undefined)
-      patch.review = body.review ? JSON.stringify(body.review) : null;
-    if (Object.keys(patch).length)
-      await getDb()
-        .update(mirrorHighlights)
-        .set(patch)
-        .where(eq(mirrorHighlights.extId, extId));
+    fanoutChangedNotes(result.changedNotes, "api");
     fanout({
       type: "highlight.updated",
       source: "api",
       data: {
         extId,
         ...body,
+        bookExtId: result.bookExtId,
+        bookTitle: result.bookTitle,
         ...(body.noteExtId === null ? { noteExtId: null } : {}),
-        ...(citationTouched
+        ...(result.citationTouched
           ? {
-              citationLevel: citation.data.citationLevel,
-              chapterId: citation.data.chapterId || null,
-              paraIndex: citation.data.paraIndex,
-              start: citation.data.start,
-              end: citation.data.end,
-              pdfAnchor: citation.data.pdfAnchor,
+              citationLevel: result.citation.data.citationLevel,
+              chapterId: result.citation.data.chapterId || null,
+              paraIndex: result.citation.data.paraIndex,
+              start: result.citation.data.start,
+              end: result.citation.data.end,
+              pdfAnchor: result.citation.data.pdfAnchor,
             }
           : {}),
       },
@@ -661,19 +1118,31 @@ v1.get("/review/due", async c => {
 
 v1.delete("/highlights/:extId", async c => {
   const extId = c.req.param("extId");
-  const rows = await getDb()
-    .select()
-    .from(mirrorHighlights)
-    .where(eq(mirrorHighlights.extId, extId))
-    .limit(1);
-  if (!rows[0]) return c.json({ error: "not_found" }, 404);
-  await getDb()
-    .delete(mirrorHighlights)
-    .where(eq(mirrorHighlights.extId, extId));
+  const result = await runMirrorEventTransaction(getDb(), async transaction => {
+    const rows = await transaction
+      .select()
+      .from(mirrorHighlights)
+      .where(eq(mirrorHighlights.extId, extId))
+      .limit(1)
+      .for("update");
+    const current = rows[0];
+    if (!current) return null;
+    await transaction
+      .delete(mirrorHighlights)
+      .where(eq(mirrorHighlights.extId, extId));
+    const changedNotes = await syncHighlightCitationNotes(
+      transaction,
+      current,
+      { ...current, noteExtId: null }
+    );
+    return { current, changedNotes };
+  });
+  if (!result) return c.json({ error: "not_found" }, 404);
+  fanoutChangedNotes(result.changedNotes, "api");
   fanout({
     type: "highlight.deleted",
     source: "api",
-    data: { extId, bookTitle: rows[0].bookTitle },
+    data: { extId, bookTitle: result.current.bookTitle },
   });
   return c.json({ ok: true });
 });
@@ -914,6 +1383,99 @@ const notePatchBody = noteBody
     message: "title or content is required",
   });
 
+function nextServerNoteVersion(current = 0): number {
+  return Math.max(Date.now(), current + 1);
+}
+
+async function noteTombstoneExists(
+  database: DatabaseExecutor,
+  extId: string
+): Promise<boolean> {
+  const rows = await database
+    .select({ extId: mirrorNoteTombstones.extId })
+    .from(mirrorNoteTombstones)
+    .where(eq(mirrorNoteTombstones.extId, extId))
+    .limit(1)
+    .for("update");
+  return rows.length > 0;
+}
+
+function storedJsonListHasItems(value: string | null): boolean {
+  if (!value) return false;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return !Array.isArray(parsed) || parsed.length > 0;
+  } catch {
+    // Preserve malformed legacy rows rather than deleting user content.
+    return true;
+  }
+}
+
+function isStoredCitationOnlyHighlight(
+  highlight: typeof mirrorHighlights.$inferSelect
+): boolean {
+  return (
+    highlight.styleKind === "none" &&
+    !highlight.note &&
+    !highlight.name &&
+    !storedJsonListHasItems(highlight.aiQa) &&
+    !storedJsonListHasItems(highlight.tags) &&
+    !storedJsonListHasItems(highlight.cloze) &&
+    !highlight.review
+  );
+}
+
+async function deleteMirrorNoteWithLinkedHighlights(
+  database: DatabaseExecutor,
+  extId: string,
+  options: { tombstoneIfAbsent: boolean }
+): Promise<{
+  noteFound: boolean;
+  deletedHighlights: DeletedMirrorHighlight[];
+}> {
+  await noteTombstoneExists(database, extId);
+  const notes = await database
+    .select({ extId: mirrorNotes.extId })
+    .from(mirrorNotes)
+    .where(eq(mirrorNotes.extId, extId))
+    .limit(1)
+    .for("update");
+  const noteFound = notes.length > 0;
+  if (!noteFound && !options.tombstoneIfAbsent) {
+    return { noteFound: false, deletedHighlights: [] };
+  }
+
+  const linkedHighlights = noteFound
+    ? await database
+        .select()
+        .from(mirrorHighlights)
+        .where(eq(mirrorHighlights.noteExtId, extId))
+        .for("update")
+    : [];
+  const citationOnly = linkedHighlights.filter(isStoredCitationOnlyHighlight);
+  for (const highlight of citationOnly) {
+    await database
+      .delete(mirrorHighlights)
+      .where(eq(mirrorHighlights.extId, highlight.extId));
+  }
+
+  await database
+    .insert(mirrorNoteTombstones)
+    .values({ extId })
+    .onDuplicateKeyUpdate({ set: { deletedAt: new Date() } });
+  if (noteFound) {
+    // The FK clears noteExtId on every enriched highlight that remains.
+    await database.delete(mirrorNotes).where(eq(mirrorNotes.extId, extId));
+  }
+  return {
+    noteFound,
+    deletedHighlights: citationOnly.map(highlight => ({
+      extId: highlight.extId,
+      bookTitle: highlight.bookTitle,
+    })),
+  };
+}
+
 v1.get("/notes", async c => {
   const rows = await getDb().select().from(mirrorNotes);
   return c.json({
@@ -929,14 +1491,43 @@ v1.get("/notes", async c => {
 
 v1.post("/notes", zValidator("json", noteBody), async c => {
   const n = c.req.valid("json");
-  await getDb()
-    .insert(mirrorNotes)
-    .values(n)
-    .onDuplicateKeyUpdate({ set: { title: n.title, content: n.content } });
+  let updatedAt = 0;
+  let tombstoned = false;
+  await runMirrorEventTransaction(getDb(), async transaction => {
+    tombstoned = await noteTombstoneExists(transaction, n.extId);
+    if (tombstoned) return;
+    const rows = await transaction
+      .select({ clientUpdatedAt: mirrorNotes.clientUpdatedAt })
+      .from(mirrorNotes)
+      .where(eq(mirrorNotes.extId, n.extId))
+      .limit(1)
+      .for("update");
+    updatedAt = nextServerNoteVersion(rows[0]?.clientUpdatedAt);
+    if (rows[0]) {
+      await transaction
+        .update(mirrorNotes)
+        .set({
+          title: n.title,
+          content: n.content,
+          clientUpdatedAt: updatedAt,
+        })
+        .where(eq(mirrorNotes.extId, n.extId));
+    } else {
+      await transaction
+        .insert(mirrorNotes)
+        .values({ ...n, clientUpdatedAt: updatedAt });
+    }
+  });
+  if (tombstoned) {
+    return c.json(
+      { error: "note_deleted", message: "deleted note ids cannot be reused" },
+      409
+    );
+  }
   fanout({
     type: "note.created",
     source: "api",
-    data: { extId: n.extId, title: n.title, content: n.content },
+    data: { extId: n.extId, title: n.title, content: n.content, updatedAt },
   });
   return c.json({ ok: true, extId: n.extId }, 201);
 });
@@ -960,28 +1551,37 @@ v1.get("/notes/:extId", async c => {
 
 v1.patch("/notes/:extId", zValidator("json", notePatchBody), async c => {
   const extId = c.req.param("extId");
-  const rows = await getDb()
-    .select()
-    .from(mirrorNotes)
-    .where(eq(mirrorNotes.extId, extId))
-    .limit(1);
-  if (!rows[0]) return c.json({ error: "not_found" }, 404);
   const body = c.req.valid("json");
-  const patch = {
-    ...(body.title !== undefined ? { title: body.title } : {}),
-    ...(body.content !== undefined ? { content: body.content } : {}),
-  };
-  await getDb()
-    .update(mirrorNotes)
-    .set(patch)
-    .where(eq(mirrorNotes.extId, extId));
+  const result = await runMirrorEventTransaction(getDb(), async transaction => {
+    const rows = await transaction
+      .select()
+      .from(mirrorNotes)
+      .where(eq(mirrorNotes.extId, extId))
+      .limit(1)
+      .for("update");
+    const current = rows[0];
+    if (!current) return null;
+    const updatedAt = nextServerNoteVersion(current.clientUpdatedAt);
+    const patch = {
+      ...(body.title !== undefined ? { title: body.title } : {}),
+      ...(body.content !== undefined ? { content: body.content } : {}),
+      clientUpdatedAt: updatedAt,
+    };
+    await transaction
+      .update(mirrorNotes)
+      .set(patch)
+      .where(eq(mirrorNotes.extId, extId));
+    return { current, patch, updatedAt };
+  });
+  if (!result) return c.json({ error: "not_found" }, 404);
   fanout({
     type: "note.updated",
     source: "api",
     data: {
       extId,
-      title: patch.title ?? rows[0].title,
-      content: patch.content ?? rows[0].content,
+      title: result.patch.title ?? result.current.title,
+      content: result.patch.content ?? result.current.content,
+      updatedAt: result.updatedAt,
     },
   });
   return c.json({ ok: true });
@@ -989,19 +1589,27 @@ v1.patch("/notes/:extId", zValidator("json", notePatchBody), async c => {
 
 v1.delete("/notes/:extId", async c => {
   const extId = c.req.param("extId");
-  const rows = await getDb()
-    .select()
-    .from(mirrorNotes)
-    .where(eq(mirrorNotes.extId, extId))
-    .limit(1);
-  if (!rows[0]) return c.json({ error: "not_found" }, 404);
-  await getDb()
-    .update(mirrorHighlights)
-    .set({ noteExtId: "" })
-    .where(eq(mirrorHighlights.noteExtId, extId));
-  await getDb().delete(mirrorNotes).where(eq(mirrorNotes.extId, extId));
+  const deleted = await runMirrorEventTransaction(getDb(), transaction =>
+    deleteMirrorNoteWithLinkedHighlights(transaction, extId, {
+      tombstoneIfAbsent: false,
+    })
+  );
+  if (!deleted.noteFound) return c.json({ error: "not_found" }, 404);
+  for (const highlight of deleted.deletedHighlights) {
+    fanout({
+      type: "highlight.deleted",
+      source: "api",
+      data: {
+        extId: highlight.extId,
+        bookTitle: highlight.bookTitle,
+      },
+    });
+  }
   fanout({ type: "note.deleted", source: "api", data: { extId } });
-  return c.json({ ok: true });
+  return c.json({
+    ok: true,
+    deletedHighlightIds: deleted.deletedHighlights.map(item => item.extId),
+  });
 });
 
 /* ---------- 文件夹 ---------- */
@@ -1058,7 +1666,7 @@ v1.delete("/folders/:extId", async c => {
 
 const translationBody = z.object({
   extId: z.string().min(1).max(64),
-  bookExtId: z.string().max(64).default(""),
+  bookExtId: z.string().min(1).max(64),
   bookTitle: z.string().max(255).default(""),
   chapterTitle: z.string().max(255).default(""),
   targetLang: z.string().min(1).max(32),
@@ -1143,7 +1751,7 @@ v1.post(
       sourceLang: z.string().max(40).default(""),
       mode: z.enum(["passage", "chapter"]).default("passage"),
       extId: z.string().max(64).optional(),
-      bookExtId: z.string().max(64).default(""),
+      bookExtId: z.string().min(1).max(64),
       bookTitle: z.string().max(255).default(""),
       chapterTitle: z.string().max(255).default(""),
     })
@@ -1218,7 +1826,7 @@ const mindNodeSchema: z.ZodType<MindNodeInput> = z.lazy(() =>
 const mindmapBody = z.object({
   extId: z.string().min(1).max(64),
   title: z.string().min(1).max(255),
-  bookExtId: z.string().max(64).default(""),
+  bookExtId: z.string().min(1).max(64),
   bookTitle: z.string().max(255).default(""),
   root: mindNodeSchema,
 });
@@ -1372,16 +1980,15 @@ v1.post(
         } catch {
           overview = ""; // 导读失败不阻塞问答
         }
-        await getDb()
-          .insert(bookDigests)
-          .values({
-            contentHash: q.contentHash,
+        await getDb().transaction(transaction =>
+          saveDigestIfReferenced(transaction, {
+            contentHash: q.contentHash!,
             title: q.title || "未命名",
             author: "",
-            structure: q.structure,
-            overview,
+            structure: q.structure!,
+            overview: overview || null,
           })
-          .onDuplicateKeyUpdate({ set: { structure: q.structure, overview } });
+        );
       }
     }
 
@@ -1451,10 +2058,45 @@ class InvalidMirrorEventError extends Error {
   }
 }
 
+async function canonicalBookTitleForEvent(
+  database: DatabaseExecutor,
+  bookExtId: string
+): Promise<string> {
+  const title = await lockCanonicalBookTitle(database, bookExtId);
+  if (title === null) {
+    throw new InvalidMirrorEventError([
+      {
+        path: "data.bookExtId",
+        message: "mirrored book not found",
+      },
+    ]);
+  }
+  return title;
+}
+
+async function lockCanonicalBookTitle(
+  database: DatabaseExecutor,
+  bookExtId: string
+): Promise<string | null> {
+  const books = await database
+    .select({ title: mirrorBooks.title })
+    .from(mirrorBooks)
+    .where(eq(mirrorBooks.extId, bookExtId))
+    .limit(1)
+    .for("update");
+  return books[0]?.title ?? null;
+}
+
 const MIRROR_EVENT_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const MIRROR_EVENT_RECEIPT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 const MIRROR_EVENT_RECEIPT_CLEANUP_BATCH_SIZE = 1_000;
 const MIRROR_EVENT_TRANSACTION_MAX_ATTEMPTS = 3;
+const READER_EVENT_TYPES = [
+  ...EVENT_TYPES,
+  "book.import.started",
+  "book.import.chunk",
+  "book.import.completed",
+] as const;
 const RETRYABLE_MIRROR_EVENT_ERROR_CODES = new Set([
   "ER_LOCK_DEADLOCK",
   "ER_LOCK_WAIT_TIMEOUT",
@@ -1556,7 +2198,7 @@ v1.post(
           .max(64)
           .regex(/^[A-Za-z0-9._:-]+$/)
           .default(() => randomUUID()),
-        type: z.string().min(1).max(64),
+        type: z.enum(READER_EVENT_TYPES),
         data: z.record(z.string(), z.unknown()).default({}),
       })
       .strict()
@@ -1583,7 +2225,11 @@ v1.post(
     };
     let suppressFanout = false;
     let duplicateDelivery = false;
-    let deletedAssociations: (typeof mirrorAssociations.$inferSelect)[] = [];
+    let deletedAssociations: DeletedMirrorAssociation[] = [];
+    let deletedHighlights: DeletedMirrorHighlight[] = [];
+    let changedNotes: ChangedMirrorNote[] = [];
+    let deletedDigestHashes: string[] = [];
+    let invalidatedDigestHashes: string[] = [];
     let mirrorDatabase: DatabaseExecutor;
     let mirrorClient: DatabaseClient;
 
@@ -1591,6 +2237,7 @@ v1.post(
     let mirrored: boolean | undefined;
     const persistEvent = async () => {
       const d = normalized.data;
+      let persistence: "mirrored" | "fanout-only" | "unmirrored" = "mirrored";
       if (
         ev.type === "association.created" ||
         ev.type === "association.updated"
@@ -1616,87 +2263,108 @@ v1.post(
         typeof d.extId === "string" &&
         typeof d.text === "string"
       ) {
+        const canonicalBookTitle = await canonicalBookTitleForEvent(
+          mirrorDatabase,
+          String(d.bookExtId)
+        );
+        const stored = {
+          extId: d.extId,
+          bookExtId: String(d.bookExtId ?? ""),
+          bookTitle: canonicalBookTitle,
+          citationLevel: String(d.citationLevel ?? "content"),
+          chapterId: String(d.chapterId ?? ""),
+          chapterTitle: String(d.chapterTitle ?? ""),
+          text: d.text,
+          paraIndex: typeof d.paraIndex === "number" ? d.paraIndex : null,
+          start: typeof d.start === "number" ? d.start : null,
+          end: typeof d.end === "number" ? d.end : null,
+          pdfAnchor: d.pdfAnchor ? JSON.stringify(d.pdfAnchor) : null,
+          styleKind: String(d.styleKind ?? "underline"),
+          styleColor: String(d.styleColor ?? "orange"),
+          note: typeof d.note === "string" ? d.note : null,
+          name: typeof d.name === "string" ? d.name : null,
+          noteExtId: typeof d.noteExtId === "string" ? d.noteExtId : null,
+          aiQa: Array.isArray(d.aiQa) ? JSON.stringify(d.aiQa) : null,
+          tags: Array.isArray(d.tags) ? JSON.stringify(d.tags) : null,
+          cloze: Array.isArray(d.cloze) ? JSON.stringify(d.cloze) : null,
+          review: d.review ? JSON.stringify(d.review) : null,
+        };
+        const rows = await mirrorDatabase
+          .select()
+          .from(mirrorHighlights)
+          .where(eq(mirrorHighlights.extId, d.extId))
+          .limit(1)
+          .for("update");
+        const previous = rows[0];
         await mirrorDatabase
           .insert(mirrorHighlights)
-          .values({
-            extId: d.extId,
-            bookExtId: String(d.bookExtId ?? ""),
-            bookTitle: String(d.bookTitle ?? ""),
-            citationLevel: String(d.citationLevel ?? "content"),
-            chapterId: String(d.chapterId ?? ""),
-            chapterTitle: String(d.chapterTitle ?? ""),
-            text: d.text,
-            paraIndex: typeof d.paraIndex === "number" ? d.paraIndex : null,
-            start: typeof d.start === "number" ? d.start : null,
-            end: typeof d.end === "number" ? d.end : null,
-            pdfAnchor: d.pdfAnchor ? JSON.stringify(d.pdfAnchor) : null,
-            styleKind: String(d.styleKind ?? "underline"),
-            styleColor: String(d.styleColor ?? "orange"),
-            note: typeof d.note === "string" ? d.note : null,
-            noteExtId: typeof d.noteExtId === "string" ? d.noteExtId : "",
-            aiQa: Array.isArray(d.aiQa) ? JSON.stringify(d.aiQa) : null,
-            tags: Array.isArray(d.tags) ? JSON.stringify(d.tags) : null,
-            cloze: Array.isArray(d.cloze) ? JSON.stringify(d.cloze) : null,
-            review: d.review ? JSON.stringify(d.review) : null,
-          })
-          .onDuplicateKeyUpdate({
-            set: {
-              bookExtId: String(d.bookExtId ?? ""),
-              bookTitle: String(d.bookTitle ?? ""),
-              citationLevel: String(d.citationLevel ?? "content"),
-              chapterId: String(d.chapterId ?? ""),
-              chapterTitle: String(d.chapterTitle ?? ""),
-              text: d.text,
-              paraIndex: typeof d.paraIndex === "number" ? d.paraIndex : null,
-              start: typeof d.start === "number" ? d.start : null,
-              end: typeof d.end === "number" ? d.end : null,
-              pdfAnchor: d.pdfAnchor ? JSON.stringify(d.pdfAnchor) : null,
-              note: typeof d.note === "string" ? d.note : null,
-              noteExtId: typeof d.noteExtId === "string" ? d.noteExtId : "",
-              styleKind: String(d.styleKind ?? "underline"),
-              styleColor: String(d.styleColor ?? "orange"),
-              aiQa: Array.isArray(d.aiQa) ? JSON.stringify(d.aiQa) : null,
-              tags: Array.isArray(d.tags) ? JSON.stringify(d.tags) : null,
-              cloze: Array.isArray(d.cloze) ? JSON.stringify(d.cloze) : null,
-              review: d.review ? JSON.stringify(d.review) : null,
-            },
-          });
+          .values(stored)
+          .onDuplicateKeyUpdate({ set: stored });
+        changedNotes.push(
+          ...(await syncHighlightCitationNotes(
+            mirrorDatabase,
+            previous ?? { ...stored, noteExtId: null },
+            stored
+          ))
+        );
+        event = {
+          ...event,
+          data: { ...event.data, bookTitle: canonicalBookTitle },
+        };
       } else if (
         ev.type === "highlight.updated" &&
         typeof d.extId === "string"
       ) {
-        const patch: Record<string, unknown> = {};
-        if (d.bookExtId !== undefined) patch.bookExtId = d.bookExtId;
-        if (d.bookTitle !== undefined) patch.bookTitle = d.bookTitle;
-        if (d.chapterTitle !== undefined) patch.chapterTitle = d.chapterTitle;
-        if (d.text !== undefined) patch.text = d.text;
-        if (d.note === null || typeof d.note === "string") patch.note = d.note;
-        if (d.noteExtId === null || typeof d.noteExtId === "string")
-          patch.noteExtId = d.noteExtId ?? "";
-        if (typeof d.styleKind === "string") patch.styleKind = d.styleKind;
-        if (typeof d.styleColor === "string") patch.styleColor = d.styleColor;
-        if (Array.isArray(d.aiQa)) patch.aiQa = JSON.stringify(d.aiQa);
-        if (Array.isArray(d.tags)) patch.tags = JSON.stringify(d.tags);
-        if (Array.isArray(d.cloze)) patch.cloze = JSON.stringify(d.cloze);
-        if (d.review === null) patch.review = null;
-        else if (d.review && typeof d.review === "object")
-          patch.review = JSON.stringify(d.review);
+        const rows = await mirrorDatabase
+          .select()
+          .from(mirrorHighlights)
+          .where(eq(mirrorHighlights.extId, d.extId))
+          .limit(1)
+          .for("update");
+        const current = rows[0];
+        if (!current) {
+          throw new InvalidMirrorEventError([
+            {
+              path: "data.extId",
+              message: "mirrored highlight not found",
+            },
+          ]);
+        } else {
+          const nextBookExtId =
+            typeof d.bookExtId === "string" ? d.bookExtId : current.bookExtId;
+          const canonicalBookTitle = await canonicalBookTitleForEvent(
+            mirrorDatabase,
+            nextBookExtId
+          );
+          const patch: Record<string, unknown> = {};
+          if (d.bookExtId !== undefined) patch.bookExtId = d.bookExtId;
+          patch.bookTitle = canonicalBookTitle;
+          if (d.chapterTitle !== undefined) patch.chapterTitle = d.chapterTitle;
+          if (d.text !== undefined) patch.text = d.text;
+          if (d.note === null || typeof d.note === "string")
+            patch.note = d.note;
+          if (d.name === null || typeof d.name === "string")
+            patch.name = d.name;
+          if (d.noteExtId === null || typeof d.noteExtId === "string")
+            patch.noteExtId = d.noteExtId || null;
+          if (typeof d.styleKind === "string") patch.styleKind = d.styleKind;
+          if (typeof d.styleColor === "string") patch.styleColor = d.styleColor;
+          if (Array.isArray(d.aiQa)) patch.aiQa = JSON.stringify(d.aiQa);
+          if (Array.isArray(d.tags)) patch.tags = JSON.stringify(d.tags);
+          if (Array.isArray(d.cloze)) patch.cloze = JSON.stringify(d.cloze);
+          if (d.review === null) patch.review = null;
+          else if (d.review && typeof d.review === "object")
+            patch.review = JSON.stringify(d.review);
 
-        const citationTouched =
-          d.citationLevel !== undefined ||
-          d.chapterId !== undefined ||
-          d.paraIndex !== undefined ||
-          d.start !== undefined ||
-          d.end !== undefined ||
-          d.pdfAnchor !== undefined;
-        if (citationTouched) {
-          const rows = await mirrorDatabase
-            .select()
-            .from(mirrorHighlights)
-            .where(eq(mirrorHighlights.extId, d.extId))
-            .limit(1);
-          if (rows[0]) {
-            const current = rows[0];
+          const citationTouched =
+            d.citationLevel !== undefined ||
+            d.chapterId !== undefined ||
+            d.paraIndex !== undefined ||
+            d.start !== undefined ||
+            d.end !== undefined ||
+            d.pdfAnchor !== undefined;
+          let nextCitationLevel = current.citationLevel;
+          if (citationTouched) {
             const citation = resolveCitationPatch(
               {
                 citationLevel: parseStoredCitationLevel(current.citationLevel),
@@ -1739,66 +2407,190 @@ v1.post(
                 { path: "data", message: citation.message },
               ]);
             }
-            patch.citationLevel = citation.data.citationLevel;
+            nextCitationLevel = citation.data.citationLevel;
+            patch.citationLevel = nextCitationLevel;
             patch.chapterId = citation.data.chapterId;
             patch.paraIndex = citation.data.paraIndex;
             patch.start = citation.data.start;
             patch.end = citation.data.end;
             patch.pdfAnchor = serializePdfAnchor(citation.data.pdfAnchor);
           }
+          if (Object.keys(patch).length) {
+            await mirrorDatabase
+              .update(mirrorHighlights)
+              .set(patch)
+              .where(eq(mirrorHighlights.extId, d.extId));
+          }
+          changedNotes.push(
+            ...(await syncHighlightCitationNotes(mirrorDatabase, current, {
+              extId: current.extId,
+              noteExtId:
+                d.noteExtId === null || typeof d.noteExtId === "string"
+                  ? d.noteExtId || null
+                  : current.noteExtId,
+              citationLevel: nextCitationLevel,
+              bookTitle: canonicalBookTitle,
+              chapterTitle:
+                typeof d.chapterTitle === "string"
+                  ? d.chapterTitle
+                  : current.chapterTitle,
+              text: typeof d.text === "string" ? d.text : current.text,
+            }))
+          );
+          event = {
+            ...event,
+            data: {
+              ...event.data,
+              bookExtId: nextBookExtId,
+              bookTitle: canonicalBookTitle,
+            },
+          };
         }
-        if (Object.keys(patch).length)
-          await mirrorDatabase
-            .update(mirrorHighlights)
-            .set(patch)
-            .where(eq(mirrorHighlights.extId, d.extId));
       } else if (
         ev.type === "highlight.deleted" &&
         typeof d.extId === "string"
       ) {
-        await mirrorDatabase
-          .delete(mirrorHighlights)
-          .where(eq(mirrorHighlights.extId, d.extId));
+        const rows = await mirrorDatabase
+          .select()
+          .from(mirrorHighlights)
+          .where(eq(mirrorHighlights.extId, d.extId))
+          .limit(1)
+          .for("update");
+        const current = rows[0];
+        if (current) {
+          await mirrorDatabase
+            .delete(mirrorHighlights)
+            .where(eq(mirrorHighlights.extId, d.extId));
+          changedNotes.push(
+            ...(await syncHighlightCitationNotes(mirrorDatabase, current, {
+              ...current,
+              noteExtId: null,
+            }))
+          );
+        }
       } else if (
         ev.type === "note.created" &&
         typeof d.extId === "string" &&
         typeof d.title === "string" &&
-        typeof d.content === "string"
+        typeof d.content === "string" &&
+        typeof d.updatedAt === "number"
       ) {
-        await mirrorDatabase
-          .insert(mirrorNotes)
-          .values({ extId: d.extId, title: d.title, content: d.content })
-          .onDuplicateKeyUpdate({
-            set: { title: d.title, content: d.content },
-          });
-      } else if (ev.type === "note.updated" && typeof d.extId === "string") {
-        const notePatch: Record<string, unknown> = {};
-        if (typeof d.title === "string") notePatch.title = d.title;
-        if (typeof d.content === "string") notePatch.content = d.content;
-        if (typeof d.title === "string" && typeof d.content === "string") {
-          await mirrorDatabase
-            .insert(mirrorNotes)
-            .values({ extId: d.extId, title: d.title, content: d.content })
-            .onDuplicateKeyUpdate({ set: notePatch });
-        } else if (Object.keys(notePatch).length) {
-          await mirrorDatabase
-            .update(mirrorNotes)
-            .set(notePatch)
-            .where(eq(mirrorNotes.extId, d.extId));
+        if (await noteTombstoneExists(mirrorDatabase, d.extId)) {
+          suppressFanout = true;
+        } else {
+          const rows = await mirrorDatabase
+            .select({ clientUpdatedAt: mirrorNotes.clientUpdatedAt })
+            .from(mirrorNotes)
+            .where(eq(mirrorNotes.extId, d.extId))
+            .limit(1)
+            .for("update");
+          if (!rows[0]) {
+            await mirrorDatabase
+              .insert(mirrorNotes)
+              .values({
+                extId: d.extId,
+                title: d.title,
+                content: d.content,
+                clientUpdatedAt: d.updatedAt,
+              })
+              .onDuplicateKeyUpdate({
+                set: {
+                  title: sql`IF(${mirrorNotes.clientUpdatedAt} < ${d.updatedAt}, ${d.title}, ${mirrorNotes.title})`,
+                  content: sql`IF(${mirrorNotes.clientUpdatedAt} < ${d.updatedAt}, ${d.content}, ${mirrorNotes.content})`,
+                  clientUpdatedAt: sql`GREATEST(${mirrorNotes.clientUpdatedAt}, ${d.updatedAt})`,
+                },
+              });
+          } else if (d.updatedAt > rows[0].clientUpdatedAt) {
+            await mirrorDatabase
+              .update(mirrorNotes)
+              .set({
+                title: d.title,
+                content: d.content,
+                clientUpdatedAt: d.updatedAt,
+              })
+              .where(eq(mirrorNotes.extId, d.extId));
+          } else {
+            suppressFanout = true;
+          }
+        }
+      } else if (
+        ev.type === "note.updated" &&
+        typeof d.extId === "string" &&
+        typeof d.updatedAt === "number"
+      ) {
+        if (await noteTombstoneExists(mirrorDatabase, d.extId)) {
+          suppressFanout = true;
+        } else {
+          const rows = await mirrorDatabase
+            .select()
+            .from(mirrorNotes)
+            .where(eq(mirrorNotes.extId, d.extId))
+            .limit(1)
+            .for("update");
+          const current = rows[0];
+          if (current && d.updatedAt > current.clientUpdatedAt) {
+            const notePatch: Record<string, unknown> = {
+              clientUpdatedAt: d.updatedAt,
+            };
+            if (typeof d.title === "string") notePatch.title = d.title;
+            if (typeof d.content === "string") notePatch.content = d.content;
+            await mirrorDatabase
+              .update(mirrorNotes)
+              .set(notePatch)
+              .where(eq(mirrorNotes.extId, d.extId));
+          } else if (
+            !current &&
+            typeof d.title === "string" &&
+            typeof d.content === "string"
+          ) {
+            // A full snapshot can repair a note.created delivery that exhausted
+            // its retries. Tombstones were checked first, so deletion remains
+            // final even across tabs.
+            await mirrorDatabase
+              .insert(mirrorNotes)
+              .values({
+                extId: d.extId,
+                title: d.title,
+                content: d.content,
+                clientUpdatedAt: d.updatedAt,
+              })
+              .onDuplicateKeyUpdate({
+                set: {
+                  title: sql`IF(${mirrorNotes.clientUpdatedAt} < ${d.updatedAt}, ${d.title}, ${mirrorNotes.title})`,
+                  content: sql`IF(${mirrorNotes.clientUpdatedAt} < ${d.updatedAt}, ${d.content}, ${mirrorNotes.content})`,
+                  clientUpdatedAt: sql`GREATEST(${mirrorNotes.clientUpdatedAt}, ${d.updatedAt})`,
+                },
+              });
+          } else {
+            suppressFanout = true;
+          }
         }
       } else if (ev.type === "note.deleted" && typeof d.extId === "string") {
-        await mirrorDatabase
-          .update(mirrorHighlights)
-          .set({ noteExtId: "" })
-          .where(eq(mirrorHighlights.noteExtId, d.extId));
-        await mirrorDatabase
-          .delete(mirrorNotes)
-          .where(eq(mirrorNotes.extId, d.extId));
+        const deleted = await deleteMirrorNoteWithLinkedHighlights(
+          mirrorDatabase,
+          d.extId,
+          { tombstoneIfAbsent: true }
+        );
+        deletedHighlights = deleted.deletedHighlights;
       } else if (
         ev.type === "highlight.tagged" &&
         typeof d.extId === "string" &&
         Array.isArray(d.tags)
       ) {
+        const rows = await mirrorDatabase
+          .select({ extId: mirrorHighlights.extId })
+          .from(mirrorHighlights)
+          .where(eq(mirrorHighlights.extId, d.extId))
+          .limit(1)
+          .for("update");
+        if (!rows[0]) {
+          throw new InvalidMirrorEventError([
+            {
+              path: "data.extId",
+              message: "mirrored highlight not found",
+            },
+          ]);
+        }
         await mirrorDatabase
           .update(mirrorHighlights)
           .set({
@@ -1808,6 +2600,21 @@ v1.post(
           })
           .where(eq(mirrorHighlights.extId, d.extId));
       } else if (ev.type === "review.updated" && typeof d.extId === "string") {
+        const rows = await mirrorDatabase
+          .select()
+          .from(mirrorHighlights)
+          .where(eq(mirrorHighlights.extId, d.extId))
+          .limit(1)
+          .for("update");
+        const current = rows[0];
+        if (!current) {
+          throw new InvalidMirrorEventError([
+            {
+              path: "data.extId",
+              message: "mirrored highlight not found",
+            },
+          ]);
+        }
         // 浏览器端上报：inReview=false 移出复习；带完整 review 对象则落库
         if (d.inReview === false) {
           await mirrorDatabase
@@ -1821,13 +2628,8 @@ v1.post(
             .where(eq(mirrorHighlights.extId, d.extId));
         } else if (typeof d.due === "number") {
           // 只有评分结果：合并进已有 review
-          const rows = await mirrorDatabase
-            .select()
-            .from(mirrorHighlights)
-            .where(eq(mirrorHighlights.extId, d.extId))
-            .limit(1);
-          const cur = rows[0]?.review
-            ? (JSON.parse(rows[0].review) as Record<string, unknown>)
+          const cur = current.review
+            ? (JSON.parse(current.review) as Record<string, unknown>)
             : null;
           if (cur) {
             const next = {
@@ -1850,6 +2652,20 @@ v1.post(
         typeof d.extId === "string" &&
         Array.isArray(d.aiQa)
       ) {
+        const rows = await mirrorDatabase
+          .select({ extId: mirrorHighlights.extId })
+          .from(mirrorHighlights)
+          .where(eq(mirrorHighlights.extId, d.extId))
+          .limit(1)
+          .for("update");
+        if (!rows[0]) {
+          throw new InvalidMirrorEventError([
+            {
+              path: "data.extId",
+              message: "mirrored highlight not found",
+            },
+          ]);
+        }
         await mirrorDatabase
           .update(mirrorHighlights)
           .set({ aiQa: JSON.stringify(d.aiQa) })
@@ -1876,6 +2692,10 @@ v1.post(
           normalized.data as Parameters<typeof completeBookMirrorUpload>[0],
           mirrorClient
         );
+        for (const contentHash of completed.invalidatedDigestHashes) {
+          deleteMemoryDigest(contentHash);
+        }
+        changedNotes = completed.changedNotes;
         mirrored = true;
         suppressFanout = completed.alreadyCompleted;
         event = {
@@ -1898,40 +2718,162 @@ v1.post(
         Array.isArray(d.chapters)
       ) {
         mirrored = false;
-        await mirrorDatabase
-          .insert(mirrorBooks)
-          .values({
+        const tombstones = await mirrorDatabase
+          .select({ extId: mirrorBookTombstones.extId })
+          .from(mirrorBookTombstones)
+          .where(eq(mirrorBookTombstones.extId, d.extId))
+          .limit(1)
+          .for("update");
+        if (tombstones.length > 0) {
+          throw new BookMirrorUploadError(
+            "book_deleted",
+            "book was deleted after this import was queued"
+          );
+        }
+        const previousBooks = await mirrorDatabase
+          .select({
+            title: mirrorBooks.title,
+            author: mirrorBooks.author,
+            contentHash: mirrorBooks.contentHash,
+          })
+          .from(mirrorBooks)
+          .where(eq(mirrorBooks.extId, d.extId))
+          .limit(1)
+          .for("update");
+        const metadata = d.metadata
+          ? bookMetadataSchema.parse(d.metadata)
+          : undefined;
+        const author = canonicalBookAuthor(
+          typeof d.author === "string" ? d.author : undefined,
+          metadata,
+          previousBooks[0]?.author ?? ""
+        );
+        const serializedMetadata = metadata
+          ? serializeBookMetadata(metadata)
+          : undefined;
+        const contentHash = String(d.contentHash ?? "");
+        const previous = previousBooks[0];
+        if (previous) {
+          const updated = await updateBookMirrorFields(
+            mirrorDatabase,
+            d.extId,
+            {
+              title: d.title,
+              author,
+              folder: String(d.folder ?? ""),
+              ...(serializedMetadata ? { metadata: serializedMetadata } : {}),
+            }
+          );
+          if (!updated) throw new Error("mirrored book not found");
+          changedNotes.push(...updated.changedNotes);
+          if (updated.invalidatedDigestHash) {
+            invalidatedDigestHashes.push(updated.invalidatedDigestHash);
+          }
+          await mirrorDatabase
+            .update(mirrorBooks)
+            .set({
+              format: String(d.format ?? "unknown"),
+              contentHash,
+              chapters: JSON.stringify(d.chapters),
+            })
+            .where(eq(mirrorBooks.extId, d.extId));
+        } else {
+          await mirrorDatabase.insert(mirrorBooks).values({
             extId: d.extId,
             title: d.title,
-            author: String(d.author ?? ""),
+            author,
+            metadata:
+              serializedMetadata ?? serializeBookMetadata({ version: 1 }),
             format: String(d.format ?? "unknown"),
             folder: String(d.folder ?? ""),
-            contentHash: String(d.contentHash ?? ""),
+            contentHash,
             chapters: JSON.stringify(d.chapters),
-          })
-          .onDuplicateKeyUpdate({
-            set: { title: d.title, chapters: JSON.stringify(d.chapters) },
           });
+        }
+        if (
+          previous?.contentHash &&
+          previous.contentHash !== contentHash &&
+          (await deleteDigestIfUnreferenced(
+            mirrorDatabase,
+            previous.contentHash
+          ))
+        ) {
+          invalidatedDigestHashes.push(previous.contentHash);
+        }
+        if (
+          previous &&
+          contentHash &&
+          (previous.title !== d.title || previous.author !== author)
+        ) {
+          await mirrorDatabase
+            .delete(bookDigests)
+            .where(eq(bookDigests.contentHash, contentHash));
+          invalidatedDigestHashes.push(contentHash);
+        }
+        mirrored = true;
+      } else if (ev.type === "book.updated" && typeof d.extId === "string") {
+        mirrored = false;
+        const patch = {
+          ...(typeof d.title === "string" ? { title: d.title } : {}),
+          ...(typeof d.author === "string" ? { author: d.author } : {}),
+          ...(typeof d.folder === "string" ? { folder: d.folder } : {}),
+          ...(d.metadata
+            ? {
+                metadata: serializeBookMetadata(
+                  bookMetadataSchema.parse(d.metadata)
+                ),
+              }
+            : {}),
+        };
+        const updated = await updateBookMirrorFields(
+          mirrorDatabase,
+          d.extId,
+          patch
+        );
+        if (!updated) throw new Error("mirrored book not found");
+        changedNotes = updated.changedNotes;
+        invalidatedDigestHashes = updated.invalidatedDigestHash
+          ? [updated.invalidatedDigestHash]
+          : [];
+        event = {
+          ...event,
+          data: {
+            ...event.data,
+            ...(updated.patch.author !== undefined
+              ? { author: updated.patch.author }
+              : {}),
+          },
+        };
         mirrored = true;
       } else if (ev.type === "book.deleted" && typeof d.extId === "string") {
         mirrored = false;
         const deleted = await deleteBookMirrorResourcesWith(
           mirrorDatabase,
-          d.extId
+          d.extId,
+          { tombstoneIfAbsent: true }
         );
         deletedAssociations = deleted.associations;
+        changedNotes = deleted.changedNotes;
+        deletedDigestHashes = deleted.deletedDigestHashes;
+        if (!deleted.resourceFound && !deleted.tombstoneWritten) {
+          suppressFanout = true;
+        }
         mirrored = true;
       } else if (
         ev.type === "translation.created" &&
         typeof d.extId === "string" &&
         typeof d.text === "string"
       ) {
+        const canonicalBookTitle = await canonicalBookTitleForEvent(
+          mirrorDatabase,
+          String(d.bookExtId)
+        );
         await mirrorDatabase
           .insert(mirrorTranslations)
           .values({
             extId: d.extId,
             bookExtId: String(d.bookExtId ?? ""),
-            bookTitle: String(d.bookTitle ?? ""),
+            bookTitle: canonicalBookTitle,
             chapterTitle: String(d.chapterTitle ?? ""),
             targetLang: String(d.targetLang ?? "中文"),
             scope: String(d.scope ?? "passage"),
@@ -1939,39 +2881,137 @@ v1.post(
           })
           .onDuplicateKeyUpdate({
             set: {
+              bookExtId: String(d.bookExtId),
+              bookTitle: canonicalBookTitle,
+              chapterTitle: String(d.chapterTitle ?? ""),
               text: d.text,
               targetLang: String(d.targetLang ?? "中文"),
               scope: String(d.scope ?? "passage"),
             },
           });
+        event = {
+          ...event,
+          data: { ...event.data, bookTitle: canonicalBookTitle },
+        };
       } else if (
-        (ev.type === "mindmap.created" || ev.type === "mindmap.updated") &&
+        ev.type === "mindmap.created" &&
         typeof d.extId === "string" &&
         typeof d.title === "string" &&
+        typeof d.bookExtId === "string" &&
         d.root
       ) {
-        await mirrorDatabase
-          .insert(mirrorMindmaps)
-          .values({
-            extId: d.extId,
-            title: d.title,
-            bookExtId: String(d.bookExtId ?? ""),
-            bookTitle: String(d.bookTitle ?? ""),
-            root: JSON.stringify(d.root),
-          })
-          .onDuplicateKeyUpdate({
-            set: {
+        if (d.bookExtId === "") {
+          persistence = "unmirrored";
+        } else {
+          const canonicalBookTitle = await canonicalBookTitleForEvent(
+            mirrorDatabase,
+            d.bookExtId
+          );
+          await mirrorDatabase
+            .insert(mirrorMindmaps)
+            .values({
+              extId: d.extId,
               title: d.title,
-              bookExtId: String(d.bookExtId ?? ""),
-              bookTitle: String(d.bookTitle ?? ""),
+              bookExtId: d.bookExtId,
+              bookTitle: canonicalBookTitle,
               root: JSON.stringify(d.root),
+            })
+            .onDuplicateKeyUpdate({
+              set: {
+                title: d.title,
+                bookExtId: d.bookExtId,
+                bookTitle: canonicalBookTitle,
+                root: JSON.stringify(d.root),
+              },
+            });
+          event = {
+            ...event,
+            data: { ...event.data, bookTitle: canonicalBookTitle },
+          };
+        }
+      } else if (ev.type === "mindmap.updated" && typeof d.extId === "string") {
+        if (d.bookExtId === "") {
+          persistence = "unmirrored";
+        } else {
+          const rows = await mirrorDatabase
+            .select()
+            .from(mirrorMindmaps)
+            .where(eq(mirrorMindmaps.extId, d.extId))
+            .limit(1)
+            .for("update");
+          const current = rows[0];
+          if (!current) {
+            throw new InvalidMirrorEventError([
+              {
+                path: "data.extId",
+                message: "mirrored mindmap not found",
+              },
+            ]);
+          }
+          const nextBookExtId =
+            typeof d.bookExtId === "string" ? d.bookExtId : current.bookExtId;
+          const canonicalBookTitle = await canonicalBookTitleForEvent(
+            mirrorDatabase,
+            nextBookExtId
+          );
+          await mirrorDatabase
+            .update(mirrorMindmaps)
+            .set({
+              ...(typeof d.title === "string" ? { title: d.title } : {}),
+              bookExtId: nextBookExtId,
+              bookTitle: canonicalBookTitle,
+              ...(d.root ? { root: JSON.stringify(d.root) } : {}),
+            })
+            .where(eq(mirrorMindmaps.extId, d.extId));
+          event = {
+            ...event,
+            data: {
+              ...event.data,
+              title: typeof d.title === "string" ? d.title : current.title,
+              bookExtId: nextBookExtId,
+              bookTitle: canonicalBookTitle,
             },
-          });
+          };
+        }
       } else if (ev.type === "mindmap.deleted" && typeof d.extId === "string") {
         await mirrorDatabase
           .delete(mirrorMindmaps)
           .where(eq(mirrorMindmaps.extId, d.extId));
+      } else if (
+        ev.type === "folder.created" &&
+        typeof d.extId === "string" &&
+        typeof d.name === "string"
+      ) {
+        await mirrorDatabase
+          .insert(mirrorFolders)
+          .values({ extId: d.extId, name: d.name })
+          .onDuplicateKeyUpdate({ set: { name: d.name } });
+      } else if (ev.type === "folder.deleted" && typeof d.extId === "string") {
+        await mirrorDatabase
+          .delete(mirrorFolders)
+          .where(eq(mirrorFolders.extId, d.extId));
+      } else if (
+        ev.type === "studyset.created" ||
+        ev.type === "studyset.updated" ||
+        ev.type === "studyset.deleted"
+      ) {
+        // Study sets are currently browser-owned and have no MySQL mirror
+        // table. They remain validated, idempotent WebHook-only events.
+        persistence = "fanout-only";
+      } else {
+        throw new InvalidMirrorEventError([
+          {
+            path: "type",
+            message: "reader event has no persistence strategy",
+          },
+        ]);
       }
+      mirrored =
+        persistence === "mirrored"
+          ? true
+          : persistence === "unmirrored"
+            ? false
+            : undefined;
     };
 
     try {
@@ -1993,6 +3033,10 @@ v1.post(
           mirrorDatabase = transaction;
           duplicateDelivery = false;
           deletedAssociations = [];
+          deletedHighlights = [];
+          changedNotes = [];
+          deletedDigestHashes = [];
+          invalidatedDigestHashes = [];
           mirrored = undefined;
           const claimResult = await transaction
             .insert(mirrorEventReceipts)
@@ -2021,11 +3065,17 @@ v1.post(
               throw new MirrorEventDeliveryConflictError();
             }
             duplicateDelivery = true;
-            mirrored = true;
+            mirrored =
+              (ev.type === "mindmap.created" ||
+                ev.type === "mindmap.updated") &&
+              normalized.data.bookExtId === ""
+                ? false
+                : ev.type.startsWith("studyset.")
+                  ? undefined
+                  : true;
             return;
           }
           await persistEvent();
-          mirrored = true;
         });
       }
     } catch (error) {
@@ -2038,6 +3088,15 @@ v1.post(
       if (error instanceof InvalidMirrorEventError) {
         return c.json(
           { error: "invalid_event_data", issues: error.issues },
+          400
+        );
+      }
+      if (error instanceof ConflictingBookAuthorError) {
+        return c.json(
+          {
+            error: "invalid_event_data",
+            issues: [{ path: "data.author", message: error.message }],
+          },
           400
         );
       }
@@ -2072,16 +3131,44 @@ v1.post(
         503
       );
     }
+    for (const contentHash of deletedDigestHashes) {
+      deleteMemoryDigest(contentHash);
+    }
+    for (const contentHash of invalidatedDigestHashes) {
+      deleteMemoryDigest(contentHash);
+    }
     if (duplicateDelivery) {
-      return c.json({ ok: true, mirrored: true, duplicate: true });
+      return c.json({
+        ok: true,
+        ...(mirrored === undefined ? {} : { mirrored }),
+        duplicate: true,
+      });
+    }
+    for (const highlight of deletedHighlights) {
+      fanout({
+        type: "highlight.deleted",
+        source: "reader",
+        data: {
+          extId: highlight.extId,
+          bookTitle: highlight.bookTitle,
+        },
+      });
     }
     if (deletedAssociations.length > 0) {
       fanoutDeletedAssociations(deletedAssociations, "reader");
+    }
+    if (changedNotes.length > 0) {
+      fanoutChangedNotes(changedNotes, "reader");
     }
     if (!suppressFanout) fanout(event);
     return c.json({
       ok: true,
       ...(mirrored === undefined ? {} : { mirrored }),
+      ...(deletedHighlights.length > 0
+        ? {
+            deletedHighlightIds: deletedHighlights.map(item => item.extId),
+          }
+        : {}),
     });
   }
 );

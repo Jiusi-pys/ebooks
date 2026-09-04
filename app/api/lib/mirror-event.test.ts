@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { associationPairKey, type PassageAnchor } from "./association";
 import { normalizeReaderMirrorEvent } from "./mirror-event";
+import { EVENT_TYPES, type EventType } from "./webhooks";
 
 describe("normalizeReaderMirrorEvent", () => {
   it("keeps every content anchor and normalizes legacy noteId", () => {
@@ -41,6 +42,7 @@ describe("normalizeReaderMirrorEvent", () => {
   it("defaults old highlight events to content without inventing anchors", () => {
     const result = normalizeReaderMirrorEvent("highlight.created", {
       extId: "legacy-highlight",
+      bookExtId: "legacy-book",
       bookTitle: "Legacy",
       chapterTitle: "Chapter",
       text: "old text",
@@ -91,6 +93,7 @@ describe("normalizeReaderMirrorEvent", () => {
         extId: "note-1",
         title: "Citation note",
         content: "Quoted content",
+        updatedAt: 1_800_000_000_000,
       }).success
     ).toBe(true);
     expect(
@@ -103,6 +106,7 @@ describe("normalizeReaderMirrorEvent", () => {
       normalizeReaderMirrorEvent("note.updated", {
         extId: "note-1",
         content: "Updated content",
+        updatedAt: 1_800_000_000_001,
       }).success
     ).toBe(true);
     expect(
@@ -228,5 +232,151 @@ describe("normalizeReaderMirrorEvent", () => {
         unexpected: true,
       }).success
     ).toBe(false);
+  });
+
+  it("validates bounded book metadata updates", () => {
+    expect(
+      normalizeReaderMirrorEvent("book.updated", {
+        extId: "book-1",
+        title: "Updated title",
+        author: "Author",
+        metadata: {
+          version: 1,
+          publisher: "Example Press",
+          languages: ["zh-Hans"],
+          identifiers: [{ scheme: "ISBN", value: "9780000000001" }],
+        },
+      }).success
+    ).toBe(true);
+    expect(
+      normalizeReaderMirrorEvent("book.updated", {
+        extId: "book-1",
+        metadata: { version: 1, unknown: true },
+      }).success
+    ).toBe(false);
+    expect(
+      normalizeReaderMirrorEvent("book.updated", { extId: "book-1" }).success
+    ).toBe(false);
+  });
+
+  it("strictly validates every public reader event type", () => {
+    const source: PassageAnchor = {
+      kind: "text",
+      bookId: "book-a",
+      chapterId: "chapter-a",
+      chapterTitle: "A",
+      text: "source",
+      paraIndex: 0,
+      start: 0,
+      end: 6,
+    };
+    const target: PassageAnchor = {
+      ...source,
+      bookId: "book-b",
+      chapterId: "chapter-b",
+      chapterTitle: "B",
+      text: "target",
+    };
+    const association = {
+      extId: "association-1",
+      source,
+      target,
+      direction: "bidirectional",
+      pairKey: associationPairKey(source, target, "bidirectional"),
+      createdAt: 1_000,
+      updatedAt: 2_000,
+    };
+    const review = {
+      due: 3_000,
+      reps: 1,
+      lapses: 0,
+      interval: 1,
+      addedAt: 1_000,
+    };
+    const root = { id: "root", text: "Root", children: [] };
+    const validByType: Record<EventType, Record<string, unknown>> = {
+      "book.imported": {
+        extId: "book-1",
+        title: "Book",
+        author: "Author",
+        format: "txt",
+        chapters: [{ id: "chapter-1", title: "One", paragraphs: ["Text"] }],
+      },
+      "book.updated": { extId: "book-1", title: "Renamed" },
+      "book.deleted": { extId: "book-1", title: "Book" },
+      "highlight.created": {
+        extId: "highlight-1",
+        bookExtId: "book-1",
+        text: "Text",
+      },
+      "highlight.updated": { extId: "highlight-1", note: "Note" },
+      "highlight.deleted": { extId: "highlight-1" },
+      "association.created": association,
+      "association.updated": { ...association, updatedAt: 3_000 },
+      "association.deleted": { extId: "association-1" },
+      "note.created": {
+        extId: "note-1",
+        title: "Note",
+        content: "Body",
+        updatedAt: 1_000,
+      },
+      "note.updated": {
+        extId: "note-1",
+        content: "Changed",
+        updatedAt: 2_000,
+      },
+      "note.deleted": { extId: "note-1" },
+      "qa.recorded": {
+        extId: "highlight-1",
+        question: "Why?",
+        aiQa: [{ q: "Why?", a: "Because.", ts: 1_000 }],
+      },
+      "folder.created": { extId: "folder-1", name: "Research" },
+      "folder.deleted": { extId: "folder-1", name: "Research" },
+      "studyset.created": {
+        extId: "set-1",
+        name: "Set",
+        bookIds: ["book-1"],
+      },
+      "studyset.updated": {
+        extId: "set-1",
+        name: "Set 2",
+        description: "Focus",
+        bookIds: ["book-1"],
+      },
+      "studyset.deleted": { extId: "set-1" },
+      "translation.created": {
+        extId: "translation-1",
+        bookExtId: "book-1",
+        targetLang: "中文",
+        text: "译文",
+      },
+      "mindmap.created": {
+        extId: "map-1",
+        title: "Map",
+        bookExtId: "book-1",
+        root,
+      },
+      "mindmap.updated": { extId: "map-1", root },
+      "mindmap.deleted": { extId: "map-1", title: "Map" },
+      "highlight.tagged": { extId: "highlight-1", tags: ["important"] },
+      "review.updated": {
+        extId: "highlight-1",
+        inReview: true,
+        review,
+      },
+    };
+
+    expect(Object.keys(validByType).sort()).toEqual([...EVENT_TYPES].sort());
+    for (const type of EVENT_TYPES) {
+      const valid = validByType[type];
+      expect(normalizeReaderMirrorEvent(type, valid).success, type).toBe(true);
+      expect(
+        normalizeReaderMirrorEvent(type, { ...valid, unexpected: true })
+          .success,
+        `${type} must reject unknown fields`
+      ).toBe(false);
+    }
+    expect(normalizeReaderMirrorEvent("future.event", {}).success).toBe(false);
   });
 });

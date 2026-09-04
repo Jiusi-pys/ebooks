@@ -2,7 +2,7 @@
  * 对外开放的机器接口（REST + WebHook），供 Hermes / OpenClaw 等外部 AI 调用。
  *
  * 鉴权：请求头 `X-API-Key: <OPEN_API_KEY>`，或 `Authorization: Bearer <OPEN_API_KEY>`。
- * 密钥来自环境变量 OPEN_API_KEY；缺省回退 APP_SECRET（已存在于 .env）。
+ * 密钥仅来自环境变量 OPEN_API_KEY。未配置时机器接口保持禁用。
  */
 import type { Context, Next } from "hono";
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -11,8 +11,7 @@ export function resolveConfiguredApiKey(
   environment: Readonly<Record<string, string | undefined>>
 ): string {
   const dedicatedKey = environment.OPEN_API_KEY?.trim();
-  if (dedicatedKey) return dedicatedKey;
-  return environment.APP_SECRET?.trim() ?? "";
+  return dedicatedKey ?? "";
 }
 
 const API_KEY = resolveConfiguredApiKey(process.env);
@@ -35,6 +34,15 @@ export function validKey(key: string): boolean {
 
 /** Hono 中间件：保护 /api/v1 下的资源路由 */
 export async function requireApiKey(c: Context, next: Next) {
+  if (!API_KEY) {
+    return c.json(
+      {
+        error: "machine_api_unavailable",
+        message: "机器接口未启用，请配置 OPEN_API_KEY 后重启服务",
+      },
+      503
+    );
+  }
   if (!validKey(extractKey(c))) {
     return c.json(
       { error: "unauthorized", hint: "发送请求头 X-API-Key: <OPEN_API_KEY>" },

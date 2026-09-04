@@ -3,11 +3,29 @@ import { describe, expect, it } from "vitest";
 
 import {
   EPUB_LIMITS,
+  extractEpubPackageFields,
   parseEpub,
   validateEpubArchive,
   validateEpubEntryLimits,
   validateEpubFileSize,
 } from "./parseEpub";
+
+function fakeElement(
+  textContent = "",
+  attributes: Record<string, string> = {},
+  descendants: Record<string, Element[]> = {}
+): Element {
+  return {
+    textContent,
+    getAttribute: (name: string) => attributes[name] ?? null,
+    getAttributeNS: (_namespace: string | null, name: string) =>
+      attributes[`opf:${name}`] ?? attributes[name] ?? null,
+    getElementsByTagNameNS: (_namespace: string | null, name: string) =>
+      descendants[name] ?? [],
+    getElementsByTagName: (name: string) =>
+      descendants[name.replace(/^dc:/, "")] ?? [],
+  } as unknown as Element;
+}
 
 function fakeFile(name: string, bytes: Uint8Array, size = bytes.byteLength) {
   return {
@@ -100,5 +118,85 @@ describe("EPUB resource limits", () => {
     await expect(parseEpub(fakeFile("bomb.epub", bytes))).rejects.toThrow(
       "container.xml解压后内容过大"
     );
+  });
+});
+
+describe("extractEpubPackageFields", () => {
+  it("extracts EPUB 3 Dublin Core metadata and contributor roles", () => {
+    const mainTitle = fakeElement("The Main Title", { id: "main-title" });
+    const subtitle = fakeElement("A Subtitle", { id: "subtitle" });
+    const creators = [
+      fakeElement("Alice"),
+      fakeElement("Bob"),
+      fakeElement("Eve", { id: "editor" }),
+    ];
+    const contributors = [fakeElement("Tracy", { "opf:role": "trl" })];
+    const publicationDate = fakeElement("2024-02-29T00:00:00Z", {
+      "opf:event": "publication",
+    });
+    const conversionDate = fakeElement("2025-01-01", {
+      "opf:event": "conversion",
+    });
+    const isbn = fakeElement("urn:isbn:978-1-4028-9462-6", { id: "isbn" });
+    const doi = fakeElement("10.1000/example", { id: "doi" });
+    const metas = [
+      fakeElement("main", {
+        refines: "#main-title",
+        property: "title-type",
+      }),
+      fakeElement("subtitle", {
+        refines: "#subtitle",
+        property: "title-type",
+      }),
+      fakeElement("DOI", {
+        refines: "#doi",
+        property: "identifier-type",
+      }),
+      fakeElement("edt", {
+        refines: "#editor",
+        property: "role",
+      }),
+    ];
+    const metadata = fakeElement("", {}, {
+      title: [mainTitle, subtitle],
+      creator: creators,
+      contributor: contributors,
+      meta: metas,
+      publisher: [fakeElement("Example Press")],
+      date: [conversionDate, publicationDate],
+      language: [fakeElement("en_US"), fakeElement("zh-Hans")],
+      identifier: [isbn, doi],
+      subject: [fakeElement("History"), fakeElement("Reference")],
+      description: [fakeElement("An example description.")],
+      rights: [fakeElement("Copyright holder")],
+    });
+    const opf = fakeElement("", {}, { metadata: [metadata] });
+
+    expect(
+      extractEpubPackageFields(opf as unknown as Document, "fallback")
+    ).toEqual({
+      title: "The Main Title",
+      author: "Alice、Bob",
+      metadata: {
+        version: 1,
+        subtitle: "A Subtitle",
+        contributors: [
+          { name: "Alice", role: "author" },
+          { name: "Bob", role: "author" },
+          { name: "Eve", role: "editor" },
+          { name: "Tracy", role: "translator" },
+        ],
+        publisher: "Example Press",
+        publishedDate: "2024-02-29",
+        languages: ["en-US", "zh-Hans"],
+        identifiers: [
+          { scheme: "ISBN", value: "978-1-4028-9462-6" },
+          { scheme: "DOI", value: "10.1000/example" },
+        ],
+        subjects: ["History", "Reference"],
+        description: "An example description.",
+        rights: "Copyright holder",
+      },
+    });
   });
 });

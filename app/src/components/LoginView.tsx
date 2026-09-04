@@ -3,11 +3,13 @@ import { BookOpenText, LockKeyhole, ShieldCheck } from "lucide-react";
 
 export function LoginView({
   configured,
+  accountInitialized,
   serverError,
   onLogin,
   onRetry,
 }: {
   configured: boolean;
+  accountInitialized: boolean;
   serverError?: string;
   onLogin: (appId: string, appSecret: string) => Promise<void>;
   onRetry: () => void;
@@ -57,7 +59,9 @@ export function LoginView({
           <div>
             <p className="text-[13px] font-medium">仅允许已验证的使用者进入</p>
             <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-              登录后才能访问书架、AI 后台和开放接口管理。
+              {accountInitialized
+                ? "使用保存于 MySQL 的自定义用户名与密码登录。"
+                : "首次使用 .env 初始凭据登录并设置账户。"}
             </p>
           </div>
         </div>
@@ -79,14 +83,18 @@ export function LoginView({
         ) : (
           <form onSubmit={event => void submit(event)} className="space-y-4">
             <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium">账号</span>
+              <span className="mb-1.5 block text-[12px] font-medium">
+                用户名
+              </span>
               <input
                 value={appId}
                 onChange={event => setAppId(event.target.value)}
                 autoComplete="username"
                 autoFocus
                 className="h-11 w-full rounded-[13px] border border-border bg-background/75 px-3.5 text-sm outline-none transition focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
-                placeholder="APP_ID"
+                placeholder={
+                  accountInitialized ? "自定义用户名" : "首次登录填写 APP_ID"
+                }
               />
             </label>
             <label className="block">
@@ -102,7 +110,11 @@ export function LoginView({
                   onChange={event => setAppSecret(event.target.value)}
                   autoComplete="current-password"
                   className="h-11 w-full rounded-[13px] border border-border bg-background/75 pl-10 pr-3.5 text-sm outline-none transition focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
-                  placeholder="APP_SECRET"
+                  placeholder={
+                    accountInitialized
+                      ? "当前账户密码"
+                      : "首次登录填写 APP_SECRET"
+                  }
                 />
               </div>
             </label>

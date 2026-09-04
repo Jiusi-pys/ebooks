@@ -9,8 +9,20 @@ const t = initTRPC.context<TrpcContext>().create({
 export const createRouter = t.router;
 
 export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+  if (ctx.authStoreUnavailable) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "无法读取用户数据，请检查 MySQL 连接与迁移状态",
+    });
+  }
   if (!ctx.session) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录书房" });
+  }
+  if (ctx.session.setupRequired) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "请先完成首次账户设置",
+    });
   }
   if (
     ctx.req.method !== "GET" &&

@@ -24,6 +24,11 @@ describe("sanitizeEventForWebhook", () => {
         format: "epub",
         folder: "技术",
         contentHash: "abc123",
+        metadata: {
+          version: 1,
+          publisher: "示例出版社",
+          languages: ["zh-Hans"],
+        },
         chapters: [
           { id: "chapter-1", title: "第一章", paragraphs: ["私密正文"] },
           { id: "chapter-2", title: "第二章", paragraphs: ["更多正文"] },
@@ -44,6 +49,11 @@ describe("sanitizeEventForWebhook", () => {
         format: "epub",
         folder: "技术",
         contentHash: "abc123",
+        metadata: {
+          version: 1,
+          publisher: "示例出版社",
+          languages: ["zh-Hans"],
+        },
         chapterCount: 2,
       },
     });

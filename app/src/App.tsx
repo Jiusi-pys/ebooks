@@ -23,6 +23,8 @@ import { ReviewView } from "@/components/ReviewView";
 import { StudySetView } from "@/components/StudySetView";
 import { ImportTray } from "@/components/ImportTray";
 import { LoginView } from "@/components/LoginView";
+import { FirstRunSetupView } from "@/components/FirstRunSetupView";
+import type { AccountUpdateInput } from "@/components/AccountSettingsDialog";
 import { useAppSession } from "@/lib/appAuth";
 
 export default function App() {
@@ -47,9 +49,20 @@ export default function App() {
     return (
       <LoginView
         configured={auth.session?.configured ?? Boolean(auth.error)}
+        accountInitialized={auth.session?.accountInitialized ?? false}
         serverError={auth.error}
         onLogin={auth.login}
         onRetry={auth.refresh}
+      />
+    );
+  }
+
+  if (auth.session.setupRequired) {
+    return (
+      <FirstRunSetupView
+        serverError={auth.error}
+        onComplete={auth.completeSetup}
+        onLogout={auth.logout}
       />
     );
   }
@@ -58,6 +71,7 @@ export default function App() {
     <WorkspaceApp
       key={auth.session.user.id}
       userId={auth.session.user.id}
+      onUpdateProfile={auth.updateProfile}
       onLogout={auth.logout}
     />
   );
@@ -65,9 +79,11 @@ export default function App() {
 
 function WorkspaceApp({
   userId,
+  onUpdateProfile,
   onLogout,
 }: {
   userId: string;
+  onUpdateProfile: (input: AccountUpdateInput) => Promise<void>;
   onLogout: () => Promise<void>;
 }) {
   const lib = useLibrary();
@@ -77,6 +93,7 @@ function WorkspaceApp({
   );
   const [sidebarOverlayOpen, setSidebarOverlayOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [readerImmersive, setReaderImmersive] = useState(false);
   const closeTimerRef = useRef<number | null>(null);
 
   const cancelSidebarClose = useCallback(() => {
@@ -206,31 +223,34 @@ function WorkspaceApp({
           </button>
         </div>
       )}
-      {isMobile && sidebarOpen && (
-        <button
-          type="button"
-          aria-label="关闭侧栏"
-          className="fixed inset-0 z-30 bg-foreground/20 backdrop-blur-[1px]"
-          onClick={closeTransientSidebar}
-        />
-      )}
-      <Sidebar
-        lib={lib}
-        userId={userId}
-        mode={sidebarMode}
-        open={sidebarOpen}
-        floating={!sidebarPinned}
-        mobile={isMobile}
-        onModeChange={changeSidebarMode}
-        onNavigate={closeTransientSidebar}
-        onRequestClose={closeTransientSidebar}
-        onInteractionStart={cancelSidebarClose}
-        onInteractionEnd={isMobile ? cancelSidebarClose : scheduleSidebarClose}
-        onLogout={onLogout}
-      />
-      {!sidebarOpen && (
+      {!readerImmersive && (
         <>
-          {!isMobile && sidebarMode === "auto" && (
+          {isMobile && sidebarOpen && (
+            <button
+              type="button"
+              aria-label="关闭侧栏"
+              className="fixed inset-0 z-30 bg-foreground/20 backdrop-blur-[1px]"
+              onClick={closeTransientSidebar}
+            />
+          )}
+          <Sidebar
+            lib={lib}
+            userId={userId}
+            mode={sidebarMode}
+            open={sidebarOpen}
+            floating={!sidebarPinned}
+            mobile={isMobile}
+            onModeChange={changeSidebarMode}
+            onNavigate={closeTransientSidebar}
+            onRequestClose={closeTransientSidebar}
+            onInteractionStart={cancelSidebarClose}
+            onInteractionEnd={
+              isMobile ? cancelSidebarClose : scheduleSidebarClose
+            }
+            onUpdateProfile={onUpdateProfile}
+            onLogout={onLogout}
+          />
+          {!sidebarOpen && !isMobile && sidebarMode === "auto" && (
             <div
               aria-hidden="true"
               className="fixed inset-y-0 left-0 z-20 w-2"
@@ -239,28 +259,38 @@ function WorkspaceApp({
               }}
             />
           )}
-          <button
-            type="button"
-            aria-label="打开侧栏"
-            aria-controls="app-sidebar"
-            aria-expanded="false"
-            title={
-              sidebarMode === "auto"
-                ? "打开侧栏（也可移动到左侧边缘）"
-                : "打开侧栏"
-            }
-            onClick={openSidebar}
-            className="fixed left-0 top-1/2 z-30 flex h-14 w-8 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-sidebar-border bg-sidebar/95 text-muted-foreground shadow-md backdrop-blur transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <PanelLeftOpen size={17} />
-          </button>
+          {!sidebarOpen && (
+            <button
+              type="button"
+              aria-label="打开侧栏"
+              aria-controls="app-sidebar"
+              aria-expanded="false"
+              title="打开侧栏"
+              onClick={openSidebar}
+              onPointerEnter={event => {
+                if (!isMobile && event.pointerType === "mouse") openSidebar();
+              }}
+              className={`fixed z-30 flex items-center justify-center rounded-[12px] border border-sidebar-border bg-sidebar/95 text-muted-foreground shadow-md backdrop-blur transition-[color,background-color,opacity] hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                isMobile
+                  ? "left-3 top-3 h-10 w-10"
+                  : "left-2 top-2 h-9 w-9 opacity-0 hover:opacity-100 [@media(pointer:coarse)]:opacity-100"
+              }`}
+            >
+              <PanelLeftOpen size={17} />
+            </button>
+          )}
         </>
       )}
       <main className="min-w-0 flex-1 bg-background">
         {lib.route.view === "library" && <LibraryView lib={lib} />}
         {lib.route.view === "reader" &&
           (book ? (
-            <ReaderView key={book.id} lib={lib} book={book} />
+            <ReaderView
+              key={book.id}
+              lib={lib}
+              book={book}
+              onImmersiveChange={setReaderImmersive}
+            />
           ) : (
             <LibraryView lib={lib} />
           ))}

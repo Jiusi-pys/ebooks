@@ -2,6 +2,7 @@ import { openDB, type IDBPDatabase } from "idb";
 import type {
   Association,
   Book,
+  BookMetadata,
   ChapterTranslation,
   Folder,
   FolderIconKey,
@@ -11,6 +12,12 @@ import type {
   OutlineItem,
   StudySet,
 } from "@/types";
+import {
+  appendCitationBlock,
+  citationDescriptorForHighlight,
+  isCitationOnlyHighlight,
+  removeCitationBlocks,
+} from "./citations";
 
 export const SHUFANG_DB_NAME = "shufang";
 export const SHUFANG_DB_VERSION = 7;
@@ -294,6 +301,56 @@ export async function patchBookTitle(
   return patchStoredBook(bookId, current => ({ ...current, title }));
 }
 
+export async function patchBookMetadata(
+  bookId: string,
+  values: { title: string; author: string; metadata: BookMetadata }
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => ({
+    ...current,
+    title: values.title,
+    author: values.author,
+    metadata: values.metadata,
+  }));
+}
+
+/** Persist a catalogue edit and its generated citation-note rewrites atomically. */
+export async function patchBookMetadataWithNotes(
+  bookId: string,
+  values: { title: string; author: string; metadata: BookMetadata },
+  notes: Note[]
+): Promise<Book | undefined> {
+  const database = await db();
+  const tx = database.transaction(["books", "notes"], "readwrite");
+  const bookStore = tx.objectStore("books");
+  const current = (await bookStore.get(bookId)) as Book | undefined;
+  if (!current) {
+    await tx.done;
+    return undefined;
+  }
+  const updated: Book = {
+    ...current,
+    title: values.title,
+    author: values.author,
+    metadata: values.metadata,
+  };
+  await bookStore.put(updated);
+  for (const note of notes) await tx.objectStore("notes").put(note);
+  await tx.done;
+  return updated;
+}
+
+export async function patchBookLastOpenedAt(
+  bookId: string,
+  openedAt = Date.now()
+): Promise<Book | undefined> {
+  if (!Number.isFinite(openedAt) || openedAt < 0) return undefined;
+  return patchStoredBook(bookId, current => ({
+    ...current,
+    // A delayed write from an older tab must not move a book backwards.
+    lastOpenedAt: Math.max(current.lastOpenedAt ?? 0, openedAt),
+  }));
+}
+
 export async function patchBookOutline(
   bookId: string,
   outline: OutlineItem[]
@@ -327,16 +384,71 @@ export async function patchBookFolder(
   return updated;
 }
 
-export async function deleteBook(id: string) {
+export async function deleteBook(id: string): Promise<Note[]> {
   const d = await db();
   const tx = d.transaction(
-    ["books", "files", "highlights", "studySets", "associations"],
+    [
+      "books",
+      "notes",
+      "files",
+      "highlights",
+      "studySets",
+      "associations",
+      "translations",
+      "mindMaps",
+    ],
     "readwrite"
   );
+  const bookStore = tx.objectStore("books");
+  const book = (await bookStore.get(id)) as Book | undefined;
+  if (!book) {
+    await tx.done;
+    return [];
+  }
+  const highlightStore = tx.objectStore("highlights");
+  const linkedHighlights = (await highlightStore
+    .index("by-book")
+    .getAll(id)) as Highlight[];
+  const allHighlights = (await highlightStore.getAll()) as Highlight[];
+  const linkedByNote = new Map<string, Highlight[]>();
+  for (const highlight of linkedHighlights) {
+    if (!highlight.noteId) continue;
+    const linked = linkedByNote.get(highlight.noteId) ?? [];
+    linked.push(highlight);
+    linkedByNote.set(highlight.noteId, linked);
+  }
+  const updatedNotes: Note[] = [];
+  const noteStore = tx.objectStore("notes");
+  for (const [noteId, highlights] of linkedByNote) {
+    const note = (await noteStore.get(noteId)) as Note | undefined;
+    if (!note) continue;
+    let content = removeCitationBlocks(
+      note.content,
+      highlights.map(highlight =>
+        citationDescriptorForHighlight(highlight, book.title)
+      )
+    );
+    const survivors = allHighlights.filter(
+      highlight => highlight.noteId === noteId && highlight.bookId !== id
+    );
+    for (const survivor of survivors) {
+      const survivorBook = (await bookStore.get(survivor.bookId)) as
+        Book | undefined;
+      if (survivorBook) {
+        content = appendCitationBlock(
+          content,
+          citationDescriptorForHighlight(survivor, survivorBook.title)
+        );
+      }
+    }
+    if (content === note.content) continue;
+    const updated = { ...note, content, updatedAt: Date.now() };
+    await noteStore.put(updated);
+    updatedNotes.push(updated);
+  }
   await tx.objectStore("books").delete(id);
   await tx.objectStore("files").delete(id);
 
-  const highlightStore = tx.objectStore("highlights");
   const highlightKeys = (await highlightStore
     .index("by-book")
     .getAllKeys(id)) as string[];
@@ -350,6 +462,20 @@ export async function deleteBook(id: string) {
   for (const key of new Set([...sourceKeys, ...targetKeys]))
     await associationStore.delete(key);
 
+  const translationStore = tx.objectStore("translations");
+  const translations =
+    (await translationStore.getAll()) as ChapterTranslation[];
+  for (const translation of translations) {
+    if (translation.bookId === id)
+      await translationStore.delete(translation.id);
+  }
+
+  const mindMapStore = tx.objectStore("mindMaps");
+  const mindMaps = (await mindMapStore.getAll()) as MindMap[];
+  for (const mindMap of mindMaps) {
+    if (mindMap.bookId === id) await mindMapStore.delete(mindMap.id);
+  }
+
   const sets = (await tx.objectStore("studySets").getAll()) as StudySet[];
   for (const set of sets) {
     if (set.bookIds.includes(id)) {
@@ -361,6 +487,7 @@ export async function deleteBook(id: string) {
     }
   }
   await tx.done;
+  return updatedNotes;
 }
 
 /* ---------- 原始文件（PDF 原版模式用） ---------- */
@@ -474,20 +601,36 @@ export async function putNote(note: Note) {
   await (await db()).put("notes", note);
 }
 
-export async function deleteNote(id: string) {
-  const d = await db();
-  await d.delete("notes", id);
-  // 清除书摘上对该笔记的关联
-  const all = (await d.getAll("highlights")) as Highlight[];
-  const tx = d.transaction("highlights", "readwrite");
-  for (const h of all) {
-    if (h.noteId === id) {
-      h.noteId = undefined;
-      h.citation = undefined;
-      await tx.store.put(h);
+export interface LocalNoteDeletionResult {
+  deletedHighlightIds: string[];
+  unlinkedHighlights: Highlight[];
+}
+
+/** Delete a note and update every local citation relation in one transaction. */
+export async function deleteNote(id: string): Promise<LocalNoteDeletionResult> {
+  const database = await db();
+  const tx = database.transaction(["notes", "highlights"], "readwrite");
+  const highlightStore = tx.objectStore("highlights");
+  const linked = ((await highlightStore.getAll()) as Highlight[]).filter(
+    highlight => highlight.noteId === id
+  );
+  const deletedHighlightIds: string[] = [];
+  const unlinkedHighlights: Highlight[] = [];
+  for (const highlight of linked) {
+    if (isCitationOnlyHighlight(highlight)) {
+      await highlightStore.delete(highlight.id);
+      deletedHighlightIds.push(highlight.id);
+      continue;
     }
+    const unlinked = { ...highlight };
+    delete unlinked.noteId;
+    delete unlinked.citation;
+    await highlightStore.put(unlinked);
+    unlinkedHighlights.push(unlinked);
   }
+  await tx.objectStore("notes").delete(id);
   await tx.done;
+  return { deletedHighlightIds, unlinkedHighlights };
 }
 
 export async function getHighlights(bookId?: string): Promise<Highlight[]> {
@@ -508,6 +651,74 @@ export async function putHighlight(h: Highlight) {
 
 export async function deleteHighlight(id: string) {
   await (await db()).delete("highlights", id);
+}
+
+export interface LocalHighlightDeletionResult {
+  deletedHighlightIds: string[];
+  updatedNotes: Note[];
+}
+
+/**
+ * Delete highlights and their generated citation blocks in one IndexedDB
+ * transaction. Book titles and current note bodies are read inside the same
+ * transaction so a stale React snapshot cannot overwrite a newer local edit.
+ */
+export async function deleteHighlightsWithCitationCleanup(
+  ids: readonly string[]
+): Promise<LocalHighlightDeletionResult> {
+  const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length === 0) {
+    return { deletedHighlightIds: [], updatedNotes: [] };
+  }
+
+  const database = await db();
+  const tx = database.transaction(
+    ["books", "notes", "highlights"],
+    "readwrite"
+  );
+  const bookStore = tx.objectStore("books");
+  const noteStore = tx.objectStore("notes");
+  const highlightStore = tx.objectStore("highlights");
+  const highlights = (
+    await Promise.all(uniqueIds.map(id => highlightStore.get(id)))
+  ).filter((item): item is Highlight => item !== undefined);
+
+  const byNote = new Map<string, Highlight[]>();
+  for (const highlight of highlights) {
+    if (!highlight.noteId) continue;
+    const linked = byNote.get(highlight.noteId) ?? [];
+    linked.push(highlight);
+    byNote.set(highlight.noteId, linked);
+  }
+
+  const updatedNotes: Note[] = [];
+  for (const [noteId, linked] of byNote) {
+    const note = (await noteStore.get(noteId)) as Note | undefined;
+    if (!note) continue;
+    const descriptors = [];
+    for (const highlight of linked) {
+      const book = (await bookStore.get(highlight.bookId)) as Book | undefined;
+      descriptors.push(
+        citationDescriptorForHighlight(highlight, book?.title ?? "")
+      );
+    }
+    const content = removeCitationBlocks(note.content, descriptors);
+    if (content === note.content) continue;
+    const updated = {
+      ...note,
+      content,
+      updatedAt: Math.max(Date.now(), note.updatedAt + 1),
+    };
+    await noteStore.put(updated);
+    updatedNotes.push(updated);
+  }
+
+  for (const id of uniqueIds) await highlightStore.delete(id);
+  await tx.done;
+  return {
+    deletedHighlightIds: highlights.map(highlight => highlight.id),
+    updatedNotes,
+  };
 }
 
 /* ---------- 文段关联（独立于书摘与引用） ---------- */

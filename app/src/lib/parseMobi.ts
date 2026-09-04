@@ -1,5 +1,6 @@
 import { initKf8File, initMobiFile } from "@lingo-reader/mobi-parser";
 import type { ParsedBook } from "./parseBook";
+import { mirrorSafeBookField } from "./parseMetadataField";
 import {
   coverResourceToDataUrl,
   extractHtmlBookChapters,
@@ -604,11 +605,15 @@ export async function parseMobi(
     onProgress?.("读取 Kindle 书目信息", 0.1);
     parser = await initializeKindleParser(bytes, format);
     const metadata = parser.getMetadata();
-    const title = metadata.title?.trim() || fileTitle(file);
-    const author = (metadata.author ?? [])
-      .map(item => item.trim())
-      .filter(Boolean)
-      .join("、");
+    const title = mirrorSafeBookField(
+      metadata.title?.trim() || fileTitle(file)
+    );
+    const author = mirrorSafeBookField(
+      (metadata.author ?? [])
+        .map(item => item.trim())
+        .filter(Boolean)
+        .join("、")
+    );
 
     let cover: string | undefined;
     try {

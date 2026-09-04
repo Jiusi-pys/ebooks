@@ -15,7 +15,7 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { getDb } from "../queries/connection";
 import { webhookSubscriptions } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { sanitizeEventForWebhook } from "./webhook-event";
 
 export const EVENT_TYPES = [
@@ -34,6 +34,9 @@ export const EVENT_TYPES = [
   "qa.recorded",
   "folder.created",
   "folder.deleted",
+  "studyset.created",
+  "studyset.updated",
+  "studyset.deleted",
   "translation.created",
   "mindmap.created",
   "mindmap.updated",
@@ -52,7 +55,7 @@ export interface ShufangEvent {
   source?: string;
 }
 
-interface WebhookRow {
+export interface WebhookRow {
   id: number;
   url: string;
   secret: string;
@@ -61,7 +64,54 @@ interface WebhookRow {
   failCount: number;
 }
 
-async function deliver(row: WebhookRow, event: ShufangEvent) {
+type DeliveryOutcome = "success" | "failure";
+
+// Preserve the order in which concurrent HTTP outcomes arrive for each
+// subscription. Without this queue, a slow success-state write can overwrite a
+// failure whose HTTP response arrived later but whose database write completed
+// first. Each database statement remains atomic; the queue only defines their
+// application order inside this process.
+const outcomeQueues = new Map<number, Promise<void>>();
+
+function persistDeliveryOutcome(
+  subscriptionId: number,
+  outcome: DeliveryOutcome
+): Promise<void> {
+  const previous = outcomeQueues.get(subscriptionId) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(async () => {
+      if (outcome === "success") {
+        // Always reset from the database's current value. The WebhookRow is a
+        // fanout-time snapshot and must not decide whether this write is needed.
+        await getDb()
+          .update(webhookSubscriptions)
+          .set({ failCount: 0 })
+          .where(eq(webhookSubscriptions.id, subscriptionId));
+        return;
+      }
+
+      await getDb()
+        .update(webhookSubscriptions)
+        .set({
+          failCount: sql`${webhookSubscriptions.failCount} + 1`,
+          active: sql`CASE WHEN ${webhookSubscriptions.failCount} + 1 > 20 THEN false ELSE ${webhookSubscriptions.active} END`,
+        })
+        .where(eq(webhookSubscriptions.id, subscriptionId));
+    });
+
+  outcomeQueues.set(subscriptionId, current);
+  return current.finally(() => {
+    if (outcomeQueues.get(subscriptionId) === current) {
+      outcomeQueues.delete(subscriptionId);
+    }
+  });
+}
+
+export async function deliverWebhook(
+  row: WebhookRow,
+  event: ShufangEvent
+): Promise<void> {
   const payload = JSON.stringify({
     id: randomUUID(),
     type: event.type,
@@ -79,6 +129,7 @@ async function deliver(row: WebhookRow, event: ShufangEvent) {
     headers["X-Shufang-Signature"] =
       `sha256=${createHmac("sha256", row.secret).update(payload).digest("hex")}`;
   }
+  let succeeded = false;
   try {
     const resp = await fetch(row.url, {
       method: "POST",
@@ -86,23 +137,15 @@ async function deliver(row: WebhookRow, event: ShufangEvent) {
       body: payload,
       signal: AbortSignal.timeout(10000),
     });
-    if (resp.ok) {
-      if (row.failCount > 0)
-        await getDb()
-          .update(webhookSubscriptions)
-          .set({ failCount: 0 })
-          .where(eq(webhookSubscriptions.id, row.id));
-    } else {
+    if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}`);
     }
+    succeeded = true;
   } catch {
-    const fails = row.failCount + 1;
-    // 连续失败 20 次自动停用，避免对死地址空转
-    await getDb()
-      .update(webhookSubscriptions)
-      .set({ failCount: fails, ...(fails > 20 ? { active: false } : {}) })
-      .where(eq(webhookSubscriptions.id, row.id));
+    succeeded = false;
   }
+
+  await persistDeliveryOutcome(row.id, succeeded ? "success" : "failure");
 }
 
 /** 向所有订阅了该事件类型的活跃 WebHook 分发（不 await 完成，后台进行） */
@@ -122,7 +165,7 @@ export function fanout(event: ShufangEvent): void {
       }
       if (subscribed.length > 0 && !subscribed.includes(outboundEvent.type))
         continue;
-      void deliver(row, outboundEvent);
+      void deliverWebhook(row, outboundEvent).catch(() => {});
     }
   })().catch(() => {});
 }

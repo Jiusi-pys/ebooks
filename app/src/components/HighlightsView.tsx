@@ -135,10 +135,6 @@ export function HighlightsView({ lib }: { lib: Library }) {
     if (confirm(`确定删除选中的 ${n} 张卡片？`)) {
       for (const h of selectedCards) {
         void lib.removeHighlight(h.id);
-        emitEvent("highlight.deleted", {
-          extId: h.id,
-          bookTitle: lib.books.find(b => b.id === h.bookId)?.title ?? "",
-        });
       }
       sel.exit();
     }

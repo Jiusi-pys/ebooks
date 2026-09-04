@@ -9,8 +9,10 @@ function required(name: string): string {
 }
 
 export const env = {
-  appId: required("APP_ID"),
-  appSecret: required("APP_SECRET"),
+  // Bootstrap credentials are required only while app_users is empty. Once
+  // setup completes, authentication is wholly database-backed.
+  appId: process.env.APP_ID?.trim() ?? "",
+  appSecret: process.env.APP_SECRET ?? "",
   isProduction: process.env.NODE_ENV === "production",
   databaseUrl: required("DATABASE_URL"),
 };

@@ -1,8 +1,21 @@
 import { and, asc, eq, gte, lt } from "drizzle-orm";
 import { z } from "zod";
 
-import { mirrorBooks, mirrorBookUploadChunks } from "@db/mirror-schema";
+import { bookDigests } from "@db/schema";
+import {
+  mirrorBooks,
+  mirrorBookTombstones,
+  mirrorBookUploadChunks,
+  mirrorHighlights,
+  mirrorMindmaps,
+  mirrorTranslations,
+} from "@db/mirror-schema";
 import { getDb } from "../queries/connection";
+import { deleteDigestIfUnreferenced } from "./book-digest-lifecycle";
+import {
+  rewriteBookCitationNotes,
+  type ChangedMirrorNote,
+} from "./book-citation-note-sync";
 
 export const BOOK_UPLOAD_MANIFEST_INDEX = -1;
 export const MAX_BOOK_UPLOAD_CHUNKS = 512;
@@ -113,6 +126,7 @@ type Database = ReturnType<typeof getDb>;
 type UploadRow = typeof mirrorBookUploadChunks.$inferSelect;
 
 export type BookMirrorUploadErrorCode =
+  | "book_deleted"
   | "upload_not_found"
   | "upload_manifest_mismatch"
   | "upload_incomplete"
@@ -143,6 +157,26 @@ function uploadPredicate(extId: string, currentUploadId: string) {
   );
 }
 
+async function assertBookWasNotDeleted(
+  transaction: Parameters<Parameters<Database["transaction"]>[0]>[0],
+  extId: string
+): Promise<void> {
+  // Lock even the absent unique-key range. Deletion uses the same tombstone
+  // key, so an import and delete cannot pass each other between check/commit.
+  const rows = await transaction
+    .select({ extId: mirrorBookTombstones.extId })
+    .from(mirrorBookTombstones)
+    .where(eq(mirrorBookTombstones.extId, extId))
+    .limit(1)
+    .for("update");
+  if (rows.length > 0) {
+    throw new BookMirrorUploadError(
+      "book_deleted",
+      "book was deleted after this import was queued"
+    );
+  }
+}
+
 export async function cleanupExpiredBookMirrorUploads(
   database: Database = getDb(),
   now = Date.now()
@@ -161,6 +195,7 @@ export async function startBookMirrorUpload(
 ): Promise<void> {
   const input = bookImportStartedSchema.parse(raw);
   await database.transaction(async transaction => {
+    await assertBookWasNotDeleted(transaction, input.extId);
     const cutoff = new Date(now - BOOK_UPLOAD_TTL_MS);
     await transaction
       .delete(mirrorBookUploadChunks)
@@ -192,6 +227,7 @@ export async function putBookMirrorChunk(
 ): Promise<void> {
   const input = bookImportChunkSchema.parse(raw);
   await database.transaction(async transaction => {
+    await assertBookWasNotDeleted(transaction, input.extId);
     const rows = await transaction
       .select()
       .from(mirrorBookUploadChunks)
@@ -266,11 +302,15 @@ export interface BookMirrorCompletionReceipt {
   contentHash: string;
   chapterCount: number;
   alreadyCompleted: boolean;
+  invalidatedDigestHashes: string[];
+  changedNotes: ChangedMirrorNote[];
 }
 
 function completionReceipt(
   manifest: UploadRow,
-  alreadyCompleted: boolean
+  alreadyCompleted: boolean,
+  invalidatedDigestHashes: string[] = [],
+  changedNotes: ChangedMirrorNote[] = []
 ): BookMirrorCompletionReceipt {
   return {
     extId: manifest.bookExtId,
@@ -281,6 +321,8 @@ function completionReceipt(
     contentHash: manifest.contentHash,
     chapterCount: manifest.chapterCount,
     alreadyCompleted,
+    invalidatedDigestHashes,
+    changedNotes,
   };
 }
 
@@ -382,6 +424,7 @@ export async function completeBookMirrorUpload(
 ): Promise<BookMirrorCompletionReceipt> {
   const input = bookImportCompletedSchema.parse(raw);
   return database.transaction(async transaction => {
+    await assertBookWasNotDeleted(transaction, input.extId);
     const rows = await transaction
       .select()
       .from(mirrorBookUploadChunks)
@@ -412,6 +455,25 @@ export async function completeBookMirrorUpload(
     if (manifest.completedAt) return completionReceipt(manifest, true);
 
     const completed = assembleBookMirrorUpload(input, rows);
+    const existing = await transaction
+      .select({
+        title: mirrorBooks.title,
+        author: mirrorBooks.author,
+        contentHash: mirrorBooks.contentHash,
+      })
+      .from(mirrorBooks)
+      .where(eq(mirrorBooks.extId, completed.extId))
+      .limit(1)
+      .for("update");
+    const changedNotes =
+      existing[0] && existing[0].title !== completed.title
+        ? await rewriteBookCitationNotes(
+            transaction,
+            completed.extId,
+            existing[0].title,
+            completed.title
+          )
+        : [];
 
     await transaction
       .insert(mirrorBooks)
@@ -434,6 +496,40 @@ export async function completeBookMirrorUpload(
           chapters: completed.chaptersJson,
         },
       });
+    if (existing[0] && existing[0].title !== completed.title) {
+      await transaction
+        .update(mirrorHighlights)
+        .set({ bookTitle: completed.title })
+        .where(eq(mirrorHighlights.bookExtId, completed.extId));
+      await transaction
+        .update(mirrorTranslations)
+        .set({ bookTitle: completed.title })
+        .where(eq(mirrorTranslations.bookExtId, completed.extId));
+      await transaction
+        .update(mirrorMindmaps)
+        .set({ bookTitle: completed.title })
+        .where(eq(mirrorMindmaps.bookExtId, completed.extId));
+    }
+    const invalidatedDigestHashes = new Set<string>();
+    const previous = existing[0];
+    if (
+      previous?.contentHash &&
+      previous.contentHash !== completed.contentHash &&
+      (await deleteDigestIfUnreferenced(transaction, previous.contentHash))
+    ) {
+      invalidatedDigestHashes.add(previous.contentHash);
+    }
+    if (
+      previous &&
+      completed.contentHash &&
+      (previous.title !== completed.title ||
+        previous.author !== completed.author)
+    ) {
+      await transaction
+        .delete(bookDigests)
+        .where(eq(bookDigests.contentHash, completed.contentHash));
+      invalidatedDigestHashes.add(completed.contentHash);
+    }
     await transaction
       .delete(mirrorBookUploadChunks)
       .where(
@@ -452,7 +548,12 @@ export async function completeBookMirrorUpload(
         )
       );
 
-    return completionReceipt(manifest, false);
+    return completionReceipt(
+      manifest,
+      false,
+      [...invalidatedDigestHashes],
+      changedNotes
+    );
   });
 }
 

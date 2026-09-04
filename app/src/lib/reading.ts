@@ -116,6 +116,7 @@ export const DEFAULT_TYPE: TypeSettings = {
   pageMargin: 32,
   fontWeight: 400,
   columns: 1,
+  pageTurnMode: "vertical",
   themeId: "warm",
 };
 
@@ -146,6 +147,8 @@ export function normalizeTypeSettings(value: unknown): TypeSettings {
     ...DEFAULT_TYPE,
     ...saved,
     pageMargin: normalizePageMargin(saved.pageMargin),
+    pageTurnMode:
+      saved.pageTurnMode === "horizontal" ? "horizontal" : "vertical",
   };
 }
 
@@ -205,6 +208,70 @@ export function saveTypeSettings(
   storage: Pick<TypeSettingsStorage, "setItem"> = localStorage
 ) {
   storage.setItem(TYPE_SETTINGS_KEY, JSON.stringify(normalizeTypeSettings(t)));
+}
+
+export interface ReaderScrollMetrics {
+  scrollTop: number;
+  scrollLeft: number;
+  scrollHeight: number;
+  scrollWidth: number;
+  clientHeight: number;
+  clientWidth: number;
+}
+
+export interface HorizontalReaderPageState {
+  page: number;
+  pageCount: number;
+  atStart: boolean;
+  atEnd: boolean;
+}
+
+/** Return a stable 0..1 chapter progress for either reflow layout. */
+export function readerScrollRatio(
+  metrics: ReaderScrollMetrics,
+  mode: TypeSettings["pageTurnMode"]
+): number {
+  const maximum =
+    mode === "horizontal"
+      ? Math.max(0, metrics.scrollWidth - metrics.clientWidth)
+      : Math.max(0, metrics.scrollHeight - metrics.clientHeight);
+  if (maximum === 0) return 1;
+  const offset = mode === "horizontal" ? metrics.scrollLeft : metrics.scrollTop;
+  return Math.min(1, Math.max(0, offset / maximum));
+}
+
+/** Convert persisted chapter progress back into the active scroll axis. */
+export function readerScrollOffset(
+  metrics: ReaderScrollMetrics,
+  mode: TypeSettings["pageTurnMode"],
+  ratio: number
+): number {
+  const maximum =
+    mode === "horizontal"
+      ? Math.max(0, metrics.scrollWidth - metrics.clientWidth)
+      : Math.max(0, metrics.scrollHeight - metrics.clientHeight);
+  const normalized = Number.isFinite(ratio)
+    ? Math.min(1, Math.max(0, ratio))
+    : 0;
+  return maximum * normalized;
+}
+
+/** Derive the visible horizontal screen number, including a partial last page. */
+export function horizontalReaderPageState(
+  metrics: ReaderScrollMetrics
+): HorizontalReaderPageState {
+  const pageWidth = Math.max(1, metrics.clientWidth);
+  const maximum = Math.max(0, metrics.scrollWidth - metrics.clientWidth);
+  const offset = Math.min(maximum, Math.max(0, metrics.scrollLeft));
+  const pageCount = Math.max(1, Math.ceil(maximum / pageWidth) + 1);
+  const page = Math.min(pageCount, Math.round(offset / pageWidth) + 1);
+  const epsilon = Math.max(2, pageWidth * 0.01);
+  return {
+    page,
+    pageCount,
+    atStart: offset <= epsilon,
+    atEnd: maximum - offset <= epsilon,
+  };
 }
 
 /* ---------- 划线配色 ---------- */
@@ -316,10 +383,17 @@ export function scanBookStructure(book: Book): BookStructure {
 }
 
 export async function contentHashOfBook(book: Book): Promise<string> {
-  const raw =
-    book.title +
-    "|" +
-    book.chapters.map(c => c.title + c.paragraphs.join("\n")).join("|");
+  // Versioned content identity: editable catalogue fields must not fork the
+  // digest cache for unchanged book contents.
+  const raw = JSON.stringify({
+    version: 1,
+    format: book.format,
+    chapters: book.chapters.map(chapter => ({
+      id: chapter.id,
+      title: chapter.title,
+      paragraphs: chapter.paragraphs,
+    })),
+  });
   const buf = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(raw)

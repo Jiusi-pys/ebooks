@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   BookOpenCheck,
   BrainCircuit,
@@ -28,6 +35,7 @@ interface Props {
     cloze: string[];
     tags: string[];
   }) => Promise<void>;
+  headerAction?: ReactNode;
   onClose: () => void;
 }
 
@@ -50,6 +58,7 @@ export function AiDrawer({
   theme,
   onSaveQa,
   onApplyStudyCard,
+  headerAction,
   onClose,
 }: Props) {
   const [phase, setPhase] = useState<Phase>("digest");
@@ -224,7 +233,7 @@ export function AiDrawer({
 
   return (
     <div
-      className="relative flex h-full w-[340px] shrink-0 flex-col border-l"
+      className="relative flex h-full w-full min-w-0 flex-col"
       style={{
         background: theme.panel,
         borderColor: theme.border,
@@ -237,13 +246,17 @@ export function AiDrawer({
       >
         <Sparkles size={15} className="text-primary" />
         <span className="text-[13px] font-medium">AI 伴读</span>
-        <span className="font-meta text-[10px]" style={{ color: theme.muted }}>
+        <span
+          className="font-meta min-w-0 truncate text-[10px]"
+          style={{ color: theme.muted }}
+        >
           {aiConfig.provider} · {aiConfig.model.replace(/^deepseek-|^gpt-/, "")}{" "}
           · {aiConfig.effort}
         </span>
+        {headerAction}
         <button
           onClick={() => setShowSettings(value => !value)}
-          className={`ml-auto rounded p-1 ${showSettings ? "bg-primary/10 text-primary" : "hover:opacity-70"}`}
+          className={`rounded p-1 ${headerAction ? "" : "ml-auto"} ${showSettings ? "bg-primary/10 text-primary" : "hover:opacity-70"}`}
           style={{ color: showSettings ? undefined : theme.muted }}
           title="AI 后台设置"
           aria-label="AI 后台设置"

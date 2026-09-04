@@ -18,7 +18,7 @@ import {
   deleteAssociation as dbDeleteAssociation,
   deleteBook as dbDeleteBook,
   deleteFolder as dbDeleteFolder,
-  deleteHighlight as dbDeleteHighlight,
+  deleteHighlightsWithCitationCleanup,
   deleteMindMap as dbDeleteMindMap,
   deleteNote as dbDeleteNote,
   deleteStudySet as dbDeleteStudySet,
@@ -32,11 +32,12 @@ import {
   getFile,
   getHighlights,
   patchBookFolder,
+  patchBookLastOpenedAt,
+  patchBookMetadataWithNotes,
   patchBookOutline,
   patchBookProgress,
   patchBookCustomCover,
   patchBookReaderMode,
-  patchBookTitle,
   patchFolderIcon,
   patchFolderName,
   putAssociation,
@@ -58,17 +59,19 @@ import { seedIfEmpty } from "@/lib/seed";
 import { emitEvent } from "@/lib/events";
 import { mirrorImportTrayProgress, syncBookMirror } from "@/lib/mirrorSync";
 import { selectImportedPdfMode } from "@/lib/pdfReaderState";
+import { contentHashOfBook } from "@/lib/reading";
 import {
   citationDescriptorForHighlight,
   isCitationOnlyHighlight,
   removeCitationBlock,
-  removeCitationBlocks,
   renameCitationBookTitles,
 } from "@/lib/citations";
+import { assertAssociationEndpoints } from "@/lib/associations";
+import type { EditableBookMetadata } from "@/lib/bookMetadata";
 import {
-  assertAssociationEndpoints,
-  associationsForBook,
-} from "@/lib/associations";
+  deleteHighlightWithMirror,
+  deleteHighlightsWithMirror,
+} from "@/lib/highlightDeletion";
 
 export interface ImportTask {
   id: string;
@@ -199,7 +202,36 @@ export function useLibrary() {
     setInitializationAttempt(attempt => attempt + 1);
   }, []);
 
-  const navigate = useCallback((r: Route) => setRoute(r), []);
+  const markBookOpened = useCallback((bookId: string) => {
+    const openedAt = Date.now();
+    setBooks(current =>
+      current.map(book =>
+        book.id === bookId ? { ...book, lastOpenedAt: openedAt } : book
+      )
+    );
+    void patchBookLastOpenedAt(bookId, openedAt)
+      .then(updated => {
+        if (!updated) return;
+        setBooks(current =>
+          current.map(book =>
+            book.id === bookId
+              ? { ...book, lastOpenedAt: updated.lastOpenedAt }
+              : book
+          )
+        );
+      })
+      .catch(error =>
+        console.error("Failed to persist last opened time", error)
+      );
+  }, []);
+
+  const navigate = useCallback(
+    (r: Route) => {
+      if (r.view === "reader" && r.bookId) markBookOpened(r.bookId);
+      setRoute(r);
+    },
+    [markBookOpened]
+  );
 
   const importFiles = useCallback(
     async (files: File[], pdfModes?: Map<File, "reflow" | "original">) => {
@@ -259,10 +291,13 @@ export function useLibrary() {
             coverTone: toneForTitle(parsed.title),
             chapters: parsed.chapters,
             createdAt: Date.now(),
+            metadata: parsed.metadata,
             progress: { chapterId: parsed.chapters[0]?.id ?? "", ratio: 0 },
             readerMode,
             pageCount: format === "pdf" ? parsed.pageCount : undefined,
           };
+          onProgress("计算内容指纹", 0.965);
+          book.contentHash = await contentHashOfBook(book);
           let sourceFile: StoredFile | undefined;
           if (format === "pdf") {
             onProgress("保存原始文件", 0.97);
@@ -284,6 +319,7 @@ export function useLibrary() {
                 format: book.format,
                 folder: book.folderId,
                 contentHash: book.contentHash,
+                metadata: book.metadata,
                 chapters: book.chapters,
               },
               {
@@ -374,9 +410,12 @@ export function useLibrary() {
     setImports(s => s.filter(t => t.id !== id));
   }, []);
 
-  const openReader = useCallback((bookId: string, chapterId?: string) => {
-    setRoute({ view: "reader", bookId, chapterId });
-  }, []);
+  const openReader = useCallback(
+    (bookId: string, chapterId?: string) => {
+      navigate({ view: "reader", bookId, chapterId });
+    },
+    [navigate]
+  );
 
   const saveProgress = useCallback(
     async (bookId: string, chapterId: string, ratio: number) => {
@@ -403,10 +442,11 @@ export function useLibrary() {
         updatedAt: Date.now(),
       };
       await putNote(note);
-      emitEvent("note.created", {
+      await emitEvent("note.created", {
         extId: note.id,
         title: note.title,
         content: note.content,
+        updatedAt: note.updatedAt,
       });
       await reload();
       return note;
@@ -420,14 +460,14 @@ export function useLibrary() {
       const lower = title.trim().toLowerCase();
       const book = books.find(b => b.title.toLowerCase() === lower);
       if (book) {
-        setRoute({ view: "reader", bookId: book.id });
+        navigate({ view: "reader", bookId: book.id });
         return;
       }
       let note = notes.find(n => n.title.toLowerCase() === lower);
       if (!note) note = await createNote(title.trim());
       setRoute({ view: "note", noteId: note.id });
     },
-    [books, notes, createNote]
+    [books, notes, createNote, navigate]
   );
 
   const saveNote = useCallback(async (note: Note) => {
@@ -438,39 +478,33 @@ export function useLibrary() {
         .map(n => (n.id === note.id ? updated : n))
         .sort((a, b) => b.updatedAt - a.updatedAt)
     );
-    emitEvent("note.updated", {
+    await emitEvent("note.updated", {
       extId: updated.id,
       title: updated.title,
       content: updated.content,
+      updatedAt: updated.updatedAt,
     });
   }, []);
 
   const removeNote = useCallback(
     async (id: string) => {
       const linked = highlights.filter(item => item.noteId === id);
-      await Promise.all(
-        linked.map(async highlight => {
-          if (isCitationOnlyHighlight(highlight)) {
-            await dbDeleteHighlight(highlight.id);
-            emitEvent("highlight.deleted", {
-              extId: highlight.id,
-              bookTitle:
-                books.find(book => book.id === highlight.bookId)?.title ?? "",
-            });
-            return;
-          }
-          const unlinked = { ...highlight };
-          delete unlinked.noteId;
-          delete unlinked.citation;
-          await putHighlight(unlinked);
-          emitEvent("highlight.updated", {
-            extId: highlight.id,
-            noteId: null,
-          });
-        })
+      const citationOnly = linked.filter(isCitationOnlyHighlight);
+      await deleteHighlightsWithMirror(
+        citationOnly.map(highlight => ({
+          id: highlight.id,
+          bookTitle:
+            books.find(book => book.id === highlight.bookId)?.title ?? "",
+        })),
+        {
+          emitMirror: emitEvent,
+          // Deleting the note clears every surviving noteExtId through the
+          // server FK. Only after that authoritative transaction succeeds do
+          // we atomically apply the equivalent local cascade.
+          beforeLocalCommit: () => emitEvent("note.deleted", { extId: id }),
+          commitLocal: () => dbDeleteNote(id),
+        }
       );
-      await dbDeleteNote(id);
-      emitEvent("note.deleted", { extId: id });
       await reload();
       setRoute({ view: "notes" });
     },
@@ -480,75 +514,107 @@ export function useLibrary() {
   const removeBook = useCallback(
     async (id: string) => {
       const book = books.find(item => item.id === id);
-      const linkedAssociations = associationsForBook(associations, id);
       if (book) {
-        const linked = highlights.filter(item => item.bookId === id);
-        const updatedNotes = citationNoteUpdates(
-          notes,
-          linked,
-          book.title,
-          removeCitationBlocks
-        );
-        // deleteBook also removes all book highlights, so generated note blocks
-        // must be removed first while their structured source still exists.
-        await Promise.all(updatedNotes.map(putNote));
-        for (const note of updatedNotes)
-          emitEvent("note.updated", {
-            extId: note.id,
-            title: note.title,
-            content: note.content,
+        try {
+          // Do not remove the browser's only copy until MySQL has committed
+          // the complete server-side cascade. The event endpoint also emits
+          // association.deleted WebHooks for rows removed by that cascade.
+          await emitEvent("book.deleted", {
+            extId: book.id,
+            title: book.title,
           });
+        } catch (cause) {
+          throw new Error(
+            "服务器未确认数据库删除，本地书籍仍然保留。请检查连接或登录状态后重试。",
+            { cause }
+          );
+        }
+        // deleteBook also removes all book highlights, so generated note blocks
+        // are recomputed from the latest IndexedDB state in the same transaction.
+        await dbDeleteBook(id);
+      } else {
+        await dbDeleteBook(id);
       }
-      await dbDeleteBook(id);
-      for (const association of linkedAssociations)
-        emitEvent("association.deleted", { extId: association.id });
-      if (book)
-        emitEvent("book.deleted", { extId: book.id, title: book.title });
       await reload();
       setRoute({ view: "library" });
     },
-    [associations, books, highlights, notes, reload]
+    [books, reload]
   );
 
-  const renameBook = useCallback(
-    async (id: string, title: string) => {
-      const t = title.trim();
-      if (!t) return;
+  const updateBookMetadata = useCallback(
+    async (id: string, values: EditableBookMetadata) => {
       const book = books.find(item => item.id === id);
-      if (!book || book.title === t) return;
+      if (!book) throw new Error("找不到要编辑的书籍");
 
-      const linked = highlights.filter(item => item.bookId === id);
-      const updatedNotes = citationNoteUpdates(
-        notes,
-        linked,
-        book.title,
-        (content, descriptors) =>
-          renameCitationBookTitles(content, descriptors, t)
-      );
-      // Persist generated blocks before changing the title used to identify
-      // them. Hand-written wiki-links are intentionally not rewritten.
-      await Promise.all(updatedNotes.map(putNote));
-      for (const note of updatedNotes)
-        emitEvent("note.updated", {
-          extId: note.id,
-          title: note.title,
-          content: note.content,
+      const updatedNotes =
+        book.title === values.title
+          ? []
+          : citationNoteUpdates(
+              notes,
+              highlights.filter(item => item.bookId === id),
+              book.title,
+              (content, descriptors) =>
+                renameCitationBookTitles(content, descriptors, values.title)
+            );
+      try {
+        // The server rewrites generated citation blocks and the book metadata
+        // in one MySQL transaction; the local IndexedDB transaction mirrors
+        // the same operation only after that commit succeeds.
+        await emitEvent("book.updated", {
+          extId: id,
+          title: values.title,
+          author: values.author,
+          metadata: values.metadata,
         });
-      const updated = await patchBookTitle(id, t);
-      if (!updated) return;
+      } catch (cause) {
+        throw new Error(
+          "MySQL 镜像同步未完成，本地元数据尚未更改；可安全重试保存。",
+          { cause }
+        );
+      }
+
+      // Keep generated citation blocks aligned with a changed title. Manual
+      // wiki-links remain untouched by design. Book and notes commit together.
+      const updated = await patchBookMetadataWithNotes(
+        id,
+        values,
+        updatedNotes
+      );
+      if (!updated) throw new Error("书籍已在其他窗口中删除");
+
       setNotes(current => {
         const replacements = new Map(updatedNotes.map(note => [note.id, note]));
         return current
           .map(note => replacements.get(note.id) ?? note)
-          .sort((a, b) => b.updatedAt - a.updatedAt);
+          .sort((left, right) => right.updatedAt - left.updatedAt);
       });
       setBooks(current =>
         current.map(item =>
-          item.id === id ? { ...item, title: updated.title } : item
+          item.id === id
+            ? {
+                ...item,
+                title: updated.title,
+                author: updated.author,
+                metadata: updated.metadata,
+              }
+            : item
         )
       );
     },
     [books, highlights, notes]
+  );
+
+  const renameBook = useCallback(
+    async (id: string, title: string) => {
+      const book = books.find(item => item.id === id);
+      if (!book) return;
+      await updateBookMetadata(id, {
+        title: title.trim(),
+        author: book.author,
+        metadata: book.metadata ?? { version: 1 },
+      });
+    },
+    [books, updateBookMetadata]
   );
 
   const setBookCustomCover = useCallback(
@@ -780,10 +846,43 @@ export function useLibrary() {
     emitEvent("association.deleted", { extId: id });
   }, []);
 
+  const deleteHighlightEverywhere = useCallback(
+    async (id: string) => {
+      const highlight = highlights.find(item => item.id === id);
+      const bookTitle = highlight
+        ? (books.find(book => book.id === highlight.bookId)?.title ?? "")
+        : "";
+      const result = await deleteHighlightWithMirror(id, bookTitle, {
+        emitMirror: emitEvent,
+        commitLocal: ids => deleteHighlightsWithCitationCleanup(ids),
+      });
+      if (result.updatedNotes.length > 0) {
+        const replacements = new Map(
+          result.updatedNotes.map(note => [note.id, note])
+        );
+        setNotes(current =>
+          current
+            .map(note => replacements.get(note.id) ?? note)
+            .sort((left, right) => right.updatedAt - left.updatedAt)
+        );
+      }
+      const deleted = new Set(result.deletedHighlightIds);
+      setHighlights(current =>
+        current.filter(highlight => !deleted.has(highlight.id))
+      );
+    },
+    [books, highlights]
+  );
+
   const unlinkCitation = useCallback(
     async (id: string, noteOverride?: Note) => {
       const highlight = highlights.find(item => item.id === id);
       if (!highlight?.noteId) return;
+
+      if (isCitationOnlyHighlight(highlight)) {
+        await deleteHighlightEverywhere(id);
+        return;
+      }
 
       const note =
         noteOverride?.id === highlight.noteId
@@ -802,10 +901,11 @@ export function useLibrary() {
         if (content !== note.content || noteOverride?.id === note.id) {
           const updatedNote = { ...note, content, updatedAt: Date.now() };
           await putNote(updatedNote);
-          emitEvent("note.updated", {
+          await emitEvent("note.updated", {
             extId: updatedNote.id,
             title: updatedNote.title,
             content: updatedNote.content,
+            updatedAt: updatedNote.updatedAt,
           });
           setNotes(current =>
             current
@@ -815,60 +915,23 @@ export function useLibrary() {
         }
       }
 
-      if (isCitationOnlyHighlight(highlight)) {
-        await dbDeleteHighlight(id);
-        setHighlights(current => current.filter(item => item.id !== id));
-        emitEvent("highlight.deleted", {
-          extId: id,
-          bookTitle: book?.title ?? "",
-        });
-      } else {
-        const unlinked = { ...highlight };
-        delete unlinked.noteId;
-        delete unlinked.citation;
-        await putHighlight(unlinked);
-        setHighlights(current =>
-          current.map(item => (item.id === id ? unlinked : item))
-        );
-        emitEvent("highlight.updated", { extId: id, noteId: null });
-      }
+      const unlinked = { ...highlight };
+      delete unlinked.noteId;
+      delete unlinked.citation;
+      await putHighlight(unlinked);
+      setHighlights(current =>
+        current.map(item => (item.id === id ? unlinked : item))
+      );
+      await emitEvent("highlight.updated", { extId: id, noteId: null });
     },
-    [books, highlights, notes]
+    [books, deleteHighlightEverywhere, highlights, notes]
   );
 
   const removeHighlight = useCallback(
     async (id: string) => {
-      const highlight = highlights.find(item => item.id === id);
-      if (highlight?.noteId) {
-        const note = notes.find(item => item.id === highlight.noteId);
-        const book = books.find(item => item.id === highlight.bookId);
-        if (note && book) {
-          const content = removeCitationBlock(
-            note.content,
-            citationDescriptorForHighlight(highlight, book.title)
-          );
-          if (content !== note.content) {
-            const updatedNote = { ...note, content, updatedAt: Date.now() };
-            // Keep the note and structured relationship consistent: if saving
-            // the cleanup fails, do not delete the only remaining source key.
-            await putNote(updatedNote);
-            emitEvent("note.updated", {
-              extId: updatedNote.id,
-              title: updatedNote.title,
-              content: updatedNote.content,
-            });
-            setNotes(current =>
-              current
-                .map(item => (item.id === note.id ? updatedNote : item))
-                .sort((a, b) => b.updatedAt - a.updatedAt)
-            );
-          }
-        }
-      }
-      await dbDeleteHighlight(id);
-      setHighlights(current => current.filter(item => item.id !== id));
+      await deleteHighlightEverywhere(id);
     },
-    [books, highlights, notes]
+    [deleteHighlightEverywhere]
   );
 
   const saveMindMap = useCallback(async (map: MindMap) => {
@@ -915,6 +978,7 @@ export function useLibrary() {
     removeNote,
     removeBook,
     renameBook,
+    updateBookMetadata,
     setBookCustomCover,
     updateBookOutline,
     moveBook,

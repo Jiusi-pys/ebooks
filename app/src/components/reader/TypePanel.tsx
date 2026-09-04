@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { ArrowLeftRight, ArrowUpDown } from "lucide-react";
 import type { TypeSettings } from "@/types";
 import {
   PAGE_MARGIN_MAX,
@@ -151,6 +152,37 @@ export function TypePanel({ value, onChange, onClose }: Props) {
           onChange={v => set({ pageMargin: v })}
           format={v => `${v}px`}
         />
+      </Row>
+
+      <Row label="翻页方式">
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-secondary/50 p-1">
+          {(
+            [
+              ["vertical", "上下连续", ArrowUpDown],
+              ["horizontal", "左右翻页", ArrowLeftRight],
+            ] as const
+          ).map(([mode, label, Icon]) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={value.pageTurnMode === mode}
+              onClick={() => set({ pageTurnMode: mode })}
+              className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[12px] transition-all ${
+                value.pageTurnMode === mode
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title={
+                mode === "vertical"
+                  ? "上下连续滚动，到章节边界后继续滚轮可切章"
+                  : "按屏幕宽度左右逐页阅读"
+              }
+            >
+              <Icon size={14} />
+              {label}
+            </button>
+          ))}
+        </div>
       </Row>
 
       {/* 粗细 + 单双栏 */}

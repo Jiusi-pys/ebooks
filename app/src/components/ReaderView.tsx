@@ -8,6 +8,10 @@ import {
   List,
   ListPlus,
   MessageSquarePlus,
+  Minimize2,
+  PanelRightDashed,
+  PanelRightOpen,
+  Pin,
   Quote,
   RefreshCw,
   Sparkles,
@@ -35,10 +39,13 @@ import type {
 } from "@/types";
 import {
   fontStack,
+  horizontalReaderPageState,
   loadTypeSettings,
   locateHighlight,
   planReaderChapterEntry,
   readerPagePadding,
+  readerScrollOffset,
+  readerScrollRatio,
   saveTypeSettings,
   swatch,
   themeById,
@@ -89,6 +96,16 @@ import {
   passageAnchorFromHighlight,
   passageAnchorKey,
 } from "@/lib/associations";
+import {
+  loadReaderPanelMode,
+  parseReaderPanelMode,
+  readerPanelIsVisible,
+  readerPanelOccupiesLayout,
+  READER_PANEL_MODE_STORAGE_KEY,
+  saveReaderPanelMode,
+  toggleReaderPanelMode,
+  type ReaderPanelMode,
+} from "@/lib/readerPanelMode";
 
 interface SelInfo {
   paraIndex: number;
@@ -119,9 +136,17 @@ interface AssociationRange {
 }
 
 type PanelTab = "marks" | "notes" | "qa";
-type ReadingPosture = "read" | "write" | "recall";
+type ReadingPosture = "read" | "immersive" | "recall";
 
-export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
+export function ReaderView({
+  lib,
+  book,
+  onImmersiveChange,
+}: {
+  lib: Library;
+  book: Book;
+  onImmersiveChange?: (active: boolean) => void;
+}) {
   const [type, setType] = useState<TypeSettings>(loadTypeSettings);
   const [showToc, setShowToc] = useState(true);
   const [showType, setShowType] = useState(false);
@@ -146,9 +171,29 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     useState<PassageAnchor | null>(null);
   const [associationPopup, setAssociationPopup] =
     useState<AssociationPopupState | null>(null);
+  const [readerPanelMode, setReaderPanelMode] =
+    useState<ReaderPanelMode>(loadReaderPanelMode);
+  const [readerPanelTransientOpen, setReaderPanelTransientOpen] =
+    useState(false);
+  const [wideReaderPanel, setWideReaderPanel] = useState(() =>
+    typeof window === "undefined"
+      ? true
+      : window.matchMedia("(min-width: 1280px)").matches
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const activeChapterRef = useRef<string | null>(null);
+  const readerPanelCloseTimerRef = useRef<number | null>(null);
+  const previousPageTurnModeRef = useRef(type.pageTurnMode);
+  const modeSwitchRatioRef = useRef<number | null>(null);
+  const chapterEntryRatioRef = useRef<number | null>(null);
+  const lastWheelTurnRef = useRef(0);
+  const [horizontalPage, setHorizontalPage] = useState({
+    page: 1,
+    pageCount: 1,
+    atStart: true,
+    atEnd: true,
+  });
 
   const theme = themeById(type.themeId);
   /** 原版 PDF 版面模式（保留排版逐页阅读） */
@@ -256,7 +301,111 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
     : undefined;
   const splitBooks = getSplitBooks(lib.books, book, activeStudySet);
 
+  const cancelReaderPanelClose = useCallback(() => {
+    if (readerPanelCloseTimerRef.current !== null) {
+      window.clearTimeout(readerPanelCloseTimerRef.current);
+      readerPanelCloseTimerRef.current = null;
+    }
+  }, []);
+
+  const openReaderPanel = useCallback(() => {
+    cancelReaderPanelClose();
+    setReaderPanelTransientOpen(true);
+  }, [cancelReaderPanelClose]);
+
+  const closeReaderPanel = useCallback(() => {
+    cancelReaderPanelClose();
+    setReaderPanelTransientOpen(false);
+  }, [cancelReaderPanelClose]);
+
+  const scheduleReaderPanelClose = useCallback(() => {
+    cancelReaderPanelClose();
+    readerPanelCloseTimerRef.current = window.setTimeout(() => {
+      setReaderPanelTransientOpen(false);
+      readerPanelCloseTimerRef.current = null;
+    }, 240);
+  }, [cancelReaderPanelClose]);
+
+  const changeReaderPanelMode = useCallback(
+    (mode: ReaderPanelMode) => {
+      cancelReaderPanelClose();
+      setReaderPanelMode(mode);
+      saveReaderPanelMode(mode);
+      // Keep an overlay visible across mode changes; narrow pinned panels stay
+      // open until the user explicitly closes them.
+      setReaderPanelTransientOpen(mode === "auto" || !wideReaderPanel);
+    },
+    [cancelReaderPanelClose, wideReaderPanel]
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1280px)");
+    const sync = () => setWideReaderPanel(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key !== READER_PANEL_MODE_STORAGE_KEY) return;
+      setReaderPanelMode(parseReaderPanelMode(event.newValue));
+      setReaderPanelTransientOpen(false);
+    };
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (
+        event.key === "Escape" &&
+        !readerPanelOccupiesLayout(readerPanelMode, wideReaderPanel)
+      ) {
+        closeReaderPanel();
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [closeReaderPanel, readerPanelMode, wideReaderPanel]);
+
+  useEffect(() => {
+    if (aiTarget) openReaderPanel();
+  }, [aiTarget, openReaderPanel]);
+
+  useEffect(() => () => cancelReaderPanelClose(), [cancelReaderPanelClose]);
+
+  useEffect(() => {
+    const active = posture === "immersive";
+    onImmersiveChange?.(active);
+    return () => {
+      if (active) onImmersiveChange?.(false);
+    };
+  }, [onImmersiveChange, posture]);
+
+  useEffect(() => {
+    if (posture !== "immersive") return;
+    const exitImmersive = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPosture("read");
+    };
+    window.addEventListener("keydown", exitImmersive);
+    return () => window.removeEventListener("keydown", exitImmersive);
+  }, [posture]);
+
   useEffect(() => saveTypeSettings(type), [type]);
+
+  const updateTypeSettings = useCallback(
+    (next: TypeSettings) => {
+      if (next.pageTurnMode !== type.pageTurnMode && scrollRef.current) {
+        modeSwitchRatioRef.current = readerScrollRatio(
+          scrollRef.current,
+          type.pageTurnMode
+        );
+      }
+      setType(next);
+    },
+    [type.pageTurnMode]
+  );
 
   // 首次打开恢复章内进度；只有明确切章时才回到顶部并记录重置。
   useEffect(() => {
@@ -267,6 +416,8 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
       book.progress,
       activeChapterRef.current === null && Boolean(lib.route.chapterId)
     );
+    const entryRatio = chapterEntryRatioRef.current ?? plan.ratio;
+    chapterEntryRatioRef.current = null;
     activeChapterRef.current = chapter.id;
     setSel(null);
     setHlPopup(null);
@@ -276,20 +427,55 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
       secondFrame = requestAnimationFrame(() => {
         const container = scrollRef.current;
         if (!container) return;
-        const max = Math.max(
-          0,
-          container.scrollHeight - container.clientHeight
+        const offset = readerScrollOffset(
+          container,
+          type.pageTurnMode,
+          entryRatio
         );
-        container.scrollTo({ top: max * plan.ratio });
+        container.scrollTo(
+          type.pageTurnMode === "horizontal"
+            ? { left: offset, top: 0 }
+            : { left: 0, top: offset }
+        );
+        if (type.pageTurnMode === "horizontal")
+          setHorizontalPage(horizontalReaderPageState(container));
       });
     });
-    if (plan.persist) void lib.saveProgress(book.id, chapter.id, 0);
+    if (plan.persist || entryRatio !== plan.ratio)
+      void lib.saveProgress(book.id, chapter.id, entryRatio);
     return () => {
       cancelAnimationFrame(firstFrame);
       if (secondFrame !== null) cancelAnimationFrame(secondFrame);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter?.id]);
+
+  // Preserve the current semantic chapter position when changing scroll axis.
+  useEffect(() => {
+    if (previousPageTurnModeRef.current === type.pageTurnMode) return;
+    previousPageTurnModeRef.current = type.pageTurnMode;
+    const ratio = modeSwitchRatioRef.current ?? book.progress.ratio;
+    modeSwitchRatioRef.current = null;
+    let secondFrame: number | null = null;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        const container = scrollRef.current;
+        if (!container) return;
+        const offset = readerScrollOffset(container, type.pageTurnMode, ratio);
+        container.scrollTo(
+          type.pageTurnMode === "horizontal"
+            ? { left: offset, top: 0 }
+            : { left: 0, top: offset }
+        );
+        if (type.pageTurnMode === "horizontal")
+          setHorizontalPage(horizontalReaderPageState(container));
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame !== null) cancelAnimationFrame(secondFrame);
+    };
+  }, [book.progress.ratio, type.pageTurnMode]);
 
   // 锚点跳转：滚动到书摘段落并闪烁
   useEffect(() => {
@@ -439,25 +625,171 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
 
   const saveTimer = useRef<number | null>(null);
   const onScroll = useCallback(() => {
+    const current = scrollRef.current;
+    if (current && type.pageTurnMode === "horizontal") {
+      const next = horizontalReaderPageState(current);
+      setHorizontalPage(previous =>
+        previous.page === next.page &&
+        previous.pageCount === next.pageCount &&
+        previous.atStart === next.atStart &&
+        previous.atEnd === next.atEnd
+          ? previous
+          : next
+      );
+    }
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       const el = scrollRef.current;
       if (!el || !chapter) return;
-      const max = el.scrollHeight - el.clientHeight;
       lib.saveProgress(
         book.id,
         chapter.id,
-        max > 0 ? Math.min(1, el.scrollTop / max) : 1
+        readerScrollRatio(el, type.pageTurnMode)
       );
     }, 400);
-  }, [book.id, chapter, lib]);
+  }, [book.id, chapter, lib, type.pageTurnMode]);
+
+  const navigateToChapter = useCallback(
+    (index: number, entryRatio?: number) => {
+      const target = book.chapters[index];
+      if (!target) return false;
+      if (entryRatio !== undefined) chapterEntryRatioRef.current = entryRatio;
+      lib.navigate({
+        view: "reader",
+        bookId: book.id,
+        chapterId: target.id,
+        studySetId: activeStudySet?.id,
+      });
+      return true;
+    },
+    [activeStudySet?.id, book.chapters, book.id, lib]
+  );
+
+  const turnHorizontalPage = useCallback(
+    (direction: -1 | 1) => {
+      const container = scrollRef.current;
+      if (!container) return;
+      const state = horizontalReaderPageState(container);
+      if (direction < 0 && state.atStart) {
+        navigateToChapter(chapterIdx - 1, 1);
+        return;
+      }
+      if (direction > 0 && state.atEnd) {
+        navigateToChapter(chapterIdx + 1, 0);
+        return;
+      }
+      const maximum = Math.max(
+        0,
+        container.scrollWidth - container.clientWidth
+      );
+      const targetPage = Math.max(0, state.page - 1 + direction);
+      container.scrollTo({
+        left: Math.min(maximum, targetPage * container.clientWidth),
+        behavior: "smooth",
+      });
+    },
+    [chapterIdx, navigateToChapter]
+  );
+
+  const onHorizontalWheel = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      if (
+        Math.abs(event.deltaY) < 12 ||
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      )
+        return;
+      event.preventDefault();
+      const now = Date.now();
+      if (now - lastWheelTurnRef.current < 420) return;
+      lastWheelTurnRef.current = now;
+      turnHorizontalPage(event.deltaY < 0 ? -1 : 1);
+    },
+    [turnHorizontalPage]
+  );
+
+  const onVerticalWheel = useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      const container = scrollRef.current;
+      if (!container || Math.abs(event.deltaY) < 12) return;
+      const maximum = Math.max(
+        0,
+        container.scrollHeight - container.clientHeight
+      );
+      const atStart = container.scrollTop <= 2;
+      const atEnd = maximum - container.scrollTop <= 2;
+      if (!((event.deltaY < 0 && atStart) || (event.deltaY > 0 && atEnd)))
+        return;
+      const now = Date.now();
+      if (now - lastWheelTurnRef.current < 420) return;
+      lastWheelTurnRef.current = now;
+      if (event.deltaY < 0) navigateToChapter(chapterIdx - 1, 1);
+      else navigateToChapter(chapterIdx + 1, 0);
+    },
+    [chapterIdx, navigateToChapter]
+  );
+
+  useEffect(() => {
+    if (type.pageTurnMode !== "horizontal" || isOriginal || bilingualLanguage)
+      return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      )
+        return;
+      if (event.key === "ArrowLeft" || event.key === "PageUp") {
+        event.preventDefault();
+        turnHorizontalPage(-1);
+      } else if (event.key === "ArrowRight" || event.key === "PageDown") {
+        event.preventDefault();
+        turnHorizontalPage(1);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [bilingualLanguage, isOriginal, turnHorizontalPage, type.pageTurnMode]);
+
+  useEffect(() => {
+    if (type.pageTurnMode !== "horizontal" || isOriginal) return;
+    const container = scrollRef.current;
+    if (!container) return;
+    let frame = requestAnimationFrame(() => {
+      setHorizontalPage(horizontalReaderPageState(container));
+    });
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        setHorizontalPage(horizontalReaderPageState(container));
+      });
+    });
+    observer.observe(container);
+    if (wrapRef.current) observer.observe(wrapRef.current);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [
+    chapter?.id,
+    isOriginal,
+    type.columns,
+    type.fontId,
+    type.fontSize,
+    type.fontWeight,
+    type.letterSpacing,
+    type.lineHeight,
+    type.pageMargin,
+    type.pageTurnMode,
+  ]);
 
   useEffect(
     () => () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
       if (pdfSaveTimer.current) window.clearTimeout(pdfSaveTimer.current);
     },
-    [chapter?.id]
+    [chapter?.id, type.pageTurnMode]
   );
 
   const onBilingualProgress = useCallback(
@@ -900,6 +1232,7 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
 
       const content = appendCitationBlock(note.content, {
         level,
+        highlightId: h.id,
         bookTitle: t.bookTitle,
         chapterTitle,
         text: sourceText,
@@ -1072,20 +1405,13 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
   }
 
   const gotoChapter = (idx: number) => {
-    const c = book.chapters[idx];
-    if (c)
-      lib.navigate({
-        view: "reader",
-        bookId: book.id,
-        chapterId: c.id,
-        studySetId: activeStudySet?.id,
-      });
+    navigateToChapter(idx);
   };
 
   const gotoOutline = (item: OutlineItem) => {
     if (!item.chapterId) return;
     if (item.chapterId === chapter.id && item.paraIndex === undefined) {
-      scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      scrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "smooth" });
     }
     lib.navigate({
       view: "reader",
@@ -1151,6 +1477,16 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
   );
   const panelNotes = contentHighlights.filter(h => h.note);
   const panelQa = contentHighlights.filter(h => (h.aiQa?.length ?? 0) > 0);
+  const readerPanelAvailable = posture === "read" || Boolean(aiTarget);
+  const readerPanelPinned = readerPanelOccupiesLayout(
+    readerPanelMode,
+    wideReaderPanel
+  );
+  const readerPanelVisible = readerPanelIsVisible(
+    readerPanelAvailable,
+    readerPanelMode,
+    readerPanelTransientOpen
+  );
   const popupHl = hlPopup
     ? (lib.highlights.find(h => h.id === hlPopup.id) ?? null)
     : null;
@@ -1165,7 +1501,8 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
 
   return (
     <div
-      className="reader-shell flex h-full"
+      data-reader-posture={posture}
+      className="reader-shell relative flex h-full overflow-hidden"
       style={{ background: theme.bg, color: theme.text }}
     >
       {/* 章节目录（原版模式下由 PDF 大纲代替） */}
@@ -1204,7 +1541,9 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
             <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
               {/* 顶栏 */}
               <div
-                className="flex h-12 shrink-0 items-center gap-2 border-b px-4"
+                className={`h-12 shrink-0 items-center gap-2 border-b px-4 ${
+                  posture === "immersive" ? "hidden" : "flex"
+                }`}
                 style={{ borderColor: theme.border }}
               >
                 <button
@@ -1276,7 +1615,7 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                   {(
                     [
                       ["read", "阅读", BookOpenText],
-                      ["write", "沉浸", PenLine],
+                      ["immersive", "沉浸", PenLine],
                       ["recall", "回忆", Eye],
                     ] as const
                   ).map(([mode, label, Icon]) => (
@@ -1285,6 +1624,12 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                       onClick={() => {
                         setPosture(mode);
                         if (mode !== "read") setBilingualLanguage(null);
+                        if (mode === "immersive") {
+                          setAiTargetId(null);
+                          closeReaderPanel();
+                          setShowType(false);
+                          setShowCite(false);
+                        }
                         setHlPopup(null);
                         setSel(null);
                       }}
@@ -1299,7 +1644,9 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                       title={
                         mode === "recall"
                           ? "隐藏摘录，点击模糊文字揭示答案"
-                          : undefined
+                          : mode === "immersive"
+                            ? "隐藏左右侧栏与阅读工具栏，按 Esc 退出"
+                            : undefined
                       }
                     >
                       <Icon size={10} /> {label}
@@ -1366,13 +1713,44 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                     {showType && (
                       <TypePanel
                         value={type}
-                        onChange={setType}
+                        onChange={updateTypeSettings}
                         onClose={() => setShowType(false)}
                       />
                     )}
                   </div>
                 )}
+                {readerPanelAvailable && !readerPanelVisible && (
+                  <button
+                    type="button"
+                    onClick={openReaderPanel}
+                    className="rounded-md p-1.5 transition-opacity hover:opacity-70"
+                    style={{ color: theme.muted }}
+                    aria-label="打开右侧阅读面板"
+                    aria-controls="reader-side-panel"
+                    aria-expanded="false"
+                    title="打开书摘、批注与问答"
+                  >
+                    <PanelRightOpen size={16} aria-hidden="true" />
+                  </button>
+                )}
               </div>
+
+              {posture === "immersive" && (
+                <button
+                  type="button"
+                  onClick={() => setPosture("read")}
+                  className="absolute right-3 top-3 z-30 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] shadow-sm backdrop-blur transition-opacity hover:opacity-75"
+                  style={{
+                    borderColor: theme.border,
+                    background: `${theme.panel}e6`,
+                    color: theme.muted,
+                  }}
+                  aria-label="退出沉浸模式"
+                  title="退出沉浸模式（Esc）"
+                >
+                  <Minimize2 size={12} aria-hidden="true" /> 退出沉浸
+                </button>
+              )}
 
               {/* 正文：原版 PDF 或重排文本 */}
               {isOriginal ? (
@@ -1559,412 +1937,579 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
                   className="flex-1"
                 />
               ) : (
-                <div
-                  ref={scrollRef}
-                  className="relative flex-1 overflow-y-auto"
-                  onScroll={onScroll}
-                >
+                <>
                   <div
-                    ref={wrapRef}
-                    className="relative mx-auto pb-28 pt-12"
-                    style={{
-                      maxWidth: type.columns === 2 ? 1080 : 680,
-                      paddingInline: readerPagePadding(type.pageMargin),
-                    }}
-                    onMouseUp={onMouseUp}
+                    ref={scrollRef}
+                    data-reader-page-mode={type.pageTurnMode}
+                    className={`relative min-h-0 flex-1 ${
+                      type.pageTurnMode === "horizontal"
+                        ? "overflow-x-auto overflow-y-hidden overscroll-x-contain"
+                        : "overflow-y-auto overflow-x-hidden"
+                    }`}
+                    style={
+                      type.pageTurnMode === "horizontal"
+                        ? { containerType: "inline-size" }
+                        : undefined
+                    }
+                    onScroll={onScroll}
+                    onWheel={
+                      type.pageTurnMode === "horizontal"
+                        ? onHorizontalWheel
+                        : onVerticalWheel
+                    }
                   >
-                    <h1 className="font-reading mb-2 text-center text-[26px] font-bold tracking-wide">
-                      {chapter.title}
-                    </h1>
                     <div
-                      className="font-meta mb-10 text-center text-[10.5px] uppercase tracking-[0.2em]"
-                      style={{ color: theme.muted }}
+                      ref={wrapRef}
+                      className={`relative ${
+                        type.pageTurnMode === "horizontal"
+                          ? "reader-horizontal-pages"
+                          : "mx-auto pb-28 pt-12"
+                      }`}
+                      style={
+                        type.pageTurnMode === "horizontal"
+                          ? ({
+                              "--reader-page-margin": readerPagePadding(
+                                type.pageMargin
+                              ),
+                              columnCount: type.columns,
+                            } as React.CSSProperties)
+                          : {
+                              maxWidth: type.columns === 2 ? 1080 : 680,
+                              paddingInline: readerPagePadding(type.pageMargin),
+                            }
+                      }
+                      onMouseUp={onMouseUp}
                     >
-                      {book.title} · {chapterIdx + 1} / {book.chapters.length}
-                    </div>
-                    <div
-                      className={`reader-body${type.columns === 2 ? " cols-2" : ""}`}
-                      style={{
-                        fontFamily: fontStack(type.fontId),
-                        fontSize: type.fontSize,
-                        lineHeight: type.lineHeight,
-                        letterSpacing: `${type.letterSpacing}em`,
-                        fontWeight: type.fontWeight,
-                      }}
-                    >
-                      {chapter.paragraphs.map((p, i) => (
-                        <Paragraph
-                          key={`${chapter.id}:${i}:${posture === "recall" ? "recall" : "normal"}`}
-                          index={i}
-                          text={p}
-                          ranges={rangesByPara.get(i) ?? []}
-                          associationRanges={
-                            associationRangesByPara.get(i) ?? []
-                          }
-                          recall={posture === "recall"}
-                          onSegmentClick={(hid, top, left) =>
-                            setHlPopup({ id: hid, top, left })
-                          }
-                          onAssociationClick={openAssociationPopup}
-                        />
-                      ))}
-                    </div>
-
-                    {/* 章末导航 */}
-                    <div
-                      className="mt-16 flex items-center justify-between border-t pt-6"
-                      style={{ borderColor: theme.border }}
-                    >
-                      <button
-                        disabled={chapterIdx === 0}
-                        onClick={() => gotoChapter(chapterIdx - 1)}
-                        className="flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[13px] transition-opacity disabled:opacity-30"
-                        style={{
-                          borderColor: theme.border,
-                          color: theme.muted,
-                        }}
-                      >
-                        <ChevronLeft size={14} /> 上一章
-                      </button>
-                      <span
-                        className="font-meta text-[11px]"
+                      <h1 className="font-reading mb-2 text-center text-[26px] font-bold tracking-wide">
+                        {chapter.title}
+                      </h1>
+                      <div
+                        className="font-meta mb-10 text-center text-[10.5px] uppercase tracking-[0.2em]"
                         style={{ color: theme.muted }}
                       >
-                        {Math.round(
-                          ((chapterIdx + 1) / book.chapters.length) * 100
-                        )}
-                        %
-                      </span>
+                        {book.title} · {chapterIdx + 1} / {book.chapters.length}
+                      </div>
+                      <div
+                        className={`reader-body${
+                          type.pageTurnMode === "vertical" && type.columns === 2
+                            ? " cols-2"
+                            : ""
+                        }`}
+                        style={{
+                          fontFamily: fontStack(type.fontId),
+                          fontSize: type.fontSize,
+                          lineHeight: type.lineHeight,
+                          letterSpacing: `${type.letterSpacing}em`,
+                          fontWeight: type.fontWeight,
+                        }}
+                      >
+                        {chapter.paragraphs.map((p, i) => (
+                          <Paragraph
+                            key={`${chapter.id}:${i}:${posture === "recall" ? "recall" : "normal"}`}
+                            index={i}
+                            text={p}
+                            ranges={rangesByPara.get(i) ?? []}
+                            associationRanges={
+                              associationRangesByPara.get(i) ?? []
+                            }
+                            recall={posture === "recall"}
+                            onSegmentClick={(hid, top, left) =>
+                              setHlPopup({ id: hid, top, left })
+                            }
+                            onAssociationClick={openAssociationPopup}
+                          />
+                        ))}
+                      </div>
+
+                      {/* 章末导航 */}
+                      <div
+                        className="mt-16 flex items-center justify-between border-t pt-6"
+                        style={{ borderColor: theme.border }}
+                      >
+                        <button
+                          disabled={chapterIdx === 0}
+                          onClick={() => gotoChapter(chapterIdx - 1)}
+                          className="flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[13px] transition-opacity disabled:opacity-30"
+                          style={{
+                            borderColor: theme.border,
+                            color: theme.muted,
+                          }}
+                        >
+                          <ChevronLeft size={14} /> 上一章
+                        </button>
+                        <span
+                          className="font-meta text-[11px]"
+                          style={{ color: theme.muted }}
+                        >
+                          {Math.round(
+                            ((chapterIdx + 1) / book.chapters.length) * 100
+                          )}
+                          %
+                        </span>
+                        <button
+                          disabled={chapterIdx >= book.chapters.length - 1}
+                          onClick={() => gotoChapter(chapterIdx + 1)}
+                          className="flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[13px] transition-opacity disabled:opacity-30"
+                          style={{
+                            borderColor: theme.border,
+                            color: theme.muted,
+                          }}
+                        >
+                          下一章 <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 划选工具条 */}
+                    {sel && (
+                      <SelectionToolbar
+                        top={sel.top}
+                        left={sel.left}
+                        onHighlight={addMark}
+                        onComment={addComment}
+                        onAssociate={beginSelectionAssociation}
+                        notes={lib.notes}
+                        sourceText={sel.text}
+                        onCite={async noteId => {
+                          await citePassage(
+                            {
+                              level: "content",
+                              bookId: book.id,
+                              bookTitle: book.title,
+                              chapterId: chapter.id,
+                              chapterTitle: chapter.title,
+                              paraIndex: sel.paraIndex,
+                              start: sel.start,
+                              end: sel.end,
+                              text: sel.text,
+                            },
+                            noteId
+                          );
+                          clearSelection();
+                        }}
+                        onTranslate={openTranslation}
+                        onAddToOutline={() => void addSelectionToOutline()}
+                        onAskAi={() => askAiOn()}
+                        onClose={() => setSel(null)}
+                      />
+                    )}
+
+                    {/* 划选即时翻译 */}
+                    {translationSel && (
+                      <TranslationPopup
+                        top={translationSel.top + 42}
+                        left={translationSel.left}
+                        sourceText={translationSel.text}
+                        bookTitle={book.title}
+                        chapterTitle={chapter.title}
+                        theme={theme}
+                        onSave={(translation, targetLang) =>
+                          void saveTranslation(translation, targetLang)
+                        }
+                        onClose={() => setTranslationSel(null)}
+                      />
+                    )}
+
+                    {/* 已有书摘的点击弹层 */}
+                    {popupHl && hlPopup && (
+                      <HighlightPopup
+                        key={popupHl.id + String(popupHl.aiQa?.length ?? 0)}
+                        h={popupHl}
+                        top={hlPopup.top}
+                        left={hlPopup.left}
+                        onEditNote={text => {
+                          lib.updateHighlight({ ...popupHl, note: text });
+                          emitEvent("highlight.updated", {
+                            extId: popupHl.id,
+                            note: text,
+                          });
+                        }}
+                        onEditName={name => {
+                          lib.updateHighlight({
+                            ...popupHl,
+                            name: name || undefined,
+                          });
+                          emitEvent("highlight.updated", {
+                            extId: popupHl.id,
+                            name,
+                          });
+                        }}
+                        onEditTags={tags => {
+                          lib.updateHighlight({
+                            ...popupHl,
+                            tags: tags.length > 0 ? tags : undefined,
+                          });
+                          emitEvent("highlight.tagged", {
+                            extId: popupHl.id,
+                            tags,
+                          });
+                        }}
+                        onEditCloze={cloze => {
+                          lib.updateHighlight({
+                            ...popupHl,
+                            cloze: cloze.length > 0 ? cloze : undefined,
+                          });
+                          emitEvent("highlight.updated", {
+                            extId: popupHl.id,
+                            cloze,
+                          });
+                        }}
+                        onToggleReview={() => {
+                          const next = popupHl.review
+                            ? undefined
+                            : newReviewState();
+                          lib.updateHighlight({ ...popupHl, review: next });
+                          emitEvent("review.updated", {
+                            extId: popupHl.id,
+                            inReview: !popupHl.review,
+                            due: next?.due,
+                            review: next,
+                          });
+                        }}
+                        onAddToMindMap={() => void addToMindMap(popupHl)}
+                        onAddToOutline={() =>
+                          void addHighlightToOutline(popupHl)
+                        }
+                        associationCount={popupAssociationCount}
+                        onAssociate={() => beginHighlightAssociation(popupHl)}
+                        onCite={async noteId => {
+                          await citePassage(
+                            {
+                              level: "content",
+                              bookId: popupHl.bookId,
+                              bookTitle: book.title,
+                              chapterId: popupHl.chapterId,
+                              chapterTitle: popupHl.chapterTitle,
+                              paraIndex: popupHl.paraIndex ?? 0,
+                              start: popupHl.start,
+                              end: popupHl.end,
+                              text: popupHl.text,
+                              pdfAnchor: popupHl.pdfAnchor,
+                            },
+                            noteId,
+                            popupHl
+                          );
+                          setHlPopup(null);
+                        }}
+                        onUnlinkCitation={async () => {
+                          await lib.unlinkCitation(popupHl.id);
+                          showToast("引用已删除，图谱关系已同步更新");
+                          setHlPopup(null);
+                        }}
+                        onAskAi={() => askAiOn(popupHl)}
+                        onDelete={() => {
+                          void lib.removeHighlight(popupHl.id);
+                          setHlPopup(null);
+                        }}
+                        onClose={() => setHlPopup(null)}
+                        notes={lib.notes}
+                      />
+                    )}
+
+                    {toast && (
+                      <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-foreground px-4 py-1.5 text-xs text-background shadow-lg">
+                        {toast}
+                      </div>
+                    )}
+                  </div>
+
+                  {type.pageTurnMode === "horizontal" && (
+                    <>
                       <button
-                        disabled={chapterIdx >= book.chapters.length - 1}
-                        onClick={() => gotoChapter(chapterIdx + 1)}
-                        className="flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[13px] transition-opacity disabled:opacity-30"
+                        type="button"
+                        aria-label="向左翻页"
+                        title="上一页（←）"
+                        disabled={horizontalPage.atStart && chapterIdx === 0}
+                        onClick={() => turnHorizontalPage(-1)}
+                        className="absolute left-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border bg-background/90 shadow-md backdrop-blur-sm transition-all hover:scale-105 disabled:pointer-events-none disabled:opacity-25"
                         style={{
                           borderColor: theme.border,
                           color: theme.muted,
                         }}
                       >
-                        下一章 <ChevronRight size={14} />
+                        <ChevronLeft size={20} />
                       </button>
-                    </div>
-                  </div>
-
-                  {/* 划选工具条 */}
-                  {sel && (
-                    <SelectionToolbar
-                      top={sel.top}
-                      left={sel.left}
-                      onHighlight={addMark}
-                      onComment={addComment}
-                      onAssociate={beginSelectionAssociation}
-                      notes={lib.notes}
-                      sourceText={sel.text}
-                      onCite={async noteId => {
-                        await citePassage(
-                          {
-                            level: "content",
-                            bookId: book.id,
-                            bookTitle: book.title,
-                            chapterId: chapter.id,
-                            chapterTitle: chapter.title,
-                            paraIndex: sel.paraIndex,
-                            start: sel.start,
-                            end: sel.end,
-                            text: sel.text,
-                          },
-                          noteId
-                        );
-                        clearSelection();
-                      }}
-                      onTranslate={openTranslation}
-                      onAddToOutline={() => void addSelectionToOutline()}
-                      onAskAi={() => askAiOn()}
-                      onClose={() => setSel(null)}
-                    />
+                      <button
+                        type="button"
+                        aria-label="向右翻页"
+                        title="下一页（→）"
+                        disabled={
+                          horizontalPage.atEnd &&
+                          chapterIdx >= book.chapters.length - 1
+                        }
+                        onClick={() => turnHorizontalPage(1)}
+                        className="absolute right-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border bg-background/90 shadow-md backdrop-blur-sm transition-all hover:scale-105 disabled:pointer-events-none disabled:opacity-25"
+                        style={{
+                          borderColor: theme.border,
+                          color: theme.muted,
+                        }}
+                      >
+                        <ChevronRight size={20} />
+                      </button>
+                      <div
+                        aria-live="polite"
+                        className="font-meta pointer-events-none absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full border bg-background/85 px-2.5 py-1 text-[10px] shadow-sm backdrop-blur-sm"
+                        style={{
+                          borderColor: theme.border,
+                          color: theme.muted,
+                        }}
+                      >
+                        {horizontalPage.page} / {horizontalPage.pageCount}
+                      </div>
+                    </>
                   )}
-
-                  {/* 划选即时翻译 */}
-                  {translationSel && (
-                    <TranslationPopup
-                      top={translationSel.top + 42}
-                      left={translationSel.left}
-                      sourceText={translationSel.text}
-                      bookTitle={book.title}
-                      chapterTitle={chapter.title}
-                      theme={theme}
-                      onSave={(translation, targetLang) =>
-                        void saveTranslation(translation, targetLang)
-                      }
-                      onClose={() => setTranslationSel(null)}
-                    />
-                  )}
-
-                  {/* 已有书摘的点击弹层 */}
-                  {popupHl && hlPopup && (
-                    <HighlightPopup
-                      key={popupHl.id + String(popupHl.aiQa?.length ?? 0)}
-                      h={popupHl}
-                      top={hlPopup.top}
-                      left={hlPopup.left}
-                      onEditNote={text => {
-                        lib.updateHighlight({ ...popupHl, note: text });
-                        emitEvent("highlight.updated", {
-                          extId: popupHl.id,
-                          note: text,
-                        });
-                      }}
-                      onEditName={name => {
-                        lib.updateHighlight({
-                          ...popupHl,
-                          name: name || undefined,
-                        });
-                        emitEvent("highlight.updated", {
-                          extId: popupHl.id,
-                          name,
-                        });
-                      }}
-                      onEditTags={tags => {
-                        lib.updateHighlight({
-                          ...popupHl,
-                          tags: tags.length > 0 ? tags : undefined,
-                        });
-                        emitEvent("highlight.tagged", {
-                          extId: popupHl.id,
-                          tags,
-                        });
-                      }}
-                      onEditCloze={cloze => {
-                        lib.updateHighlight({
-                          ...popupHl,
-                          cloze: cloze.length > 0 ? cloze : undefined,
-                        });
-                        emitEvent("highlight.updated", {
-                          extId: popupHl.id,
-                          cloze,
-                        });
-                      }}
-                      onToggleReview={() => {
-                        const next = popupHl.review
-                          ? undefined
-                          : newReviewState();
-                        lib.updateHighlight({ ...popupHl, review: next });
-                        emitEvent("review.updated", {
-                          extId: popupHl.id,
-                          inReview: !popupHl.review,
-                          due: next?.due,
-                          review: next,
-                        });
-                      }}
-                      onAddToMindMap={() => void addToMindMap(popupHl)}
-                      onAddToOutline={() => void addHighlightToOutline(popupHl)}
-                      associationCount={popupAssociationCount}
-                      onAssociate={() => beginHighlightAssociation(popupHl)}
-                      onCite={async noteId => {
-                        await citePassage(
-                          {
-                            level: "content",
-                            bookId: popupHl.bookId,
-                            bookTitle: book.title,
-                            chapterId: popupHl.chapterId,
-                            chapterTitle: popupHl.chapterTitle,
-                            paraIndex: popupHl.paraIndex ?? 0,
-                            start: popupHl.start,
-                            end: popupHl.end,
-                            text: popupHl.text,
-                            pdfAnchor: popupHl.pdfAnchor,
-                          },
-                          noteId,
-                          popupHl
-                        );
-                        setHlPopup(null);
-                      }}
-                      onUnlinkCitation={async () => {
-                        await lib.unlinkCitation(popupHl.id);
-                        showToast("引用已删除，图谱关系已同步更新");
-                        setHlPopup(null);
-                      }}
-                      onAskAi={() => askAiOn(popupHl)}
-                      onDelete={() => {
-                        lib.removeHighlight(popupHl.id);
-                        emitEvent("highlight.deleted", {
-                          extId: popupHl.id,
-                          bookTitle: book.title,
-                        });
-                        setHlPopup(null);
-                      }}
-                      onClose={() => setHlPopup(null)}
-                      notes={lib.notes}
-                    />
-                  )}
-
-                  {toast && (
-                    <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-foreground px-4 py-1.5 text-xs text-background shadow-lg">
-                      {toast}
-                    </div>
-                  )}
-                </div>
+                </>
               )}
             </div>
           }
         />
       </div>
 
-      {/* 右侧：AI 抽屉 或 书摘面板 */}
-      {aiTarget ? (
-        <AiDrawer
-          book={book}
-          chapter={chapter}
-          target={aiTarget}
-          theme={theme}
-          onSaveQa={onSaveQa}
-          onApplyStudyCard={applyStudyCard}
-          onClose={() => setAiTargetId(null)}
-        />
-      ) : posture === "read" ? (
-        <div
-          className="hidden w-72 shrink-0 flex-col border-l xl:flex"
-          style={{ background: theme.panel, borderColor: theme.border }}
-        >
-          <div
-            className="flex shrink-0 border-b"
-            style={{ borderColor: theme.border }}
-          >
-            {(
-              [
-                ["marks", `书摘 ${panelMarks.length}`],
-                ["notes", `批注 ${panelNotes.length}`],
-                ["qa", `问答 ${panelQa.length}`],
-              ] as [PanelTab, string][]
-            ).map(([t, label]) => (
+      {/* 右侧：AI 抽屉或书摘面板；固定与自动隐藏共用一个外壳。 */}
+      {readerPanelAvailable && (
+        <>
+          {readerPanelVisible &&
+            readerPanelMode === "auto" &&
+            !wideReaderPanel && (
               <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`flex-1 py-2.5 text-[12px] ${tab === t ? "font-medium" : ""}`}
-                style={{
-                  color: tab === t ? theme.text : theme.muted,
-                  borderBottom:
-                    tab === t ? "2px solid #f54001" : "2px solid transparent",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1 overflow-y-auto p-3">
-            {tab === "marks" &&
-              (panelMarks.length === 0 ? (
-                <PanelEmpty text="选中正文即可划线：下划线、背景色、字色三种样式五种颜色。" />
-              ) : (
-                panelMarks.map(h => (
-                  <MarkCard
-                    key={h.id}
-                    h={h}
-                    onLocate={() =>
-                      lib.navigate({
-                        view: "reader",
-                        bookId: book.id,
-                        chapterId: h.chapterId,
-                        highlightId: h.id,
-                      })
+                type="button"
+                aria-label="关闭右侧阅读面板"
+                className="absolute inset-0 z-30 bg-foreground/15 backdrop-blur-[1px]"
+                onClick={closeReaderPanel}
+              />
+            )}
+          {!readerPanelVisible && wideReaderPanel && (
+            <div
+              aria-hidden="true"
+              className="absolute inset-y-0 right-0 z-30 w-2"
+              onPointerEnter={event => {
+                if (event.pointerType === "mouse") openReaderPanel();
+              }}
+            />
+          )}
+          <aside
+            id="reader-side-panel"
+            aria-label="书摘、批注与问答"
+            aria-hidden={!readerPanelVisible}
+            inert={!readerPanelVisible}
+            onPointerEnter={cancelReaderPanelClose}
+            onPointerLeave={event => {
+              if (
+                event.pointerType === "mouse" &&
+                !event.currentTarget.matches(":focus-within") &&
+                readerPanelMode === "auto"
+              ) {
+                scheduleReaderPanelClose();
+              }
+            }}
+            onFocusCapture={cancelReaderPanelClose}
+            onBlurCapture={event => {
+              if (
+                readerPanelMode === "auto" &&
+                !event.currentTarget.contains(event.relatedTarget) &&
+                !event.currentTarget.matches(":hover")
+              ) {
+                scheduleReaderPanelClose();
+              }
+            }}
+            className={`flex h-full shrink-0 flex-col border-l transition-[transform,opacity] duration-200 motion-reduce:transition-none ${
+              aiTarget ? "w-[340px]" : "w-72"
+            } ${
+              readerPanelPinned
+                ? "relative"
+                : "absolute inset-y-0 right-0 z-40 max-w-[calc(100%-3rem)] shadow-2xl"
+            } ${
+              readerPanelVisible
+                ? "translate-x-0 opacity-100"
+                : "pointer-events-none translate-x-full opacity-0"
+            }`}
+            style={{ background: theme.panel, borderColor: theme.border }}
+          >
+            {aiTarget ? (
+              <AiDrawer
+                book={book}
+                chapter={chapter}
+                target={aiTarget}
+                theme={theme}
+                onSaveQa={onSaveQa}
+                onApplyStudyCard={applyStudyCard}
+                headerAction={
+                  <ReaderPanelModeButton
+                    mode={readerPanelMode}
+                    color={theme.muted}
+                    onToggle={() =>
+                      changeReaderPanelMode(
+                        toggleReaderPanelMode(readerPanelMode)
+                      )
                     }
-                    onAskAi={() => setAiTargetId(h.id)}
                   />
-                ))
-              ))}
-            {tab === "notes" &&
-              (panelNotes.length === 0 ? (
-                <PanelEmpty text="选中文字后点「批注」，在文段旁直接写下想法，不打断阅读。" />
-              ) : (
-                panelNotes.map(h => (
-                  <div
-                    key={h.id}
-                    className="mb-3 rounded-md p-3 shadow-sm"
-                    style={{ background: theme.bg }}
-                  >
-                    {h.name && (
-                      <div className="font-meta mb-1 text-[10px] uppercase tracking-wider text-primary">
-                        {h.name}
-                      </div>
-                    )}
-                    <p className="font-reading text-[12.5px] leading-6 opacity-70">
-                      「{h.text}」
-                    </p>
-                    <p className="mt-2 text-[13px] leading-6">{h.note}</p>
-                    <div
-                      className="font-meta mt-2 flex items-center justify-between text-[10px]"
-                      style={{ color: theme.muted }}
-                    >
-                      <span>{h.chapterTitle}</span>
-                      <button
-                        className="hover:text-primary"
-                        onClick={() =>
-                          lib.navigate({
-                            view: "reader",
-                            bookId: book.id,
-                            chapterId: h.chapterId,
-                            highlightId: h.id,
-                          })
-                        }
-                      >
-                        定位
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ))}
-            {tab === "qa" &&
-              (panelQa.length === 0 ? (
-                <PanelEmpty text="选中文字后点「问 AI」，Codex 会结合全书作答，回答记录在该文段上。" />
-              ) : (
-                panelQa.map(h => (
-                  <button
-                    key={h.id}
-                    onClick={() => setAiTargetId(h.id)}
-                    className="mb-3 block w-full rounded-md p-3 text-left shadow-sm"
-                    style={{ background: theme.bg }}
-                  >
-                    <p className="font-reading text-[12.5px] leading-6 opacity-70">
-                      「{h.text.slice(0, 50)}
-                      {h.text.length > 50 ? "…" : ""}」
-                    </p>
-                    <div className="font-meta mt-2 flex items-center gap-1.5 text-[10.5px] text-primary">
-                      <Sparkles size={11} /> {h.aiQa!.length} 条问答
-                    </div>
-                    <p className="mt-1 truncate text-[12px]">
-                      {h.aiQa![h.aiQa!.length - 1].q}
-                    </p>
-                  </button>
-                ))
-              ))}
-
-            {/* 引用本书的笔记（backlinks） */}
-            {citingNotes.length > 0 && (
-              <div
-                className="mt-4 border-t pt-3"
-                style={{ borderColor: theme.border }}
-              >
+                }
+                onClose={() => {
+                  setAiTargetId(null);
+                  if (readerPanelMode === "auto") closeReaderPanel();
+                }}
+              />
+            ) : (
+              <div className="flex h-full min-h-0 flex-col">
                 <div
-                  className="font-meta mb-2 text-[10px] uppercase tracking-[0.16em]"
-                  style={{ color: theme.muted }}
+                  className="flex shrink-0 border-b"
+                  style={{ borderColor: theme.border }}
                 >
-                  引用本书的笔记 · {citingNotes.length}
+                  {(
+                    [
+                      ["marks", `书摘 ${panelMarks.length}`],
+                      ["notes", `批注 ${panelNotes.length}`],
+                      ["qa", `问答 ${panelQa.length}`],
+                    ] as [PanelTab, string][]
+                  ).map(([t, label]) => (
+                    <button
+                      key={t}
+                      onClick={() => setTab(t)}
+                      className={`flex-1 py-2.5 text-[12px] ${tab === t ? "font-medium" : ""}`}
+                      style={{
+                        color: tab === t ? theme.text : theme.muted,
+                        borderBottom:
+                          tab === t
+                            ? "2px solid #f54001"
+                            : "2px solid transparent",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <ReaderPanelModeButton
+                    mode={readerPanelMode}
+                    color={theme.muted}
+                    onToggle={() =>
+                      changeReaderPanelMode(
+                        toggleReaderPanelMode(readerPanelMode)
+                      )
+                    }
+                  />
                 </div>
-                {citingNotes.map(n => (
-                  <button
-                    key={n.id}
-                    onClick={() => lib.navigate({ view: "note", noteId: n.id })}
-                    className="mb-1.5 block w-full truncate rounded-md px-2.5 py-1.5 text-left text-[12.5px] hover:opacity-70"
-                    style={{ background: theme.bg }}
-                  >
-                    <Quote size={10} className="mr-1.5 inline text-primary" />
-                    {n.title}
-                  </button>
-                ))}
+                <div className="flex-1 overflow-y-auto p-3">
+                  {tab === "marks" &&
+                    (panelMarks.length === 0 ? (
+                      <PanelEmpty text="选中正文即可划线：下划线、背景色、字色三种样式五种颜色。" />
+                    ) : (
+                      panelMarks.map(h => (
+                        <MarkCard
+                          key={h.id}
+                          h={h}
+                          onLocate={() =>
+                            lib.navigate({
+                              view: "reader",
+                              bookId: book.id,
+                              chapterId: h.chapterId,
+                              highlightId: h.id,
+                            })
+                          }
+                          onAskAi={() => setAiTargetId(h.id)}
+                        />
+                      ))
+                    ))}
+                  {tab === "notes" &&
+                    (panelNotes.length === 0 ? (
+                      <PanelEmpty text="选中文字后点「批注」，在文段旁直接写下想法，不打断阅读。" />
+                    ) : (
+                      panelNotes.map(h => (
+                        <div
+                          key={h.id}
+                          className="mb-3 rounded-md p-3 shadow-sm"
+                          style={{ background: theme.bg }}
+                        >
+                          {h.name && (
+                            <div className="font-meta mb-1 text-[10px] uppercase tracking-wider text-primary">
+                              {h.name}
+                            </div>
+                          )}
+                          <p className="font-reading text-[12.5px] leading-6 opacity-70">
+                            「{h.text}」
+                          </p>
+                          <p className="mt-2 text-[13px] leading-6">{h.note}</p>
+                          <div
+                            className="font-meta mt-2 flex items-center justify-between text-[10px]"
+                            style={{ color: theme.muted }}
+                          >
+                            <span>{h.chapterTitle}</span>
+                            <button
+                              className="hover:text-primary"
+                              onClick={() =>
+                                lib.navigate({
+                                  view: "reader",
+                                  bookId: book.id,
+                                  chapterId: h.chapterId,
+                                  highlightId: h.id,
+                                })
+                              }
+                            >
+                              定位
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ))}
+                  {tab === "qa" &&
+                    (panelQa.length === 0 ? (
+                      <PanelEmpty text="选中文字后点「问 AI」，Codex 会结合全书作答，回答记录在该文段上。" />
+                    ) : (
+                      panelQa.map(h => (
+                        <button
+                          key={h.id}
+                          onClick={() => setAiTargetId(h.id)}
+                          className="mb-3 block w-full rounded-md p-3 text-left shadow-sm"
+                          style={{ background: theme.bg }}
+                        >
+                          <p className="font-reading text-[12.5px] leading-6 opacity-70">
+                            「{h.text.slice(0, 50)}
+                            {h.text.length > 50 ? "…" : ""}」
+                          </p>
+                          <div className="font-meta mt-2 flex items-center gap-1.5 text-[10.5px] text-primary">
+                            <Sparkles size={11} /> {h.aiQa!.length} 条问答
+                          </div>
+                          <p className="mt-1 truncate text-[12px]">
+                            {h.aiQa![h.aiQa!.length - 1].q}
+                          </p>
+                        </button>
+                      ))
+                    ))}
+
+                  {/* 引用本书的笔记（backlinks） */}
+                  {citingNotes.length > 0 && (
+                    <div
+                      className="mt-4 border-t pt-3"
+                      style={{ borderColor: theme.border }}
+                    >
+                      <div
+                        className="font-meta mb-2 text-[10px] uppercase tracking-[0.16em]"
+                        style={{ color: theme.muted }}
+                      >
+                        引用本书的笔记 · {citingNotes.length}
+                      </div>
+                      {citingNotes.map(n => (
+                        <button
+                          key={n.id}
+                          onClick={() =>
+                            lib.navigate({ view: "note", noteId: n.id })
+                          }
+                          className="mb-1.5 block w-full truncate rounded-md px-2.5 py-1.5 text-left text-[12.5px] hover:opacity-70"
+                          style={{ background: theme.bg }}
+                        >
+                          <Quote
+                            size={10}
+                            className="mr-1.5 inline text-primary"
+                          />
+                          {n.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-          </div>
-        </div>
-      ) : null}
+          </aside>
+        </>
+      )}
 
       {associationPopup && (
         <AssociationPopup
@@ -1999,6 +2544,39 @@ export function ReaderView({ lib, book }: { lib: Library; book: Book }) {
         </div>
       )}
     </div>
+  );
+}
+
+function ReaderPanelModeButton({
+  mode,
+  color,
+  onToggle,
+}: {
+  mode: ReaderPanelMode;
+  color: string;
+  onToggle: () => void;
+}) {
+  const pinned = mode === "pinned";
+  const label = pinned ? "切换右侧栏为自动隐藏" : "固定显示右侧栏";
+  return (
+    <button
+      type="button"
+      className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-foreground/5"
+      style={{ color }}
+      aria-label={label}
+      aria-pressed={pinned}
+      title={label}
+      onClick={event => {
+        onToggle();
+        if (event.detail > 0) event.currentTarget.blur();
+      }}
+    >
+      {pinned ? (
+        <PanelRightDashed size={15} aria-hidden="true" />
+      ) : (
+        <Pin size={15} aria-hidden="true" />
+      )}
+    </button>
   );
 }
 

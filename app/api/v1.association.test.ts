@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   deletedTables: [] as unknown[],
   events: [] as Record<string, unknown>[],
   transactionActive: false,
+  resourceDeleteOutsideTransaction: false,
   eventDuringTransaction: false,
   failDeleteTable: null as unknown,
   receiptTable: null as unknown,
@@ -17,11 +18,20 @@ vi.mock("./queries/connection", () => {
   const operations = {
     select: () => ({
       from: (table: unknown) => {
-        const rows = () =>
-          state.selectResults.shift() ?? state.tableRows.get(table) ?? [];
+        let limit: number | undefined;
+        let resolved: Record<string, unknown>[] | undefined;
+        const rows = () => {
+          resolved ??=
+            state.selectResults.shift() ?? state.tableRows.get(table) ?? [];
+          return limit === undefined ? resolved : resolved.slice(0, limit);
+        };
         const builder = {
           where: () => builder,
-          limit: async (count: number) => rows().slice(0, count),
+          limit: (count: number) => {
+            limit = count;
+            return builder;
+          },
+          for: async () => rows(),
           then: (
             resolve: (value: Record<string, unknown>[]) => unknown,
             reject: (reason: unknown) => unknown
@@ -54,6 +64,9 @@ vi.mock("./queries/connection", () => {
     delete: (table: unknown) => {
       const runDelete = async () => {
         if (table === state.receiptTable) return;
+        if (!state.transactionActive) {
+          state.resourceDeleteOutsideTransaction = true;
+        }
         if (state.failDeleteTable === table)
           throw new Error("injected transaction failure");
         state.deletedTables.push(table);
@@ -98,6 +111,7 @@ vi.mock("./lib/webhooks", () => ({
     "association.created",
     "association.updated",
     "association.deleted",
+    "book.deleted",
   ],
   fanout: (event: Record<string, unknown>) => {
     if (state.transactionActive) state.eventDuringTransaction = true;
@@ -123,6 +137,7 @@ import {
 import { v1 } from "./v1";
 import {
   mirrorAssociations,
+  mirrorBookTombstones,
   mirrorBookUploadChunks,
   mirrorBooks,
   mirrorEventReceipts,
@@ -130,6 +145,7 @@ import {
   mirrorMindmaps,
   mirrorTranslations,
 } from "@db/mirror-schema";
+import { bookDigests } from "@db/schema";
 
 const source: PassageAnchor = {
   kind: "text",
@@ -193,6 +209,7 @@ describe("v1 passage associations", () => {
     state.deletedTables = [];
     state.events = [];
     state.transactionActive = false;
+    state.resourceDeleteOutsideTransaction = false;
     state.eventDuringTransaction = false;
     state.failDeleteTable = null;
     state.receiptTable = mirrorEventReceipts;
@@ -432,11 +449,83 @@ describe("v1 passage associations", () => {
       mirrorMindmaps,
       mirrorBooks,
     ]);
+    expect(state.inserted).toContainEqual({
+      table: mirrorBookTombstones,
+      value: { extId: "book-a" },
+    });
     expect(state.eventDuringTransaction).toBe(false);
+    expect(state.resourceDeleteOutsideTransaction).toBe(false);
     expect(state.events.map(event => event.type)).toEqual([
       "association.deleted",
       "book.deleted",
     ]);
+  });
+
+  it("deletes an unreferenced whole-book digest in the same transaction", async () => {
+    const storedBook = {
+      id: 7,
+      extId: "book-a",
+      title: "A",
+      author: "",
+      format: "txt",
+      folder: "",
+      contentHash: "a".repeat(64),
+      chapters: "[]",
+      createdAt: new Date(1_000),
+      updatedAt: new Date(1_000),
+    };
+    state.selectResults = [[], [storedBook], []];
+
+    const response = await v1.request(
+      "/books/book-a",
+      jsonRequest("DELETE", undefined)
+    );
+
+    expect(response.status).toBe(200);
+    expect(state.deletedTables).toEqual([
+      mirrorAssociations,
+      mirrorBookUploadChunks,
+      mirrorHighlights,
+      mirrorTranslations,
+      mirrorMindmaps,
+      mirrorBooks,
+      bookDigests,
+    ]);
+    expect(state.resourceDeleteOutsideTransaction).toBe(false);
+    expect(state.eventDuringTransaction).toBe(false);
+  });
+
+  it("preserves a digest while another mirrored book has the same hash", async () => {
+    const storedBook = {
+      id: 7,
+      extId: "book-a",
+      title: "A",
+      author: "",
+      format: "txt",
+      folder: "",
+      contentHash: "b".repeat(64),
+      chapters: "[]",
+      createdAt: new Date(1_000),
+      updatedAt: new Date(1_000),
+    };
+    state.selectResults = [
+      [],
+      [storedBook],
+      [],
+      [],
+      [],
+      [],
+      [{ ...storedBook, id: 8, extId: "book-b" }],
+    ];
+
+    const response = await v1.request(
+      "/books/book-a",
+      jsonRequest("DELETE", undefined)
+    );
+
+    expect(response.status).toBe(200);
+    expect(state.deletedTables).not.toContain(bookDigests);
+    expect(state.resourceDeleteOutsideTransaction).toBe(false);
   });
 
   it("does not fan out deletion before a failed cascade commits", async () => {
@@ -501,6 +590,7 @@ describe("v1 passage associations", () => {
       mirrorBooks,
     ]);
     expect(state.eventDuringTransaction).toBe(false);
+    expect(state.resourceDeleteOutsideTransaction).toBe(false);
     expect(state.events.map(event => event.type)).toEqual([
       "association.deleted",
       "book.deleted",

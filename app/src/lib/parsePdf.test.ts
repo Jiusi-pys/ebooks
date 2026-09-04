@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { openPdfDocument } from "./pdfjs";
-import { parsePdf } from "./parsePdf";
+import { extractPdfPackageFields, parsePdf } from "./parsePdf";
 
 vi.mock("./pdfjs", () => ({
   openPdfDocument: vi.fn(),
@@ -63,6 +63,18 @@ describe("parsePdf", () => {
       cover: "data:image/jpeg;base64,cover",
       pageCount: 900,
       chapters: [],
+      metadata: {
+        version: 1,
+        contributors: [{ name: "作者", role: "author" }],
+        publisher: undefined,
+        publishedDate: undefined,
+        languages: undefined,
+        identifiers: undefined,
+        subjects: undefined,
+        description: undefined,
+        rights: undefined,
+        subtitle: undefined,
+      },
     });
     expect(doc.getPage).toHaveBeenCalledOnce();
     expect(doc.getPage).toHaveBeenCalledWith(1);
@@ -70,5 +82,46 @@ describe("parsePdf", () => {
     expect(streamTextContent).not.toHaveBeenCalled();
     expect(progress).toHaveBeenLastCalledWith("完成原版 PDF 导入", 1);
     expect(destroy).toHaveBeenCalledOnce();
+  });
+
+  it("maps bounded PDF Info and XMP Dublin Core fields", () => {
+    const values: Record<string, unknown> = {
+      "dc:creator": ["Alice", "Bob"],
+      "dc:publisher": ["Example Press"],
+      "dc:date": ["2023-07-04T00:00:00Z"],
+      "dc:language": ["en_us"],
+      "dc:identifier": ["urn:isbn:978-1-4028-9462-6"],
+      "dc:subject": ["History"],
+      "dc:description": "An example PDF.",
+      "dc:rights": "Copyright holder",
+    };
+
+    expect(
+      extractPdfPackageFields(
+        "fallback",
+        { Title: "PDF Title", Keywords: "Reference; Archive" },
+        { get: name => values[name] }
+      )
+    ).toEqual({
+      title: "PDF Title",
+      author: "Alice、Bob",
+      metadata: {
+        version: 1,
+        subtitle: undefined,
+        contributors: [
+          { name: "Alice", role: "author" },
+          { name: "Bob", role: "author" },
+        ],
+        publisher: "Example Press",
+        publishedDate: "2023-07-04",
+        languages: ["en-US"],
+        identifiers: [
+          { scheme: "ISBN", value: "978-1-4028-9462-6" },
+        ],
+        subjects: ["History", "Reference", "Archive"],
+        description: "An example PDF.",
+        rights: "Copyright holder",
+      },
+    });
   });
 });

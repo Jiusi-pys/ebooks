@@ -42,6 +42,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { prepareCoverImage } from "@/lib/coverImage";
+import { BookMetadataDialog } from "./BookMetadataDialog";
 
 function bookProgress(b: Book): number {
   const idx = b.chapters.findIndex(c => c.id === b.progress.chapterId);
@@ -132,8 +133,9 @@ function BookCard({
   onToggleSelect: () => void;
 }) {
   const pct = bookProgress(book);
-  const [renaming, setRenaming] = useState(false);
+  const [metadataEditing, setMetadataEditing] = useState(false);
   const [coverBusy, setCoverBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -199,8 +201,8 @@ function BookCard({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 bg-card">
-            <DropdownMenuItem onClick={() => setRenaming(true)}>
-              <Pencil size={13} className="mr-2" /> 重命名
+            <DropdownMenuItem onClick={() => setMetadataEditing(true)}>
+              <Pencil size={13} className="mr-2" /> 编辑元数据
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={coverBusy}
@@ -265,13 +267,30 @@ function BookCard({
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              disabled={deleteBusy}
               className="text-destructive focus:text-destructive"
               onClick={() => {
-                if (confirm(`确定删除《${book.title}》？相关书摘会一并移除。`))
-                  lib.removeBook(book.id);
+                if (
+                  !confirm(
+                    `确定删除《${book.title}》？相关书摘、译文、脑图和文段关联会一并移除。`
+                  )
+                )
+                  return;
+                setDeleteBusy(true);
+                void lib
+                  .removeBook(book.id)
+                  .catch(error =>
+                    alert(
+                      error instanceof Error
+                        ? error.message
+                        : "删除失败，本地书籍仍然保留。"
+                    )
+                  )
+                  .finally(() => setDeleteBusy(false));
               }}
             >
-              <Trash2 size={13} className="mr-2" /> 删除
+              <Trash2 size={13} className="mr-2" />
+              {deleteBusy ? "正在删除…" : "删除"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -296,12 +315,11 @@ function BookCard({
         }}
       />
 
-      <RenameDialog
-        open={renaming}
-        title="重命名书籍"
-        initial={book.title}
-        onSubmit={v => lib.renameBook(book.id, v)}
-        onClose={() => setRenaming(false)}
+      <BookMetadataDialog
+        book={book}
+        open={metadataEditing}
+        onOpenChange={setMetadataEditing}
+        onSave={metadata => lib.updateBookMetadata(book.id, metadata)}
       />
     </div>
   );
@@ -445,6 +463,7 @@ export function LibraryView({ lib }: { lib: Library }) {
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [pendingPdfs, setPendingPdfs] = useState<File[] | null>(null);
+  const [batchDeleting, setBatchDeleting] = useState(false);
   const sel = useSelection();
 
   /** 导入入口：PDF 先选择排版方式，其余支持格式直接导入 */
@@ -473,12 +492,39 @@ export function LibraryView({ lib }: { lib: Library }) {
     for (const id of sel.selected) void lib.moveBook(id, folderId);
     sel.exit();
   };
-  const batchDelete = () => {
+  const batchDelete = async () => {
     const n = sel.selected.size;
-    if (n === 0) return;
-    if (confirm(`确定删除选中的 ${n} 本书？相关书摘会一并移除。`)) {
-      for (const id of sel.selected) void lib.removeBook(id);
-      sel.exit();
+    if (n === 0 || batchDeleting) return;
+    if (
+      confirm(
+        `确定删除选中的 ${n} 本书？相关书摘、译文、脑图和文段关联会一并移除。`
+      )
+    ) {
+      const ids = [...sel.selected];
+      setBatchDeleting(true);
+      try {
+        // Serialize deletions so each transaction observes the note rewrites
+        // made by the preceding book and shared-digest cleanup stays bounded.
+        const failures: unknown[] = [];
+        for (const id of ids) {
+          try {
+            await lib.removeBook(id);
+          } catch (error) {
+            failures.push(error);
+          }
+        }
+        if (failures.length > 0) {
+          const first = failures[0];
+          alert(
+            `${failures.length} 本书删除失败，本地数据仍然保留。${
+              first instanceof Error ? `\n${first.message}` : ""
+            }`
+          );
+        }
+        sel.exit();
+      } finally {
+        setBatchDeleting(false);
+      }
     }
   };
 
@@ -722,11 +768,11 @@ export function LibraryView({ lib }: { lib: Library }) {
             </BatchAction>
           )}
           <BatchAction
-            disabled={sel.selected.size === 0}
+            disabled={sel.selected.size === 0 || batchDeleting}
             danger
-            onClick={batchDelete}
+            onClick={() => void batchDelete()}
           >
-            <Trash2 size={13} /> 删除
+            <Trash2 size={13} /> {batchDeleting ? "正在删除…" : "删除"}
           </BatchAction>
         </BatchBar>
       )}

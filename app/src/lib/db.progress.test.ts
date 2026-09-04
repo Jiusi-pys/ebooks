@@ -7,6 +7,8 @@ import {
   getAllBooks,
   getAllFolders,
   patchBookFolder,
+  patchBookLastOpenedAt,
+  patchBookMetadata,
   patchBookCustomCover,
   patchBookOutline,
   patchBookProgress,
@@ -138,6 +140,43 @@ describe("atomic book progress updates", () => {
       progress: instanceA.progress,
     });
     expect(persisted).not.toHaveProperty("folderId");
+  });
+
+  it("updates catalogue metadata without replacing reading-owned fields", async () => {
+    const id = `metadata-${Date.now()}-${Math.random()}`;
+    createdIds.push(id);
+    const stored = book(id);
+    await putBook(stored);
+
+    const updated = await patchBookMetadata(id, {
+      title: "Edited title",
+      author: "Alice；Bob",
+      metadata: {
+        version: 1,
+        publisher: "Example Press",
+        languages: ["zh-Hans"],
+      },
+    });
+
+    expect(updated).toMatchObject({
+      title: "Edited title",
+      author: "Alice；Bob",
+      metadata: { publisher: "Example Press", languages: ["zh-Hans"] },
+      progress: stored.progress,
+      customCover: stored.customCover,
+      outline: stored.outline,
+    });
+  });
+
+  it("keeps last-opened timestamps monotonic across delayed writes", async () => {
+    const id = `last-opened-${Date.now()}-${Math.random()}`;
+    createdIds.push(id);
+    await putBook(book(id));
+
+    await patchBookLastOpenedAt(id, 900);
+    const updated = await patchBookLastOpenedAt(id, 500);
+
+    expect(updated?.lastOpenedAt).toBe(900);
   });
 
   it("updates a folder icon without replacing its name", async () => {

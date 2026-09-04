@@ -4,6 +4,7 @@
  * 浏览器端的本地 IndexedDB 仍是阅读器的主存储；此镜像面向机器消费。
  */
 import {
+  bigint,
   mysqlTable,
   serial,
   varchar,
@@ -24,6 +25,8 @@ export const mirrorBooks = mysqlTable(
     extId: varchar("ext_id", { length: 64 }).notNull().unique(),
     title: varchar("title", { length: 255 }).notNull(),
     author: varchar("author", { length: 255 }).notNull().default(""),
+    /** Versioned JSON for repeatable catalogue fields and future extension. */
+    metadata: text("metadata"),
     format: varchar("format", { length: 16 }).notNull().default("unknown"),
     folder: varchar("folder", { length: 255 }).notNull().default(""),
     contentHash: varchar("content_hash", { length: 64 }).notNull().default(""),
@@ -36,6 +39,12 @@ export const mirrorBooks = mysqlTable(
 );
 
 export type MirrorBook = typeof mirrorBooks.$inferSelect;
+
+/** Prevent delayed browser events from recreating a book after deletion. */
+export const mirrorBookTombstones = mysqlTable("mirror_book_tombstones", {
+  extId: varchar("ext_id", { length: 64 }).primaryKey(),
+  deletedAt: timestamp("deleted_at").notNull().defaultNow(),
+});
 
 /**
  * Resumable browser-to-MySQL book mirror upload. Row -1 is the manifest and
@@ -97,7 +106,12 @@ export const mirrorHighlights = mysqlTable(
   {
     id: serial("id").primaryKey(),
     extId: varchar("ext_id", { length: 64 }).notNull().unique(),
-    bookExtId: varchar("book_ext_id", { length: 64 }).notNull().default(""),
+    bookExtId: varchar("book_ext_id", { length: 64 })
+      .notNull()
+      .references(() => mirrorBooks.extId, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     bookTitle: varchar("book_title", { length: 255 }).notNull().default(""),
     /** book | chapter | content；旧数据按 content 兼容 */
     citationLevel: varchar("citation_level", { length: 16 })
@@ -108,13 +122,13 @@ export const mirrorHighlights = mysqlTable(
     chapterTitle: varchar("chapter_title", { length: 255 })
       .notNull()
       .default(""),
-    text: text("text").notNull(),
+    text: longtext("text").notNull(),
     /** 可排版内容的段落与字符级锚点 */
     paraIndex: int("para_index"),
     start: int("start_offset"),
     end: int("end_offset"),
     /** PDF 页码与归一化矩形 JSON */
-    pdfAnchor: text("pdf_anchor"),
+    pdfAnchor: longtext("pdf_anchor"),
     /** underline | background | color | none */
     styleKind: varchar("style_kind", { length: 16 })
       .notNull()
@@ -123,17 +137,22 @@ export const mirrorHighlights = mysqlTable(
       .notNull()
       .default("orange"),
     /** 内联批注内容 */
-    note: text("note"),
-    /** 引用到的笔记 extId */
-    noteExtId: varchar("note_ext_id", { length: 64 }).notNull().default(""),
+    note: longtext("note"),
+    /** Optional card title; a non-empty value makes the highlight enriched. */
+    name: varchar("name", { length: 255 }),
+    /** 引用到的笔记 extId；删除笔记时由外键原子解除关系。 */
+    noteExtId: varchar("note_ext_id", { length: 64 }).references(
+      () => mirrorNotes.extId,
+      { onDelete: "set null", onUpdate: "cascade" }
+    ),
     /** AI 问答记录 JSON：[{ q, a, ts }] */
-    aiQa: text("ai_qa"),
+    aiQa: longtext("ai_qa"),
     /** 卡片标签 JSON：string[] */
-    tags: text("tags"),
+    tags: longtext("tags"),
     /** 挖空项 JSON：string[]（复习时遮挡的词） */
-    cloze: text("cloze"),
+    cloze: longtext("cloze"),
     /** 复习状态 JSON：{ due, reps, lapses, interval, lastRating?, lastReviewedAt?, addedAt }；null = 未加入复习 */
-    review: text("review"),
+    review: longtext("review"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   t => [
@@ -154,23 +173,33 @@ export const mirrorAssociations = mysqlTable(
     id: serial("id").primaryKey(),
     extId: varchar("ext_id", { length: 64 }).notNull().unique(),
     sourceKind: varchar("source_kind", { length: 8 }).notNull(),
-    sourceBookExtId: varchar("source_book_ext_id", { length: 64 }).notNull(),
+    sourceBookExtId: varchar("source_book_ext_id", { length: 64 })
+      .notNull()
+      .references(() => mirrorBooks.extId, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     sourceChapterId: varchar("source_chapter_id", { length: 64 }).notNull(),
     sourceChapterTitle: varchar("source_chapter_title", { length: 255 })
       .notNull()
       .default(""),
-    sourceText: text("source_text").notNull(),
+    sourceText: longtext("source_text").notNull(),
     sourceParaIndex: int("source_para_index"),
     sourceStart: int("source_start_offset"),
     sourceEnd: int("source_end_offset"),
     sourcePdfAnchor: longtext("source_pdf_anchor"),
     targetKind: varchar("target_kind", { length: 8 }).notNull(),
-    targetBookExtId: varchar("target_book_ext_id", { length: 64 }).notNull(),
+    targetBookExtId: varchar("target_book_ext_id", { length: 64 })
+      .notNull()
+      .references(() => mirrorBooks.extId, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     targetChapterId: varchar("target_chapter_id", { length: 64 }).notNull(),
     targetChapterTitle: varchar("target_chapter_title", { length: 255 })
       .notNull()
       .default(""),
-    targetText: text("target_text").notNull(),
+    targetText: longtext("target_text").notNull(),
     targetParaIndex: int("target_para_index"),
     targetStart: int("target_start_offset"),
     targetEnd: int("target_end_offset"),
@@ -197,12 +226,22 @@ export const mirrorNotes = mysqlTable("mirror_notes", {
   id: serial("id").primaryKey(),
   extId: varchar("ext_id", { length: 64 }).notNull().unique(),
   title: varchar("title", { length: 255 }).notNull(),
-  content: text("content").notNull(),
+  content: longtext("content").notNull(),
+  /** Browser timestamp used to reject a delayed whole-note snapshot. */
+  clientUpdatedAt: bigint("client_updated_at", { mode: "number" })
+    .notNull()
+    .default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
 });
 
 export type MirrorNote = typeof mirrorNotes.$inferSelect;
+
+/** Prevent delayed cross-tab note snapshots from reviving a deleted note. */
+export const mirrorNoteTombstones = mysqlTable("mirror_note_tombstones", {
+  extId: varchar("ext_id", { length: 64 }).primaryKey(),
+  deletedAt: timestamp("deleted_at").notNull().defaultNow(),
+});
 
 /** 文件夹镜像 */
 export const mirrorFolders = mysqlTable("mirror_folders", {
@@ -220,7 +259,12 @@ export const mirrorTranslations = mysqlTable(
   {
     id: serial("id").primaryKey(),
     extId: varchar("ext_id", { length: 64 }).notNull().unique(),
-    bookExtId: varchar("book_ext_id", { length: 64 }).notNull().default(""),
+    bookExtId: varchar("book_ext_id", { length: 64 })
+      .notNull()
+      .references(() => mirrorBooks.extId, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     bookTitle: varchar("book_title", { length: 255 }).notNull().default(""),
     chapterTitle: varchar("chapter_title", { length: 255 })
       .notNull()
@@ -228,7 +272,7 @@ export const mirrorTranslations = mysqlTable(
     targetLang: varchar("target_lang", { length: 32 }).notNull(),
     /** passage | chapter */
     scope: varchar("scope", { length: 16 }).notNull().default("passage"),
-    text: text("text").notNull(),
+    text: longtext("text").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },
@@ -244,9 +288,14 @@ export const mirrorMindmaps = mysqlTable(
     id: serial("id").primaryKey(),
     extId: varchar("ext_id", { length: 64 }).notNull().unique(),
     title: varchar("title", { length: 255 }).notNull(),
-    bookExtId: varchar("book_ext_id", { length: 64 }).notNull().default(""),
+    bookExtId: varchar("book_ext_id", { length: 64 })
+      .notNull()
+      .references(() => mirrorBooks.extId, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     bookTitle: varchar("book_title", { length: 255 }).notNull().default(""),
-    root: text("root").notNull(),
+    root: longtext("root").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },

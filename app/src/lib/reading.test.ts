@@ -1,12 +1,48 @@
 import { describe, expect, it } from "vitest";
+import type { Book } from "@/types";
 import {
+  contentHashOfBook,
   DEFAULT_TYPE,
+  horizontalReaderPageState,
   loadTypeSettings,
   normalizePageMargin,
   planReaderChapterEntry,
   readerPagePadding,
+  readerScrollOffset,
+  readerScrollRatio,
   saveTypeSettings,
 } from "./reading";
+
+const hashBook: Book = {
+  id: "hash-book",
+  title: "Editable title",
+  author: "Editable author",
+  format: "epub",
+  coverTone: 0,
+  chapters: [{ id: "c1", title: "Chapter", paragraphs: ["Body"] }],
+  createdAt: 1,
+  progress: { chapterId: "c1", ratio: 0 },
+};
+
+describe("book content hash", () => {
+  it("ignores editable catalogue fields but changes with book contents", async () => {
+    const original = await contentHashOfBook(hashBook);
+    await expect(
+      contentHashOfBook({
+        ...hashBook,
+        title: "Renamed",
+        author: "Another author",
+        metadata: { version: 1, publisher: "New publisher" },
+      })
+    ).resolves.toBe(original);
+    await expect(
+      contentHashOfBook({
+        ...hashBook,
+        chapters: [{ ...hashBook.chapters[0], paragraphs: ["Changed body"] }],
+      })
+    ).resolves.not.toBe(original);
+  });
+});
 
 describe("reader page margin", () => {
   it("upgrades settings saved before pageMargin existed", () => {
@@ -18,7 +54,15 @@ describe("reader page margin", () => {
       fontSize: 22,
       columns: 2,
       pageMargin: DEFAULT_TYPE.pageMargin,
+      pageTurnMode: "vertical",
     });
+  });
+
+  it("rejects an unknown persisted page-turn mode", () => {
+    const storage = {
+      getItem: () => JSON.stringify({ pageTurnMode: "diagonal" }),
+    };
+    expect(loadTypeSettings(storage).pageTurnMode).toBe("vertical");
   });
 
   it("clamps invalid or out-of-range persisted margins", () => {
@@ -45,6 +89,44 @@ describe("reader page margin", () => {
 
   it("produces responsive padding for narrow split panes", () => {
     expect(readerPagePadding(48)).toBe("clamp(16px, 48px, 12%)");
+  });
+});
+
+describe("reader page-turn metrics", () => {
+  const metrics = {
+    scrollTop: 300,
+    scrollLeft: 800,
+    scrollHeight: 1600,
+    scrollWidth: 3200,
+    clientHeight: 600,
+    clientWidth: 800,
+  };
+
+  it("persists progress from the axis used by the selected mode", () => {
+    expect(readerScrollRatio(metrics, "vertical")).toBe(0.3);
+    expect(readerScrollRatio(metrics, "horizontal")).toBeCloseTo(1 / 3);
+  });
+
+  it("restores a ratio against the active layout dimensions", () => {
+    expect(readerScrollOffset(metrics, "vertical", 0.5)).toBe(500);
+    expect(readerScrollOffset(metrics, "horizontal", 0.5)).toBe(1200);
+    expect(readerScrollOffset(metrics, "horizontal", 9)).toBe(2400);
+  });
+
+  it("reports horizontal screens and tolerates a partial final page", () => {
+    expect(horizontalReaderPageState(metrics)).toEqual({
+      page: 2,
+      pageCount: 4,
+      atStart: false,
+      atEnd: false,
+    });
+    expect(
+      horizontalReaderPageState({
+        ...metrics,
+        scrollLeft: 1570,
+        scrollWidth: 2370,
+      })
+    ).toEqual({ page: 3, pageCount: 3, atStart: false, atEnd: true });
   });
 });
 

@@ -3,6 +3,7 @@ import { looksLikeHeading, reflowLines, type RawLine } from "./reflow";
 import { uid } from "./db";
 import type { Chapter } from "@/types";
 import type { ParsedBook } from "./parseBook";
+import { importedBookMetadata } from "./importMetadata";
 import {
   assertPdfFileSize,
   consumePdfTextBudget,
@@ -14,6 +15,114 @@ interface OutlineItem {
   title: string;
   dest: string | unknown[] | null;
   items?: OutlineItem[];
+}
+
+interface PdfMetadataLike {
+  get(name: string): unknown;
+}
+
+function metadataStrings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(metadataStrings);
+  return [];
+}
+
+function infoStrings(
+  info: Record<string, unknown>,
+  ...keys: string[]
+): string[] {
+  return keys.flatMap(key => metadataStrings(info[key]));
+}
+
+function xmpStrings(
+  metadata: PdfMetadataLike | null | undefined,
+  ...keys: string[]
+): string[] {
+  return keys.flatMap(key => {
+    try {
+      return metadataStrings(metadata?.get(key));
+    } catch {
+      return [];
+    }
+  });
+}
+
+function keywordSubjects(values: string[]): string[] {
+  return values.flatMap(value => value.split(/[,，;；\n]+/));
+}
+
+export interface PdfPackageFields {
+  title: string;
+  author: string;
+  metadata?: ParsedBook["metadata"];
+}
+
+/** Extract bounded PDF Info and XMP Dublin Core fields without trusting shape. */
+export function extractPdfPackageFields(
+  fallbackTitle: string,
+  info: Record<string, unknown>,
+  xmp?: PdfMetadataLike | null
+): PdfPackageFields {
+  const title =
+    [...infoStrings(info, "Title"), ...xmpStrings(xmp, "dc:title")]
+      .map(value => value.replaceAll("\0", "").trim())
+      .find(Boolean)
+      ?.slice(0, 255) || fallbackTitle.slice(0, 255);
+  const creators = [
+    ...xmpStrings(xmp, "dc:creator"),
+    ...infoStrings(info, "Author"),
+  ];
+  const metadata = importedBookMetadata({
+    contributors: [
+      ...creators.map(name => ({ name, role: "author" as const })),
+      ...xmpStrings(xmp, "dc:contributor").map(name => ({
+        name,
+        role: "other" as const,
+      })),
+    ],
+    publishers: [
+      ...xmpStrings(xmp, "dc:publisher"),
+      ...infoStrings(info, "Publisher"),
+    ],
+    publishedDates: [
+      ...xmpStrings(xmp, "dc:date"),
+      ...infoStrings(info, "PublicationDate", "Published"),
+    ],
+    languages: [
+      ...xmpStrings(xmp, "dc:language"),
+      ...infoStrings(info, "Language"),
+    ],
+    identifiers: [
+      ...xmpStrings(xmp, "dc:identifier").map(value => ({ value })),
+      ...infoStrings(info, "ISBN").map(value => ({
+        scheme: "ISBN",
+        value,
+      })),
+      ...infoStrings(info, "DOI").map(value => ({ scheme: "DOI", value })),
+    ],
+    subjects: [
+      ...xmpStrings(xmp, "dc:subject"),
+      ...keywordSubjects([
+        ...infoStrings(info, "Keywords"),
+        ...xmpStrings(xmp, "pdf:Keywords"),
+      ]),
+    ],
+    descriptions: [
+      ...xmpStrings(xmp, "dc:description"),
+      ...infoStrings(info, "Subject"),
+    ],
+    rights: [
+      ...xmpStrings(xmp, "dc:rights"),
+      ...infoStrings(info, "Copyright"),
+    ],
+  });
+  const author =
+    metadata?.contributors
+      ?.filter(contributor => contributor.role === "author")
+      .map(contributor => contributor.name)
+      .join("、")
+      .slice(0, 255) ?? "";
+  return { title, author, metadata };
 }
 
 /** 提取一页的文本行（带几何信息，按阅读顺序排列） */
@@ -134,29 +243,34 @@ export async function parsePdf(
     const pageCount = doc.numPages;
 
     onProgress?.("读取元信息", 0.02);
-    let title = file.name.replace(/\.pdf$/i, "");
-    let author = "";
+    let packageFields: PdfPackageFields = {
+      title: file.name.replace(/\.pdf$/i, "").slice(0, 255),
+      author: "",
+    };
     try {
       const meta = await doc.getMetadata();
-      const info = (meta?.info ?? {}) as Record<string, string>;
-      if (info.Title?.trim()) title = info.Title.trim();
-      if (info.Author?.trim()) author = info.Author.trim();
+      packageFields = extractPdfPackageFields(
+        packageFields.title,
+        (meta?.info ?? {}) as Record<string, unknown>,
+        meta?.metadata
+      );
     } catch {
       /* 无元数据 */
     }
+    const { title, author, metadata } = packageFields;
 
     const cover = await renderCover(await doc.getPage(1));
 
     if (mode === "original") {
       onProgress?.("完成原版 PDF 导入", 1);
-      return { title, author, cover, pageCount, chapters: [] };
+      return { title, author, cover, pageCount, chapters: [], metadata };
     }
 
     // A partial text copy is worse than an explicit original-only import:
     // navigation/search must never claim success while omitting later pages.
     if (!supportsCompletePdfReflow(pageCount)) {
       onProgress?.("PDF 超过 600 页，仅保留原版版面", 0.95);
-      return { title, author, cover, pageCount, chapters: [] };
+      return { title, author, cover, pageCount, chapters: [], metadata };
     }
 
     // 目录书签 → 页码边界
@@ -250,6 +364,7 @@ export async function parsePdf(
       cover,
       pageCount: doc.numPages,
       chapters: nonEmpty.length ? nonEmpty : chapters,
+      metadata,
     };
   } finally {
     await loadingTask.destroy();

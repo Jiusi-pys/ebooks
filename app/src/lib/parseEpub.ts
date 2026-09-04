@@ -1,8 +1,9 @@
 import JSZip from "jszip";
 import { uid } from "./db";
 import { normalizeParagraph } from "./reflow";
-import type { Chapter } from "@/types";
+import type { BookContributorRole, Chapter } from "@/types";
 import type { ParsedBook } from "./parseBook";
+import { importedBookMetadata } from "./importMetadata";
 
 const MIB = 1024 * 1024;
 
@@ -113,6 +114,186 @@ function boundedMetadata(value: string, label: string): string {
     );
   }
   return text;
+}
+
+function elementsByLocalName(
+  root: Document | Element,
+  localName: string
+): Element[] {
+  const elements = new Set<Element>();
+  try {
+    for (const element of Array.from(
+      root.getElementsByTagNameNS("*", localName)
+    )) {
+      elements.add(element);
+    }
+  } catch {
+    // Some older EPUB DOM implementations do not support wildcard namespaces.
+  }
+  for (const tagName of [`dc:${localName}`, localName]) {
+    for (const element of Array.from(root.getElementsByTagName(tagName))) {
+      elements.add(element);
+    }
+  }
+  return [...elements];
+}
+
+function elementText(element: Element): string {
+  return (element.textContent ?? "").replaceAll("\0", "").trim();
+}
+
+function namespacedAttribute(element: Element, name: string): string {
+  return (
+    element.getAttribute(`opf:${name}`) ??
+    element.getAttribute(name) ??
+    element.getAttributeNS("http://www.idpf.org/2007/opf", name) ??
+    ""
+  ).trim();
+}
+
+function refinedProperty(
+  metas: Element[],
+  targetId: string,
+  property: string
+): string {
+  if (!targetId) return "";
+  const refinement = metas.find(
+    meta =>
+      meta.getAttribute("refines") === `#${targetId}` &&
+      meta.getAttribute("property")?.toLowerCase() === property
+  );
+  return refinement ? elementText(refinement) : "";
+}
+
+const EPUB_CONTRIBUTOR_ROLES: Record<string, BookContributorRole> = {
+  aut: "author",
+  author: "author",
+  edt: "editor",
+  editor: "editor",
+  trl: "translator",
+  translator: "translator",
+  ill: "illustrator",
+  illustrator: "illustrator",
+};
+
+function contributorRole(
+  element: Element,
+  metas: Element[],
+  fallback: BookContributorRole
+): BookContributorRole {
+  const raw = (
+    namespacedAttribute(element, "role") ||
+    refinedProperty(metas, element.getAttribute("id") ?? "", "role")
+  )
+    .trim()
+    .toLowerCase();
+  return EPUB_CONTRIBUTOR_ROLES[raw] ?? fallback;
+}
+
+function identifierScheme(
+  element: Element,
+  metas: Element[]
+): string | undefined {
+  const direct = namespacedAttribute(element, "scheme");
+  const refined = refinedProperty(
+    metas,
+    element.getAttribute("id") ?? "",
+    "identifier-type"
+  );
+  const hint = direct || refined;
+  // ONIX codelist 5 value 15 means ISBN-13.
+  return hint === "15" ? "ISBN" : hint || undefined;
+}
+
+export interface EpubPackageFields {
+  title: string;
+  author: string;
+  metadata?: ParsedBook["metadata"];
+}
+
+/** Extract bounded EPUB 2/3 Dublin Core metadata from the package document. */
+export function extractEpubPackageFields(
+  opf: Document,
+  fallbackTitle: string
+): EpubPackageFields {
+  const metadataRoot = elementsByLocalName(opf, "metadata")[0];
+  if (!metadataRoot) {
+    return {
+      title: boundedMetadata(fallbackTitle, "EPUB 书名").slice(0, 255),
+      author: "",
+    };
+  }
+
+  const metas = elementsByLocalName(metadataRoot, "meta");
+  const titles = elementsByLocalName(metadataRoot, "title");
+  const titleType = (element: Element) =>
+    (
+      namespacedAttribute(element, "type") ||
+      refinedProperty(
+        metas,
+        element.getAttribute("id") ?? "",
+        "title-type"
+      )
+    ).toLowerCase();
+  const subtitleElement = titles.find(element =>
+    titleType(element).split(/\s+/).includes("subtitle")
+  );
+  const mainTitleElement =
+    titles.find(element =>
+      titleType(element).split(/\s+/).includes("main")
+    ) ?? titles.find(element => element !== subtitleElement);
+  const selectedTitle = mainTitleElement ?? titles[0];
+  const title = boundedMetadata(
+    (selectedTitle ? elementText(selectedTitle) : "") || fallbackTitle,
+    "EPUB 书名"
+  ).slice(0, 255);
+
+  const creators = elementsByLocalName(metadataRoot, "creator")
+    .map(element => ({
+      name: elementText(element),
+      role: contributorRole(element, metas, "author"),
+    }))
+    .filter(contributor => Boolean(contributor.name));
+  const contributors = elementsByLocalName(metadataRoot, "contributor")
+    .map(element => ({
+      name: elementText(element),
+      role: contributorRole(element, metas, "other"),
+    }))
+    .filter(contributor => Boolean(contributor.name));
+  const metadata = importedBookMetadata({
+    subtitle: subtitleElement ? elementText(subtitleElement) : undefined,
+    contributors: [...creators, ...contributors],
+    publishers: elementsByLocalName(metadataRoot, "publisher").map(elementText),
+    publishedDates: elementsByLocalName(metadataRoot, "date")
+      .sort((left, right) => {
+        const publication = (element: Element) =>
+          namespacedAttribute(element, "event").toLowerCase() ===
+          "publication"
+            ? 0
+            : 1;
+        return publication(left) - publication(right);
+      })
+      .map(elementText),
+    languages: elementsByLocalName(metadataRoot, "language").map(elementText),
+    identifiers: elementsByLocalName(metadataRoot, "identifier").map(
+      element => ({
+        value: elementText(element),
+        scheme: identifierScheme(element, metas),
+      })
+    ),
+    subjects: elementsByLocalName(metadataRoot, "subject").map(elementText),
+    descriptions: elementsByLocalName(metadataRoot, "description").map(
+      elementText
+    ),
+    rights: elementsByLocalName(metadataRoot, "rights").map(elementText),
+  });
+  const author =
+    metadata?.contributors
+      ?.filter(contributor => contributor.role === "author")
+      .map(contributor => contributor.name)
+      .join("、")
+      .slice(0, 255) ?? "";
+  return { title, author, metadata };
 }
 
 function dirname(path: string): string {
@@ -324,15 +505,11 @@ export async function parseEpub(
     )) ?? "",
     "application/xml"
   );
-  const title = boundedMetadata(
-    opf.getElementsByTagName("dc:title")[0]?.textContent?.trim() ||
-      file.name.replace(/\.epub$/i, ""),
-    "EPUB 书名"
+  const packageFields = extractEpubPackageFields(
+    opf,
+    file.name.replace(/\.epub$/i, "")
   );
-  const author = boundedMetadata(
-    opf.getElementsByTagName("dc:creator")[0]?.textContent?.trim() ?? "",
-    "EPUB 作者"
-  );
+  const { title, author, metadata } = packageFields;
 
   const manifest = new Map<
     string,
@@ -501,5 +678,5 @@ export async function parseEpub(
   }
 
   if (chapters.length === 0) throw new Error("未能从 EPUB 中识别出正文");
-  return { title, author, cover, chapters };
+  return { title, author, cover, chapters, metadata };
 }

@@ -1,4 +1,5 @@
 import type { ShufangEvent } from "./webhooks";
+import { bookMetadataSchema } from "./book-metadata";
 
 const BOOK_METADATA_FIELDS = [
   "extId",
@@ -24,6 +25,8 @@ export function sanitizeEventForWebhook(event: ShufangEvent): ShufangEvent {
     const value = event.data[field];
     if (typeof value === "string") safeData[field] = value;
   }
+  const metadata = bookMetadataSchema.safeParse(event.data.metadata);
+  if (metadata.success) safeData.metadata = metadata.data;
 
   const chapters = event.data.chapters;
   const reportedCount = event.data.chapterCount;

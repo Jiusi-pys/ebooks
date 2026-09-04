@@ -61,6 +61,8 @@ vi.mock("./lib/book-mirror-upload", async importOriginal => {
         contentHash: "hash",
         chapterCount: 1,
         alreadyCompleted: state.completed.length > 1,
+        invalidatedDigestHashes: [],
+        changedNotes: [],
       };
     },
   };

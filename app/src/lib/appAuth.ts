@@ -9,6 +9,8 @@ export interface AppSession {
   authenticated: boolean;
   user: { id: string } | null;
   expiresAt: number | null;
+  setupRequired: boolean;
+  accountInitialized?: boolean;
 }
 
 interface AuthErrorBody {
@@ -160,6 +162,7 @@ export function useAppSession() {
         ok: true;
         user: { id: string };
         expiresAt: number;
+        setupRequired: boolean;
       }>(response);
       if (requests.completeMutation(ticket)) {
         setSession({
@@ -167,6 +170,8 @@ export function useAppSession() {
           authenticated: true,
           user: result.user,
           expiresAt: result.expiresAt,
+          setupRequired: result.setupRequired,
+          accountInitialized: !result.setupRequired,
         });
         setError("");
         setLoading(false);
@@ -179,6 +184,97 @@ export function useAppSession() {
       throw reason;
     }
   }, []);
+
+  const completeSetup = useCallback(
+    async (input: {
+      username: string;
+      newPassword: string;
+      confirmPassword: string;
+    }) => {
+      const requests = coordinator.current!;
+      const ticket = requests.beginMutation();
+      setError("");
+      try {
+        const response = await fetch("/api/auth/setup", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        });
+        const result = await readJson<{
+          ok: true;
+          user: { id: string };
+          expiresAt: number;
+          setupRequired: false;
+        }>(response);
+        if (requests.completeMutation(ticket)) {
+          setSession({
+            configured: true,
+            authenticated: true,
+            user: result.user,
+            expiresAt: result.expiresAt,
+            setupRequired: false,
+            accountInitialized: true,
+          });
+          setError("");
+          setLoading(false);
+        }
+      } catch (reason) {
+        if (requests.failMutation(ticket)) {
+          setError(reason instanceof Error ? reason.message : String(reason));
+          setLoading(false);
+        }
+        throw reason;
+      }
+    },
+    []
+  );
+
+  const updateProfile = useCallback(
+    async (input: {
+      currentPassword: string;
+      username: string;
+      newPassword?: string;
+      confirmPassword?: string;
+    }) => {
+      const requests = coordinator.current!;
+      const ticket = requests.beginMutation();
+      setError("");
+      try {
+        const response = await fetch("/api/auth/profile", {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        });
+        const result = await readJson<{
+          ok: true;
+          user: { id: string };
+          expiresAt: number;
+          setupRequired: false;
+        }>(response);
+        if (requests.completeMutation(ticket)) {
+          setSession({
+            configured: true,
+            authenticated: true,
+            user: result.user,
+            expiresAt: result.expiresAt,
+            setupRequired: false,
+            accountInitialized: true,
+          });
+          setError("");
+          setLoading(false);
+        }
+      } catch (reason) {
+        if (requests.failMutation(ticket)) {
+          setError(reason instanceof Error ? reason.message : String(reason));
+          setLoading(false);
+        }
+        throw reason;
+      }
+    },
+    []
+  );
 
   const logout = useCallback(async () => {
     const requests = coordinator.current!;
@@ -198,6 +294,8 @@ export function useAppSession() {
           authenticated: false,
           user: null,
           expiresAt: null,
+          setupRequired: false,
+          accountInitialized: current?.accountInitialized ?? true,
         }));
         setLoading(false);
       }
@@ -210,5 +308,14 @@ export function useAppSession() {
     }
   }, []);
 
-  return { session, loading, error, login, logout, refresh };
+  return {
+    session,
+    loading,
+    error,
+    login,
+    completeSetup,
+    updateProfile,
+    logout,
+    refresh,
+  };
 }

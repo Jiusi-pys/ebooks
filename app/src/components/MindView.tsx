@@ -120,7 +120,6 @@ export function MindView({ lib }: { lib: Library }) {
     if (selectedMap) {
       setSelectedNodeId(selectedMap.root.id);
       setDraft(selectedMap.root.text);
-      setError("");
       setFocusNodeId(null);
     }
   }, [current?.id]);
@@ -135,14 +134,23 @@ export function MindView({ lib }: { lib: Library }) {
       const bookTitle = saved.bookId
         ? (lib.books.find(b => b.id === saved.bookId)?.title ?? "")
         : "";
-      emitEvent(type, {
-        extId: saved.id,
-        title: saved.title,
-        bookExtId: saved.bookId ?? "",
-        bookTitle,
-        root: saved.root,
-        nodeCount: countNodes(saved.root),
-      });
+      setError("");
+      try {
+        await emitEvent(type, {
+          extId: saved.id,
+          title: saved.title,
+          bookExtId: saved.bookId ?? "",
+          bookTitle,
+          root: saved.root,
+          nodeCount: countNodes(saved.root),
+        });
+      } catch {
+        setError(
+          saved.bookId
+            ? "脑图已保存在此设备，但 MySQL 镜像同步失败，请检查连接后重试。"
+            : "空白脑图已保存在此设备；未关联书籍，因此不会写入 MySQL 镜像。"
+        );
+      }
       return saved;
     },
     [lib]

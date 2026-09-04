@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  createSessionRequestCoordinator,
-  type AppSession,
-} from "./appAuth";
+import { createSessionRequestCoordinator, type AppSession } from "./appAuth";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -19,6 +16,7 @@ const authenticated: AppSession = {
   authenticated: true,
   user: { id: "reader" },
   expiresAt: 10_000,
+  setupRequired: false,
 };
 
 const anonymous: AppSession = {
@@ -26,6 +24,7 @@ const anonymous: AppSession = {
   authenticated: false,
   user: null,
   expiresAt: null,
+  setupRequired: false,
 };
 
 describe("session request generations", () => {

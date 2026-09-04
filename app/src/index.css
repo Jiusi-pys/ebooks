@@ -198,6 +198,31 @@
   column-rule: 1px solid rgba(128, 118, 96, 0.18);
 }
 
+/* 横向翻页：固定可视高度让 CSS 多栏向右产生后续页。
+ * 每个单栏页的内容宽度 + 两侧间距恰好是一个视口宽度，
+ * 因此单栏和双栏都可按 clientWidth 稳定翻屏。 */
+.reader-horizontal-pages {
+  --reader-page-margin: 32px;
+  box-sizing: border-box;
+  width: calc(100% - var(--reader-page-margin) - var(--reader-page-margin));
+  height: 100%;
+  margin-inline: var(--reader-page-margin);
+  padding-block: 2.5rem 3.5rem;
+  column-fill: auto;
+  column-gap: calc(var(--reader-page-margin) + var(--reader-page-margin));
+  column-rule: 1px solid rgba(128, 118, 96, 0.12);
+}
+
+.reader-horizontal-pages .reader-body {
+  break-inside: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-reader-page-mode="horizontal"] {
+    scroll-behavior: smooth;
+  }
+}
+
 /* 划线渲染 */
 .hl-underline {
   background-image: linear-gradient(var(--hl-solid), var(--hl-solid));

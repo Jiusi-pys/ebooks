@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { Library } from "@/hooks/useLibrary";
 import type { SidebarMode } from "@/lib/sidebarMode";
+import type { Book } from "@/types";
 import { Sidebar } from "./Sidebar";
 
 const lib = {
@@ -16,10 +17,10 @@ const lib = {
   importFiles: vi.fn(),
 } as unknown as Library;
 
-function renderSidebar(mode: SidebarMode, mobile = false) {
+function renderSidebar(mode: SidebarMode, mobile = false, books: Book[] = []) {
   return renderToStaticMarkup(
     createElement(Sidebar, {
-      lib,
+      lib: { ...lib, books },
       userId: "local-reader",
       mode,
       open: true,
@@ -30,6 +31,7 @@ function renderSidebar(mode: SidebarMode, mobile = false) {
       onRequestClose: vi.fn(),
       onInteractionStart: vi.fn(),
       onInteractionEnd: vi.fn(),
+      onUpdateProfile: vi.fn(async () => undefined),
       onLogout: vi.fn(async () => undefined),
     })
   );
@@ -58,5 +60,35 @@ describe("Sidebar display mode control", () => {
     expect(html).toContain('aria-label="关闭侧栏"');
     expect(html).not.toContain("固定显示侧栏");
     expect(html).not.toContain("切换为自动隐藏");
+  });
+
+  it("shows reading items from most recently opened to oldest", () => {
+    const book = (
+      id: string,
+      createdAt: number,
+      lastOpenedAt?: number
+    ): Book => ({
+      id,
+      title: id,
+      author: "",
+      format: "txt",
+      coverTone: 0,
+      chapters: [],
+      createdAt,
+      lastOpenedAt,
+      progress: { chapterId: "", ratio: 0 },
+    });
+    const html = renderSidebar("pinned", false, [
+      book("older-opened", 30, 100),
+      book("latest-opened", 10, 300),
+      book("never-opened", 200),
+    ]);
+
+    expect(html.indexOf("latest-opened")).toBeLessThan(
+      html.indexOf("older-opened")
+    );
+    expect(html.indexOf("older-opened")).toBeLessThan(
+      html.indexOf("never-opened")
+    );
   });
 });
