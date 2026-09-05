@@ -31,6 +31,10 @@ extensions are outside the current web scope.
 - Edit catalogue metadata such as title, contributors, publisher, publication
   date, languages, identifiers, series, subjects, description, edition, and
   rights, and mirror it to MySQL without rewriting the source ebook file.
+- Keep local IndexedDB and the optional MySQL mirror consistent across book,
+  note, highlight, citation, association, and digest deletion. Event receipts,
+  tombstones, transactional citation cleanup, and forward-only migrations make
+  late browser events safe to retry.
 - Create editable mind maps, review cards, and spaced-repetition queues.
 - Use Codex through a local ChatGPT login, or select the optional DeepSeek API
   provider from the AI settings panel.
@@ -68,6 +72,7 @@ are not uploaded by the normal browser import flow.
 | MySQL      | MySQL 8.4 recommended and validated                         |
 | Browser    | A current Chromium, Edge, Firefox, or Safari with IndexedDB |
 | Codex CLI  | Optional, but required for the default AI provider          |
+| Git        | Needed to clone and update the repository                   |
 
 ## Quick Start
 
@@ -114,6 +119,85 @@ are no longer accepted. Usernames are encrypted at rest and passwords are stored
 only as salted scrypt hashes. Production deployments must also keep the
 independent `APP_DATA_SECRET` stable.
 
+## Platform Setup Tutorials
+
+The following paths produce the same development environment. Install Node from
+the official LTS downloads or a version manager, then verify `node --version`
+is `20.19+` or `22.12+`; Vite enforces that range. MySQL 8.4 is the tested
+database version. Use the official [Node/npm installation guide](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
+and [MySQL installation guide](https://dev.mysql.com/doc/refman/8.0/en/installing.html)
+when your platform requires a different installation method.
+
+### Windows 10/11 (PowerShell)
+
+1. Install Git for Windows, Node LTS, and MySQL 8.4 using their installers. In
+   MySQL Installer, keep the server configured as a Windows service.
+2. Open a new PowerShell window and verify `git --version`, `node --version`,
+   and `mysql --version`. If PowerShell blocks `npm.ps1`, use `npm.cmd` and
+   `npx.cmd`; do not weaken the machine execution policy.
+3. Create the database and application account with the SQL below, then clone,
+   configure, migrate, and start:
+
+```powershell
+git clone git@github.com:Jiusi-pys/ebooks.git
+Set-Location ebooks\app
+npm.cmd ci
+Copy-Item .env.example .env
+# Edit .env, then:
+npm.cmd run db:migrate
+npm.cmd run dev
+```
+
+### Ubuntu/Debian Linux
+
+1. Install a supported Node release through a version manager or the official
+   Node distribution. If the distribution package does not provide MySQL 8.4,
+   use Oracle's MySQL APT repository instead of treating MariaDB as the tested
+   replacement.
+2. Start MySQL with systemd and confirm both versions:
+
+```bash
+sudo systemctl enable --now mysql
+node --version
+mysql --version
+```
+
+3. Create the database/account below, then run:
+
+```bash
+git clone git@github.com:Jiusi-pys/ebooks.git
+cd ebooks/app
+npm ci
+cp .env.example .env
+# Edit .env, then:
+npm run db:migrate
+npm run dev
+```
+
+### macOS (Homebrew)
+
+Install Node 22 and the tested MySQL series, start the database service, and
+then use the same clone/configure/migrate steps. Homebrew publishes a
+[`mysql@8.4` formula](https://formulae.brew.sh/formula/mysql@8.4); use its
+current instructions if formula names change.
+
+```bash
+brew install node@22 mysql@8.4
+brew services start mysql@8.4
+node --version
+mysql --version
+git clone git@github.com:Jiusi-pys/ebooks.git
+cd ebooks/app
+npm ci
+cp .env.example .env
+# Edit .env, then:
+npm run db:migrate
+npm run dev
+```
+
+After `npm run dev`, open <http://127.0.0.1:3000/>. The Vite development server
+also mounts the Hono API, so the browser UI and `/api/*` use this single origin.
+
 ## MySQL Setup
 
 Start MySQL using your normal service manager, then connect as an administrator
@@ -146,6 +230,11 @@ Common configuration locations include MySQL's `my.ini` under
 `C:\ProgramData\MySQL\` on Windows, `/etc/mysql/` on Linux, and the Homebrew
 MySQL configuration directory on macOS. The exact service name and path depend
 on the installation method.
+
+Before updating an existing installation, back up the database and always run
+`npm run db:migrate` rather than `db:push`. The committed migration sequence is
+forward-only through `0012_add_highlight_name`; it includes reconciliation for
+older mirror data and can be run repeatedly safely.
 
 ## Environment Configuration
 

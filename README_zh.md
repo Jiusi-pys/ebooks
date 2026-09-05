@@ -17,6 +17,7 @@
 - 可把不同书籍中的精确文段建立单向或双向“关联”，并在关系图中查看。
 - 书架文件夹与逻辑学习集相互独立；文件夹图标、书籍封面、目录和阅读排版均可自定义。
 - 可编辑书名、贡献者、出版社、出版日期、语言、标识符、系列、标签、简介、版次和版权等书库元数据，并同步至 MySQL 镜像；不会改写原始电子书文件。
+- 浏览器 IndexedDB 与可选 MySQL 镜像对书籍、笔记、书摘、引用、关联和摘要删除保持一致；事件回执、墓碑、事务化引用清理和前向迁移让迟到事件可以安全重试。
 - 支持可编辑脑图、复习卡片、回忆模式和间隔复习队列。
 - 默认通过本机 ChatGPT 登录调用 Codex，也可在 AI 后台选择 DeepSeek API。
 - 左右阅读侧栏均可在固定显示与自动隐藏间切换；沉浸模式会隐藏两侧栏和工具栏；账户面板可修改 MySQL 用户名和密码。
@@ -46,6 +47,7 @@ app/
 | MySQL     | 推荐并已验证 MySQL 8.4                                  |
 | 浏览器    | 支持 IndexedDB 的新版 Chromium、Edge、Firefox 或 Safari |
 | Codex CLI | 可选；使用默认 AI Provider 时必须安装                   |
+| Git       | 克隆和更新仓库时需要                                     |
 
 ## 快速启动
 
@@ -86,6 +88,77 @@ npm run dev
 
 访问 <http://127.0.0.1:3000/>。用户表为空时，先用 `app/.env` 中的 `APP_ID` 与 `APP_SECRET` 登录一次，再设置自定义用户名和新密码。此后每次登录只查询 MySQL，初始凭据不再有效。用户名加密存储，密码只保存带随机盐的 scrypt 强哈希。
 
+## Windows / Linux / macOS 使用教材
+
+三种系统最终使用同一套项目命令。先安装受支持的 Node，再确认
+`node --version` 为 `20.19+` 或 `22.12+`；这是 Vite 当前强制的范围。数据库以
+MySQL 8.4 为已验证版本。不同发行版的安装细节请以官方 [Node/npm 安装说明](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm)
+和 [MySQL 安装手册](https://dev.mysql.com/doc/refman/8.0/en/installing.html) 为准。
+
+### Windows 10/11（PowerShell）
+
+1. 用官方安装包安装 Git for Windows、Node LTS 和 MySQL 8.4；在 MySQL Installer
+   中将 Server 配置为 Windows 服务。
+2. 新开 PowerShell，确认 `git --version`、`node --version`、`mysql --version`。
+   若系统禁止运行 `npm.ps1`，坚持使用 `npm.cmd` / `npx.cmd`，无需修改执行策略。
+3. 按下节 SQL 创建数据库和账户，再克隆、配置、迁移并启动：
+
+```powershell
+git clone git@github.com:Jiusi-pys/ebooks.git
+Set-Location ebooks\app
+npm.cmd ci
+Copy-Item .env.example .env
+# 编辑 .env 后执行：
+npm.cmd run db:migrate
+npm.cmd run dev
+```
+
+### Ubuntu / Debian Linux
+
+1. 用常用版本管理器或 Node 官方发行包安装受支持的 Node。若系统自带仓库没有
+   MySQL 8.4，请按 Oracle MySQL APT Repository 安装，而不是把 MariaDB 当作已验证替代品。
+2. 用 systemd 启动数据库并确认版本：
+
+```bash
+sudo systemctl enable --now mysql
+node --version
+mysql --version
+```
+
+3. 按下节 SQL 创建数据库和账户，然后执行：
+
+```bash
+git clone git@github.com:Jiusi-pys/ebooks.git
+cd ebooks/app
+npm ci
+cp .env.example .env
+# 编辑 .env 后执行：
+npm run db:migrate
+npm run dev
+```
+
+### macOS（Homebrew）
+
+使用 Homebrew 安装 Node 22 和已验证的 MySQL 系列，启动服务后执行相同项目命令。
+可参考 [`mysql@8.4` formula](https://formulae.brew.sh/formula/mysql@8.4)；若公式版本发生调整，以其当前说明为准。
+
+```bash
+brew install node@22 mysql@8.4
+brew services start mysql@8.4
+node --version
+mysql --version
+git clone git@github.com:Jiusi-pys/ebooks.git
+cd ebooks/app
+npm ci
+cp .env.example .env
+# 编辑 .env 后执行：
+npm run db:migrate
+npm run dev
+```
+
+任一平台执行 `npm run dev` 后，访问 <http://127.0.0.1:3000/>。开发服务器同时挂载
+Hono API，因此浏览器界面和 `/api/*` 请求都使用同一个地址。
+
 ## MySQL 配置
 
 先使用系统服务管理器启动 MySQL，再以管理员身份连接并创建数据库和专用账户。MySQL 账户的 Host 必须与 `DATABASE_URL` 中的主机一致。
@@ -111,6 +184,10 @@ SHOW VARIABLES LIKE 'max_allowed_packet';
 ```
 
 常见配置位置包括 Windows 的 `C:\ProgramData\MySQL\` 下的 `my.ini`、Linux 的 `/etc/mysql/`，以及 macOS Homebrew 的 MySQL 配置目录。服务名和准确路径取决于安装方式。
+
+已有安装升级前请先备份数据库，并始终使用 `npm run db:migrate`（不要使用
+`db:push`）。仓库迁移已前向演进至 `0012_add_highlight_name`，其中包含旧镜像数据
+的修复逻辑，可安全重复执行。
 
 ## 环境变量配置
 
