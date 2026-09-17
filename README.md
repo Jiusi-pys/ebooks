@@ -42,6 +42,38 @@ extensions are outside the current web scope.
   and the reader toolbar. Manage the MySQL-backed local username and password
   from the account panel.
 
+## Global Search
+
+Open search from the top of the workspace or press `Ctrl + K` (`⌘ + K` on
+macOS), enter a keyword, and press Enter or click Search. The shortcut also
+works in immersive reading, where the top entry is hidden. Matching uses
+literal, case-insensitive substrings with leading and trailing query whitespace
+removed; regular expressions and semantic search are not supported.
+
+| Scope | Included content |
+| --- | --- |
+| 本书 (This book) | The current book's title, author, chapter titles, text, highlights, annotations, and notes linked through citations. Disabled when no book is open. |
+| 本合集 (This study set) | Books belonging to the selected **study set**, their highlights and annotations, and citation-linked notes. Membership is independent of bookshelf folders; choose the set below the search input. |
+| 文库全部内容 (Entire library) | All books, highlights, annotations, and notes loaded in the current workspace, including standalone notes. |
+
+Reading defaults to the current book; a specific study-set page defaults to
+that set; other pages default to the entire library. Results show their source
+and a highlighted excerpt, with one result per matching paragraph. Open a text
+or annotation result to navigate to its source, or a note result to select the
+matching title/body text. PDF navigation switches reader mode when needed.
+
+Search reports the result count and displays up to 200 entries. Narrow the scope
+or refine the keyword for more specific results. Searches can be cancelled;
+changing the query or scope cancels the previous search so late results cannot
+replace the current input.
+
+Search runs in the browser. PDFs without usable reflow text are extracted page
+by page from the locally cached original, with progress feedback. Missing files,
+extraction failures, and pages without extractable text are reported while other
+content remains searchable. Text inside images is not searched; OCR is not
+included. No database migration or additional search-service configuration is
+required.
+
 ## EPUB Navigation, Notes, and Typography
 
 EPUB imports preserve navigation entries and paragraph anchors, including notes

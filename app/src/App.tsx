@@ -13,6 +13,7 @@ import {
 } from "@/lib/sidebarMode";
 import { Sidebar } from "@/components/Sidebar";
 import { LibraryView } from "@/components/LibraryView";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { ReaderView } from "@/components/ReaderView";
 import { NotesView } from "@/components/NotesView";
 import { NoteEditor } from "@/components/NoteEditor";
@@ -296,31 +297,38 @@ function WorkspaceApp({
           )}
         </>
       )}
-      <main className="min-w-0 flex-1 bg-background">
-        {lib.route.view === "library" && <LibraryView lib={lib} />}
-        {lib.route.view === "reader" &&
-          (book ? (
-            <ReaderView
-              key={book.id}
-              lib={lib}
-              book={book}
-              onImmersiveChange={setReaderImmersive}
-            />
-          ) : (
-            <LibraryView lib={lib} />
-          ))}
-        {lib.route.view === "notes" && <NotesView lib={lib} />}
-        {lib.route.view === "note" &&
-          (note ? (
-            <NoteEditor key={note.id} lib={lib} note={note} />
-          ) : (
-            <NotesView lib={lib} />
-          ))}
-        {lib.route.view === "highlights" && <HighlightsView lib={lib} />}
-        {lib.route.view === "mind" && <MindView lib={lib} />}
-        {lib.route.view === "review" && <ReviewView lib={lib} />}
-        {lib.route.view === "studyset" && <StudySetView lib={lib} />}
-        {lib.route.view === "graph" && <GraphView lib={lib} />}
+      <main className="flex min-w-0 flex-1 flex-col bg-background">
+        <GlobalSearch
+          key={`${lib.route.view}:${lib.route.bookId ?? ""}:${lib.route.studySetId ?? ""}:${lib.route.noteId ?? ""}`}
+          lib={lib}
+          immersive={readerImmersive}
+        />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {lib.route.view === "library" && <LibraryView lib={lib} />}
+          {lib.route.view === "reader" &&
+            (book ? (
+              <ReaderView
+                key={book.id}
+                lib={lib}
+                book={book}
+                onImmersiveChange={setReaderImmersive}
+              />
+            ) : (
+              <LibraryView lib={lib} />
+            ))}
+          {lib.route.view === "notes" && <NotesView lib={lib} />}
+          {lib.route.view === "note" &&
+            (note ? (
+              <NoteEditor key={note.id} lib={lib} note={note} />
+            ) : (
+              <NotesView lib={lib} />
+            ))}
+          {lib.route.view === "highlights" && <HighlightsView lib={lib} />}
+          {lib.route.view === "mind" && <MindView lib={lib} />}
+          {lib.route.view === "review" && <ReviewView lib={lib} />}
+          {lib.route.view === "studyset" && <StudySetView lib={lib} />}
+          {lib.route.view === "graph" && <GraphView lib={lib} />}
+        </div>
       </main>
       <ImportTray lib={lib} />
     </div>

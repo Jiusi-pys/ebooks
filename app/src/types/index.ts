@@ -335,6 +335,8 @@ export interface Route {
   noteId?: string;
   /** 独立学习集 id */
   studySetId?: string;
+  /** 全局搜索打开笔记时选中命中的标题或正文文字。 */
+  searchNoteRange?: { field: "title" | "content"; start: number; end: number };
   /** 跳转后需要滚动定位并闪烁的书摘 */
   highlightId?: string;
   /** 原版 PDF 模式下用于定位的锚点文字（书摘 text） */

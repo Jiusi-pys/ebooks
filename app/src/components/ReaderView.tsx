@@ -494,7 +494,7 @@ export function ReaderView({
       window.setTimeout(() => el?.classList.remove("anchor-flash"), 2400);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lib.route.highlightId, chapter?.id]);
+  }, [lib.route.highlightId, chapter?.id, lib.route.outlineNavigationKey]);
 
   // 关联跳转：优先使用独立文段锚点，不要求目标先成为书摘。
   useEffect(() => {
@@ -534,7 +534,12 @@ export function ReaderView({
           target.classList.remove("anchor-flash");
       }, 2400);
     });
-  }, [book.id, chapter?.id, lib.route.passageAnchor]);
+  }, [
+    book.id,
+    chapter?.id,
+    lib.route.passageAnchor,
+    lib.route.outlineNavigationKey,
+  ]);
 
   // 自定义目录：可精确跳到章节内的正文段落。
   useEffect(() => {
@@ -568,7 +573,13 @@ export function ReaderView({
       setPdfAnchorPage(h.pdfAnchor?.page ?? null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book.id, lib.route.highlightId, lib.route.passageAnchor, isOriginal]);
+  }, [
+    book.id,
+    lib.route.highlightId,
+    lib.route.passageAnchor,
+    isOriginal,
+    lib.route.outlineNavigationKey,
+  ]);
 
   const pdfSaveTimer = useRef<number | null>(null);
   /** 原版模式进度：页码 / 总页数 → 沿用 progress.ratio */

@@ -34,8 +34,23 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
     active: number;
   } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | null>(null);
   const dirty = useRef(false);
+
+  useEffect(() => {
+    const range = lib.route.searchNoteRange;
+    if (!range) return;
+    setPreview(false);
+    const frame = requestAnimationFrame(() => {
+      const input = range.field === "title" ? titleRef.current : taRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(range.start, range.end);
+      input.scrollIntoView({ block: "center" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [lib.route.searchNoteRange, lib.route.outlineNavigationKey]);
 
   const existingTitles = useMemo(() => {
     const s = new Set<string>();
@@ -227,6 +242,7 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
         <div className="mx-auto max-w-[720px] px-8 pb-24 pt-10">
           {/* 标题 */}
           <input
+            ref={titleRef}
             value={title}
             onChange={e => {
               setTitle(e.target.value);
