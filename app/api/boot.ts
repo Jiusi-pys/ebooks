@@ -7,6 +7,7 @@ import { createContext } from "./context";
 import { env } from "./lib/env";
 import { v1 } from "./v1";
 import { auth } from "./auth";
+import { library } from "./library";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -19,6 +20,7 @@ app.use(async (c, next) => {
   return limitRequestBody(c, next);
 });
 app.route("/api/auth", auth);
+app.route("/api/library", library);
 app.route("/api/v1", v1);
 app.use("/api/trpc/*", async c => {
   return fetchRequestHandler({

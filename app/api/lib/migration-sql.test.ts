@@ -326,12 +326,12 @@ describe("mirror integrity migration", () => {
     expect(addition!.when).toBeGreaterThan(cleanup!.when);
     expect(
       journal.entries
-        .filter(entry => entry.when > cleanup!.when)
+        .filter(
+          entry => entry.when > cleanup!.when && entry.when <= addition!.when
+        )
         .map(entry => entry.tag)
     ).toEqual(["0012_add_highlight_name"]);
-    expect(
-      journal.entries.filter(entry => entry.when > addition!.when)
-    ).toEqual([]);
+    expect(journal.entries.filter(entry => entry.idx === 12)).toHaveLength(1);
 
     const previousSnapshot = readMigrationJson("0011_snapshot.json");
     const additionSnapshot = readMigrationJson("0012_snapshot.json") as {

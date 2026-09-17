@@ -32,6 +32,8 @@ export const mirrorBooks = mysqlTable(
     contentHash: varchar("content_hash", { length: 64 }).notNull().default(""),
     /** 章节数组 JSON：[{ id, title, paragraphs: string[] }] */
     chapters: longtext("chapters").notNull(),
+    readerData: longtext("reader_data"),
+    sourceManifest: text("source_manifest"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },
@@ -39,6 +41,24 @@ export const mirrorBooks = mysqlTable(
 );
 
 export type MirrorBook = typeof mirrorBooks.$inferSelect;
+
+/** Durable original-file chunks; deleting the book removes every generation. */
+export const librarySourceChunks = mysqlTable(
+  "library_source_chunks",
+  {
+    bookExtId: varchar("book_ext_id", { length: 64 })
+      .notNull()
+      .references(() => mirrorBooks.extId, { onDelete: "cascade" }),
+    uploadId: varchar("upload_id", { length: 64 }).notNull(),
+    chunkIndex: int("chunk_index").notNull(),
+    payload: longtext("payload").notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.bookExtId, table.uploadId, table.chunkIndex],
+    }),
+  ]
+);
 
 /** Prevent delayed browser events from recreating a book after deletion. */
 export const mirrorBookTombstones = mysqlTable("mirror_book_tombstones", {

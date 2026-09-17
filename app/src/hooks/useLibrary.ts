@@ -55,7 +55,11 @@ import {
 import { detectBookFormat, SUPPORTED_FORMAT_LABEL } from "@/lib/bookFormats";
 import { parseBookFile } from "@/lib/parseBook";
 import { toneForTitle } from "@/lib/covers";
-import { seedIfEmpty } from "@/lib/seed";
+import {
+  flushReaderStates,
+  persistImportedBook,
+  synchronizeLibrary,
+} from "@/lib/librarySync";
 import { emitEvent } from "@/lib/events";
 import { mirrorImportTrayProgress, syncBookMirror } from "@/lib/mirrorSync";
 import { selectImportedPdfMode } from "@/lib/pdfReaderState";
@@ -133,6 +137,7 @@ function citationNoteUpdates(
 
 export function useLibrary() {
   const [ready, setReady] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [startupError, setStartupError] = useState<string | null>(null);
   const [databaseIssue, setDatabaseIssue] =
     useState<DatabaseConnectionIssue | null>(getDatabaseConnectionIssue);
@@ -179,14 +184,23 @@ export function useLibrary() {
     let cancelled = false;
     void (async () => {
       try {
-        await seedIfEmpty();
+        try {
+          await synchronizeLibrary();
+          if (!cancelled) setSyncError(null);
+        } catch (error) {
+          if (!cancelled)
+            setSyncError(
+              error instanceof Error ? error.message : "服务端书库同步失败"
+            );
+          if (!(await getAllBooks()).length) throw error;
+        }
         await reload();
         if (!cancelled) setReady(true);
       } catch (reason) {
         if (cancelled) return;
         setStartupError(
           reason instanceof Error
-            ? `本地书库初始化失败：${reason.message}`
+            ? `书库初始化失败：${reason.message}`
             : "本地书库初始化失败，请重新加载后再试。"
         );
       }
@@ -195,6 +209,41 @@ export function useLibrary() {
       cancelled = true;
     };
   }, [initializationAttempt, reload]);
+
+  const syncLibrary = useCallback(async () => {
+    try {
+      await synchronizeLibrary();
+      await flushReaderStates();
+      await reload();
+      setSyncError(null);
+      return true;
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : "服务端书库同步失败"
+      );
+      return false;
+    }
+  }, [reload]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const flush = () => {
+      void flushReaderStates().catch(error =>
+        setSyncError(
+          error instanceof Error ? error.message : "阅读状态同步失败"
+        )
+      );
+    };
+    const online = () => {
+      void syncLibrary();
+    };
+    const timer = window.setInterval(flush, 5000);
+    window.addEventListener("online", online);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("online", online);
+    };
+  }, [ready, syncLibrary]);
 
   const retryInitialization = useCallback(() => {
     setReady(false);
@@ -299,17 +348,14 @@ export function useLibrary() {
           };
           onProgress("计算内容指纹", 0.965);
           book.contentHash = await contentHashOfBook(book);
-          let sourceFile: StoredFile | undefined;
-          if (format === "pdf") {
-            onProgress("保存原始文件", 0.97);
-            sourceFile = {
-              id: book.id,
-              type: "pdf" as const,
-              // IndexedDB 可直接结构化克隆 Blob，避免导入阶段再次读取整份 PDF。
-              data: file,
-            };
-          }
-          // 书目与原始 PDF 同一事务提交，失败时不会遗留孤儿文件。
+          onProgress("保存原始文件", 0.97);
+          const sourceFile: StoredFile = {
+            id: book.id,
+            type: format,
+            name: file.name,
+            data: file,
+          };
+          // 书目与原始文件同一事务提交，失败时不会遗留孤儿文件。
           await putImportedBook(book, sourceFile);
           try {
             await syncBookMirror(
@@ -334,7 +380,10 @@ export function useLibrary() {
                 },
               }
             );
+            onProgress("保存原文件与阅读状态到 MySQL", 0.995);
+            await persistImportedBook(book, sourceFile);
           } catch (mirrorError) {
+            setSyncError("书籍尚未完整保存到服务端，请重试同步");
             const detail =
               mirrorError instanceof Error
                 ? mirrorError.message
@@ -646,6 +695,7 @@ export function useLibrary() {
 
   const moveBook = useCallback(
     async (id: string, folderId: string | undefined) => {
+      await emitEvent("book.updated", { extId: id, folder: folderId ?? "" });
       const updated = await patchBookFolder(id, folderId);
       if (!updated) return;
       setBooks(current =>
@@ -667,6 +717,7 @@ export function useLibrary() {
       name: name.trim() || "未命名文件夹",
       createdAt: Date.now(),
     };
+    await emitEvent("folder.created", { extId: folder.id, name: folder.name });
     await putFolder(folder);
     setFolders(s => [...s, folder]);
     return folder;
@@ -675,6 +726,7 @@ export function useLibrary() {
   const renameFolder = useCallback(async (id: string, name: string) => {
     const t = name.trim();
     if (!t) return;
+    await emitEvent("folder.created", { extId: id, name: t });
     const updated = await patchFolderName(id, t);
     if (!updated) return;
     setFolders(current =>
@@ -696,10 +748,13 @@ export function useLibrary() {
 
   const removeFolder = useCallback(
     async (id: string) => {
+      for (const book of books.filter(book => book.folderId === id))
+        await emitEvent("book.updated", { extId: book.id, folder: "" });
+      await emitEvent("folder.deleted", { extId: id });
       await dbDeleteFolder(id);
       await reload();
     },
-    [reload]
+    [books, reload]
   );
 
   const createStudySet = useCallback(
@@ -958,6 +1013,8 @@ export function useLibrary() {
     initializationError: startupError ?? databaseIssue?.message ?? null,
     databaseIssue,
     retryInitialization,
+    syncError,
+    syncLibrary,
     books,
     notes,
     highlights,

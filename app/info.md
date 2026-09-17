@@ -1,31 +1,25 @@
-Using Node.js 20, Tailwind CSS v3.4.19, and Vite v7.2.4
+# Application development notes
 
-Tailwind CSS has been set up with the shadcn theme
+The maintained setup and deployment guides are [app README](README.md),
+[English README](../README.md), and [中文 README](../README_zh.md).
 
-Setup complete: /mnt/agents/output/app
+- Runtime: Node.js 22.13+ and MySQL 8.4; Windows, Linux, and macOS are supported.
+- Frontend: React 19, TypeScript, Vite 7, Tailwind CSS 3, and Radix UI components.
+- Backend: Hono, tRPC, Drizzle ORM, and MySQL. Browser library requests use authenticated sessions.
+- Book metadata, chapters, originals, covers, outlines, and reading state persist in MySQL; IndexedDB caches them locally.
+- The library offers a manual “同步到 MySQL” action with confirmed success or retry feedback.
 
-Components (40+):
-  accordion, alert-dialog, alert, aspect-ratio, avatar, badge, breadcrumb,
-  button-group, button, calendar, card, carousel, chart, checkbox, collapsible,
-  command, context-menu, dialog, drawer, dropdown-menu, empty, field, form,
-  hover-card, input-group, input-otp, input, item, kbd, label, menubar,
-  navigation-menu, pagination, popover, progress, radio-group, resizable,
-  scroll-area, select, separator, sheet, sidebar, skeleton, slider, sonner,
-  spinner, switch, table, tabs, textarea, toggle-group, toggle, tooltip
+## Source layout
 
-Usage:
-  import { Button } from '@/components/ui/button'
-  import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+- `src/components/`: library, readers, and reusable UI.
+- `src/hooks/`: application state and React hooks.
+- `src/lib/`: parsers, IndexedDB cache, and library synchronization.
+- `src/types/`: shared frontend types.
+- `api/`: Hono/tRPC routes, authentication, and server utilities.
+- `contracts/`: request and error contracts.
+- `db/`: Drizzle schemas and committed migrations.
+- `public/`: static assets, including the PDF worker.
 
-Structure:
-  src/sections/        Page sections
-  src/hooks/           Custom hooks
-  src/types/           Type definitions
-  src/App.css          Styles specific to the Webapp
-  src/App.tsx          Root React component
-  src/index.css        Global styles
-  src/main.tsx         Entry point for rendering the Webapp
-  index.html           Entry point for the Webapp
-  tailwind.config.js   Configures Tailwind's theme, plugins, etc.
-  vite.config.ts       Main build and dev server settings for Vite
-  postcss.config.js    Config file for CSS post-processing tools
+Run `npm run check`, `npm run lint`, `npm test`, and `npm run build` from this directory.
+Use `npm run test:mysql` for the configured MySQL integration suite.
+Do not edit or commit generated `dist/` output, `.env`, credentials, or uploaded books.

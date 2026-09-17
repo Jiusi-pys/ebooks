@@ -178,6 +178,28 @@ export async function putBook(book: Book) {
   await (await db()).put("books", book);
 }
 
+export interface PendingReaderState {
+  key: string;
+  bookId: string;
+  revision: string;
+  patch: Record<string, unknown>;
+}
+
+export async function pendingReaderStates(): Promise<PendingReaderState[]> {
+  const rows = await (await db()).getAll("metadata");
+  return rows.filter(
+    row => typeof row.key === "string" && row.key.startsWith("reader-state:")
+  ) as PendingReaderState[];
+}
+
+export async function acknowledgeReaderState(item: PendingReaderState) {
+  const tx = (await db()).transaction("metadata", "readwrite");
+  const current = (await tx.store.get(item.key)) as
+    PendingReaderState | undefined;
+  if (current?.revision === item.revision) await tx.store.delete(item.key);
+  await tx.done;
+}
+
 export interface LibrarySeedPayload {
   book: Book;
   notes: Note[];
@@ -242,14 +264,38 @@ async function patchStoredBook(
   update: (current: Book) => Book
 ): Promise<Book | undefined> {
   const database = await db();
-  const tx = database.transaction("books", "readwrite");
-  const current = (await tx.store.get(bookId)) as Book | undefined;
+  const tx = database.transaction(["books", "metadata"], "readwrite");
+  const current = (await tx.objectStore("books").get(bookId)) as
+    Book | undefined;
   if (!current) {
     await tx.done;
     return undefined;
   }
   const updated = update(current);
-  await tx.store.put(updated);
+  await tx.objectStore("books").put(updated);
+  const patch: Record<string, unknown> = {};
+  for (const field of [
+    "progress",
+    "cover",
+    "customCover",
+    "outline",
+    "readerMode",
+    "lastOpenedAt",
+  ] as const) {
+    if (JSON.stringify(current[field]) !== JSON.stringify(updated[field]))
+      patch[field] = updated[field] ?? null;
+  }
+  if (Object.keys(patch).length) {
+    const key = `reader-state:${bookId}`;
+    const previous = (await tx.objectStore("metadata").get(key)) as
+      PendingReaderState | undefined;
+    await tx.objectStore("metadata").put({
+      key,
+      bookId,
+      revision: uid(),
+      patch: { ...previous?.patch, ...patch },
+    });
+  }
   await tx.done;
   return updated;
 }
@@ -396,10 +442,12 @@ export async function deleteBook(id: string): Promise<Note[]> {
       "associations",
       "translations",
       "mindMaps",
+      "metadata",
     ],
     "readwrite"
   );
   const bookStore = tx.objectStore("books");
+  await tx.objectStore("metadata").delete(`reader-state:${id}`);
   const book = (await bookStore.get(id)) as Book | undefined;
   if (!book) {
     await tx.done;
@@ -490,20 +538,38 @@ export async function deleteBook(id: string): Promise<Note[]> {
   return updatedNotes;
 }
 
-/* ---------- 原始文件（PDF 原版模式用） ---------- */
+/* ---------- 原始书籍文件缓存 ---------- */
 
 export interface StoredFile {
   id: string; // 与 book.id 相同
-  type: "pdf";
+  type: Book["format"];
+  name?: string;
   /** 新导入使用 Blob 避免导入阶段再次读取整文件；兼容旧 ArrayBuffer。 */
   data: ArrayBuffer | Blob;
 }
 
-/** Commit an imported book and its optional source PDF as one atomic unit. */
+/** Commit an imported book and its optional source file as one atomic unit. */
 export async function putImportedBook(book: Book, file?: StoredFile) {
   const database = await db();
   const tx = database.transaction(["books", "files"], "readwrite");
   await tx.objectStore("books").put(book);
+  if (file) await tx.objectStore("files").put(file);
+  await tx.done;
+}
+
+/** Merge server data and unsent edits under the same lock as reader writes. */
+export async function cacheServerBook(book: Book, file?: StoredFile) {
+  const tx = (await db()).transaction(
+    ["books", "files", "metadata"],
+    "readwrite"
+  );
+  const pending = (await tx
+    .objectStore("metadata")
+    .get(`reader-state:${book.id}`)) as PendingReaderState | undefined;
+  const merged = { ...book, ...pending?.patch };
+  if (merged.cover === null) delete merged.cover;
+  if (merged.customCover === null) delete merged.customCover;
+  await tx.objectStore("books").put(merged);
   if (file) await tx.objectStore("files").put(file);
   await tx.done;
 }

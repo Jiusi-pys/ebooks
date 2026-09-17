@@ -223,6 +223,21 @@ function WorkspaceApp({
           </button>
         </div>
       )}
+      {lib.syncError && (
+        <div
+          role="status"
+          className="fixed bottom-4 left-1/2 z-[80] flex max-w-[90vw] -translate-x-1/2 items-center gap-3 rounded-lg border bg-card p-3 text-sm shadow-lg"
+        >
+          <span>正在使用本地缓存，服务端同步未完成：{lib.syncError}</span>
+          <button
+            type="button"
+            onClick={() => void lib.syncLibrary()}
+            className="shrink-0 text-primary"
+          >
+            重试同步
+          </button>
+        </div>
+      )}
       {!readerImmersive && (
         <>
           {isMobile && sidebarOpen && (

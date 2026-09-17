@@ -22,6 +22,7 @@ import {
 } from "@/lib/bookFormats";
 import type { Book, Folder } from "@/types";
 import { BookCover } from "./BookCover";
+import { LibrarySyncButton } from "./LibrarySyncButton";
 import { FolderGlyph } from "./FolderGlyph";
 import { FOLDER_ICON_OPTIONS } from "@/lib/folderIcons";
 import { BatchAction, BatchBar, SelectDot } from "./BatchBar";
@@ -586,15 +587,21 @@ export function LibraryView({ lib }: { lib: Library }) {
               书架
             </h1>
           )}
-          {/* 多选开关 */}
-          {visibleBooks.length > 0 && !sel.selecting && (
-            <button
-              onClick={sel.start}
-              className="font-meta mt-3 flex items-center gap-1.5 rounded-full border border-foreground/20 px-3 py-1.5 text-[11px] tracking-wider text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-            >
-              <CheckSquare size={12} /> 多选
-            </button>
-          )}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <LibrarySyncButton
+              onSync={lib.syncLibrary}
+              disabled={lib.imports.some(task => task.status === "working")}
+            />
+            {/* 多选开关 */}
+            {visibleBooks.length > 0 && !sel.selecting && (
+              <button
+                onClick={sel.start}
+                className="font-meta flex items-center gap-1.5 rounded-full border border-foreground/20 px-3 py-1.5 text-[11px] tracking-wider text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+              >
+                <CheckSquare size={12} /> 多选
+              </button>
+            )}
+          </div>
         </header>
 
         {/* 导入区（仅根目录显示） */}

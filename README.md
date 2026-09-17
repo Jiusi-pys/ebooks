@@ -2,7 +2,7 @@
 
 [简体中文](README_zh.md)
 
-Shufang is a local-first reading and book-management workspace inspired by the
+Shufang is a reading and book-management workspace with a MySQL-backed library inspired by the
 deep-reading workflow of MarginNote 4. It combines a multi-format reader,
 annotations, hierarchical citations, passage associations, study sets,
 mind maps, spaced review, and AI-assisted reading in one web application.
@@ -31,7 +31,7 @@ extensions are outside the current web scope.
 - Edit catalogue metadata such as title, contributors, publisher, publication
   date, languages, identifiers, series, subjects, description, edition, and
   rights, and mirror it to MySQL without rewriting the source ebook file.
-- Keep local IndexedDB and the optional MySQL mirror consistent across book,
+- Keep local IndexedDB and the MySQL mirror consistent across book,
   note, highlight, citation, association, and digest deletion. Event receipts,
   tombstones, transactional citation cleanup, and forward-only migrations make
   late browser events safe to retry.
@@ -86,12 +86,36 @@ app/
 └── verifier/     Historical acceptance criteria and run records
 ```
 
-Browser IndexedDB is the primary store. Original PDFs are retained there for
-original-layout rendering; reflowable formats are stored as parsed chapters
-rather than as their source file. When MySQL is configured, extracted metadata,
-chapter text, annotations, relationships, translations, mind maps, and event
-receipts are mirrored to the server for AI and machine clients. Original files
-are not uploaded by the normal browser import flow.
+MySQL stores the book library: metadata, parsed chapters (including footnotes),
+covers, editable outlines, reading progress, reader mode, and original files.
+Browser IndexedDB is a local cache. After login, the browser uploads older local-only
+books and restores the server library, including original PDFs for original-layout
+reading. New imports upload originals for every supported format in 256 KiB chunks
+(up to 256 MiB per file); byte count and SHA-256 are verified before publication.
+An import is complete only after its server writes succeed. Failed uploads keep
+the local copy and show a retry action; queued reading-state edits retry every five
+seconds while the app is open. Reopening the app or reconnecting also reconciles
+the library. Server deletion tombstones prevent stale caches resurrecting books.
+
+Use **同步到 MySQL** below the library heading (also available inside folders)
+to manually synchronize books and flush pending reading-state edits. The button
+is disabled during imports and synchronization. A successful server response
+displays **书籍已保存到 MySQL** with a timestamp; failures retain local data and
+allow retry. This action covers the book library, not all workspace tools.
+
+Older EPUB/MOBI/AZW3/FB2/TXT imports did not retain original files: their existing
+chapters, covers and reading state can migrate, but missing originals require
+reimporting the source. Leave the original browser open until migration succeeds
+before clearing its cache. Notes and other workspace tools retain their existing
+storage behavior; this library restoration does not restore every workspace tool.
+
+For access across browsers or networks, deploy the Node server and frontend under
+one HTTPS origin, configure `PUBLIC_ORIGIN` and secure session cookies, and point
+`DATABASE_URL` at the same persistent MySQL database. Run `npm run db:migrate`
+before starting the updated server. A static-only frontend cannot provide library
+persistence. Back up MySQL, including `mirror_books` and `library_source_chunks`;
+original files are stored in the database, not on the web server's local disk.
+Separate deployments only share a library when they share this database.
 
 ## Requirements
 
@@ -263,8 +287,10 @@ on the installation method.
 
 Before updating an existing installation, back up the database and always run
 `npm run db:migrate` rather than `db:push`. The committed migration sequence is
-forward-only through `0012_add_highlight_name`; it includes reconciliation for
-older mirror data and can be run repeatedly safely.
+forward-only through `0013_confused_amphibian`. Migration 0013 adds
+`mirror_books.reader_data`, `mirror_books.source_manifest`, and
+`library_source_chunks` for reading state and original files. The migration
+runner skips migrations already recorded as applied.
 
 ## Environment Configuration
 
@@ -455,6 +481,8 @@ to `APP_SECRET`.
   potentially incomplete reflow copy.
 - DRM-protected Kindle files and KFX are unsupported.
 - The server mirror has a 96 MiB encoded upload limit and uses resumable chunks.
+- The original-file endpoint supports up to 256 MiB in 256 KiB chunks; browser
+  import limits above still apply.
 
 ## Quality Checks
 
@@ -469,9 +497,17 @@ npx drizzle-kit check
 ```
 
 Vitest covers backend API behavior and browser-side storage/parser utilities.
+For real-database coverage, run `npm run test:mysql` against a migrated test
+database with `DATABASE_URL` and `OPEN_API_KEY` configured. These tests create
+and clean up their own records, including original-file upload/download checks.
 See [`AGENTS.md`](AGENTS.md) for contributor conventions.
 
 ## Troubleshooting
+
+- **Books are missing in another browser:** confirm both browsers use the same
+  deployed service/database, then click **同步到 MySQL** in the original browser
+  and wait for success before reopening the other browser. Keep old caches until
+  migration completes; source files absent from old caches require reimport.
 
 - **PowerShell blocks `npm.ps1`:** use `npm.cmd` and `npx.cmd`; no execution-policy
   change is required.
