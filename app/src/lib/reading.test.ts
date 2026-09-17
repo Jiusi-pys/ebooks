@@ -45,6 +45,25 @@ describe("book content hash", () => {
 });
 
 describe("reader page margin", () => {
+  it("restores paragraph spacing and upgrades older preferences", () => {
+    expect(loadTypeSettings({ getItem: () => "{}" })).toHaveProperty(
+      "paragraphSpacing",
+      0.4
+    );
+    const values = new Map<string, string>();
+    saveTypeSettings(
+      { ...DEFAULT_TYPE, paragraphSpacing: 1.5 },
+      {
+        setItem: (key, value) => values.set(key, value),
+      }
+    );
+    expect(
+      loadTypeSettings({ getItem: key => values.get(key) ?? null })
+    ).toHaveProperty("paragraphSpacing", 1.5);
+    expect(
+      loadTypeSettings({ getItem: () => '{"paragraphSpacing":-1}' })
+    ).toHaveProperty("paragraphSpacing", 0);
+  });
   it("upgrades settings saved before pageMargin existed", () => {
     const storage = {
       getItem: () => JSON.stringify({ fontSize: 22, columns: 2 }),
@@ -68,7 +87,8 @@ describe("reader page margin", () => {
   it("clamps invalid or out-of-range persisted margins", () => {
     expect(normalizePageMargin(Number.NaN)).toBe(DEFAULT_TYPE.pageMargin);
     expect(normalizePageMargin(4)).toBe(16);
-    expect(normalizePageMargin(120)).toBe(96);
+    expect(normalizePageMargin(320)).toBe(320);
+    expect(normalizePageMargin(600)).toBe(480);
     expect(normalizePageMargin(47.6)).toBe(48);
   });
 
@@ -84,11 +104,12 @@ describe("reader page margin", () => {
       { setItem: (key, value) => values.set(key, value) }
     );
 
-    expect(JSON.parse(values.get("shufang-type2") ?? "{}").pageMargin).toBe(96);
+    expect(JSON.parse(values.get("shufang-type2") ?? "{}").pageMargin).toBe(200);
   });
 
   it("produces responsive padding for narrow split panes", () => {
-    expect(readerPagePadding(48)).toBe("clamp(16px, 48px, 12%)");
+    expect(readerPagePadding(48)).toBe("clamp(16px, 48px, 25%)");
+    expect(readerPagePadding(480)).toBe("clamp(16px, 480px, 25%)");
   });
 });
 

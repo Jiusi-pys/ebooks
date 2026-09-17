@@ -15,6 +15,9 @@ describe("TypePanel page-turn controls", () => {
     );
 
     expect(html).toContain("翻页方式");
+    expect(html).toContain('aria-label="段间距"');
+    expect(html).toContain('aria-label="行间距"');
+    expect(html).toContain('aria-label="页边距"');
     expect(html).toContain("上下连续");
     expect(html).toContain("左右翻页");
     expect(html).toContain('title="上下连续滚动，到章节边界后继续滚轮可切章"');

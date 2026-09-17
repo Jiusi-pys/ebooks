@@ -112,6 +112,7 @@ export const DEFAULT_TYPE: TypeSettings = {
   fontId: "song",
   fontSize: 19,
   lineHeight: 2.0,
+  paragraphSpacing: 0.4,
   letterSpacing: 0.02,
   pageMargin: 32,
   fontWeight: 400,
@@ -121,7 +122,7 @@ export const DEFAULT_TYPE: TypeSettings = {
 };
 
 export const PAGE_MARGIN_MIN = 16;
-export const PAGE_MARGIN_MAX = 96;
+export const PAGE_MARGIN_MAX = 480;
 const TYPE_SETTINGS_KEY = "shufang-type2";
 
 interface TypeSettingsStorage {
@@ -147,6 +148,11 @@ export function normalizeTypeSettings(value: unknown): TypeSettings {
     ...DEFAULT_TYPE,
     ...saved,
     pageMargin: normalizePageMargin(saved.pageMargin),
+    paragraphSpacing:
+      typeof saved.paragraphSpacing === "number" &&
+      Number.isFinite(saved.paragraphSpacing)
+        ? Math.min(3, Math.max(0, saved.paragraphSpacing))
+        : DEFAULT_TYPE.paragraphSpacing,
     pageTurnMode:
       saved.pageTurnMode === "horizontal" ? "horizontal" : "vertical",
   };
@@ -154,7 +160,7 @@ export function normalizeTypeSettings(value: unknown): TypeSettings {
 
 /** Responsive padding: honour the preference while retaining room in narrow split panes. */
 export function readerPagePadding(pageMargin: number): string {
-  return `clamp(${PAGE_MARGIN_MIN}px, ${normalizePageMargin(pageMargin)}px, 12%)`;
+  return `clamp(${PAGE_MARGIN_MIN}px, ${normalizePageMargin(pageMargin)}px, 25%)`;
 }
 
 export interface ReaderChapterEntryPlan {

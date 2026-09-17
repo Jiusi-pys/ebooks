@@ -184,7 +184,7 @@ export interface BookMirrorSnapshot {
   folder?: string;
   contentHash?: string;
   metadata?: BookMetadata;
-  chapters: Pick<Chapter, "id" | "title" | "paragraphs">[];
+  chapters: Pick<Chapter, "id" | "title" | "paragraphs" | "footnotes">[];
 }
 
 export interface BookMirrorProtocol {

@@ -1,4 +1,4 @@
-import type { BookMetadata, Chapter } from "@/types";
+import type { BookMetadata, Chapter, OutlineItem } from "@/types";
 import type { ImportBookFormat } from "./bookFormats";
 // Keep every parser eager: an open production tab must not request a removed
 // hashed parser chunk after the app is rebuilt in place.
@@ -13,6 +13,7 @@ export interface ParsedBook {
   author: string;
   cover?: string;
   chapters: Chapter[];
+  outline?: OutlineItem[];
   /** 原始 PDF 总页数；其他格式为 undefined。 */
   pageCount?: number;
   /** 从书籍文件安全提取并归一化的可编辑书目元数据。 */

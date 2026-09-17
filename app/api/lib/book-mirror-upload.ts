@@ -88,8 +88,37 @@ const mirrorChapterSchema = z
     id: stableId,
     title: z.string().max(255),
     paragraphs: z.array(z.string().max(MAX_BOOK_TEXT_CHARACTERS)).max(250_000),
+    footnotes: z
+      .array(
+        z
+          .object({
+            paraIndex: z.number().int().min(0),
+            start: z.number().int().min(0),
+            end: z.number().int().min(1),
+            content: z.string().max(MAX_BOOK_TEXT_CHARACTERS),
+          })
+          .strict()
+      )
+      .max(250_000)
+      .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((chapter, context) => {
+    for (const [index, note] of (chapter.footnotes ?? []).entries()) {
+      const paragraph = chapter.paragraphs[note.paraIndex];
+      if (
+        paragraph === undefined ||
+        note.start >= note.end ||
+        note.end > paragraph.length
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["footnotes", index],
+          message: "footnote must reference a valid paragraph text range",
+        });
+      }
+    }
+  });
 
 const mirrorChaptersSchema = z
   .array(mirrorChapterSchema)
@@ -97,12 +126,23 @@ const mirrorChaptersSchema = z
   .superRefine((chapters, context) => {
     let paragraphs = 0;
     let characters = 0;
+    let footnotes = 0;
     for (const chapter of chapters) {
       paragraphs += chapter.paragraphs.length;
       for (const paragraph of chapter.paragraphs) {
         characters += paragraph.length;
       }
+      footnotes += chapter.footnotes?.length ?? 0;
+      for (const note of chapter.footnotes ?? []) {
+        characters += note.content.length;
+      }
       if (paragraphs > 250_000 || characters > MAX_BOOK_TEXT_CHARACTERS) break;
+    }
+    if (footnotes > 250_000) {
+      context.addIssue({
+        code: "custom",
+        message: "book contains more than 250000 footnotes",
+      });
     }
     if (paragraphs > 250_000) {
       context.addIssue({

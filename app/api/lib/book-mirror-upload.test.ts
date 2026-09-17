@@ -59,6 +59,38 @@ function validRows(): UploadRow[] {
   ];
 }
 
+describe("EPUB footnote mirror", () => {
+  function assemble(footnotes: unknown) {
+    const payload = JSON.stringify([{ ...chapters[0], footnotes }]);
+    const bytes = Buffer.byteLength(payload, "utf8");
+    return assembleBookMirrorUpload(
+      { ...completion, chunkCount: 1, encodedBytes: bytes },
+      [
+        row({ chunkCount: 1, encodedBytes: bytes }),
+        row({ chunkCount: 1, encodedBytes: bytes, chunkIndex: 0, payload }),
+      ]
+    );
+  }
+
+  it("preserves popup footnotes in the validated and stored chapters", () => {
+    const footnotes = [{ paraIndex: 0, start: 2, end: 4, content: "注释" }];
+    const result = assemble(footnotes);
+    expect(result.chapters[0]).toHaveProperty("footnotes", footnotes);
+    expect(JSON.parse(result.chaptersJson)[0].footnotes).toEqual(footnotes);
+  });
+
+  it.each([
+    { paraIndex: -1, start: 0, end: 1, content: "注释" },
+    { paraIndex: 2, start: 0, end: 1, content: "注释" },
+    { paraIndex: 0, start: 2, end: 2, content: "注释" },
+    { paraIndex: 0, start: 0, end: 5, content: "注释" },
+    { paraIndex: 0, start: 0.5, end: 1, content: "注释" },
+    { paraIndex: 0, start: 0, end: 1, content: "注释", extra: true },
+  ])("rejects invalid footnote anchors or fields: %j", note => {
+    expect(() => assemble([note])).toThrow();
+  });
+});
+
 interface FakeState {
   inserted: { table: unknown; value: Record<string, unknown> }[];
   upserted: Record<string, unknown>[];

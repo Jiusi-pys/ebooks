@@ -1,16 +1,21 @@
+export interface EpubFootnote {
+  paraIndex: number;
+  /** UTF-16 offsets into the normalized paragraph; no HTML is stored. */
+  start: number;
+  end: number;
+  content: string;
+}
+
 export interface Chapter {
   id: string;
   title: string;
   /** 已按段落重排后的正文 */
   paragraphs: string[];
+  footnotes?: EpubFootnote[];
 }
 
 export type BookContributorRole =
-  | "author"
-  | "editor"
-  | "translator"
-  | "illustrator"
-  | "other";
+  "author" | "editor" | "translator" | "illustrator" | "other";
 
 export interface BookContributor {
   name: string;
@@ -347,7 +352,8 @@ export interface Route {
 export interface TypeSettings {
   fontId: string;
   fontSize: number; // px
-  lineHeight: number; // 1.4 - 2.4
+  lineHeight: number; // 1.4 - 2.6
+  paragraphSpacing: number; // em, 0 - 3
   letterSpacing: number; // em, 0 - 0.12
   pageMargin: number; // px, text distance from the reading-page edge
   fontWeight: 300 | 400 | 600;

@@ -1,8 +1,7 @@
 import JSZip from "jszip";
-import { uid } from "./db";
-import { normalizeParagraph } from "./reflow";
-import type { BookContributorRole, Chapter } from "@/types";
+import type { BookContributorRole } from "@/types";
 import type { ParsedBook } from "./parseBook";
+import { parseEpubContent, readEpubToc } from "./epubContent";
 import { importedBookMetadata } from "./importMetadata";
 
 const MIB = 1024 * 1024;
@@ -229,19 +228,14 @@ export function extractEpubPackageFields(
   const titleType = (element: Element) =>
     (
       namespacedAttribute(element, "type") ||
-      refinedProperty(
-        metas,
-        element.getAttribute("id") ?? "",
-        "title-type"
-      )
+      refinedProperty(metas, element.getAttribute("id") ?? "", "title-type")
     ).toLowerCase();
   const subtitleElement = titles.find(element =>
     titleType(element).split(/\s+/).includes("subtitle")
   );
   const mainTitleElement =
-    titles.find(element =>
-      titleType(element).split(/\s+/).includes("main")
-    ) ?? titles.find(element => element !== subtitleElement);
+    titles.find(element => titleType(element).split(/\s+/).includes("main")) ??
+    titles.find(element => element !== subtitleElement);
   const selectedTitle = mainTitleElement ?? titles[0];
   const title = boundedMetadata(
     (selectedTitle ? elementText(selectedTitle) : "") || fallbackTitle,
@@ -267,8 +261,7 @@ export function extractEpubPackageFields(
     publishedDates: elementsByLocalName(metadataRoot, "date")
       .sort((left, right) => {
         const publication = (element: Element) =>
-          namespacedAttribute(element, "event").toLowerCase() ===
-          "publication"
+          namespacedAttribute(element, "event").toLowerCase() === "publication"
             ? 0
             : 1;
         return publication(left) - publication(right);
@@ -387,36 +380,6 @@ async function zipText(
     throw new EpubResourceLimitError(`${label}文本过长`);
   }
   return text;
-}
-
-/** 递归遍历正文 DOM，按阅读顺序收集块级元素 */
-function collectBlocks(root: Element): { heading: number; text: string }[] {
-  const out: { heading: number; text: string }[] = [];
-  const BLOCK = new Set(["P", "BLOCKQUOTE", "LI", "PRE", "TD"]);
-  const HEAD = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
-  const walk = (el: Element) => {
-    for (const node of Array.from(el.children)) {
-      const tag = node.tagName.toUpperCase();
-      if (HEAD.has(tag)) {
-        const text = (node.textContent ?? "").trim();
-        if (text)
-          out.push({
-            heading: Number(tag[1]),
-            text: text.slice(0, EPUB_LIMITS.metadataCharacters),
-          });
-      } else if (BLOCK.has(tag)) {
-        const text = (node.textContent ?? "").replace(/\s+/g, " ").trim();
-        if (text) out.push({ heading: 0, text: normalizeParagraph(text) });
-      } else if (tag !== "SCRIPT" && tag !== "STYLE" && tag !== "SVG") {
-        walk(node);
-      }
-      if (out.length > EPUB_LIMITS.blocksPerChapter) {
-        throw new EpubResourceLimitError("单个 EPUB 章节的段落数过多");
-      }
-    }
-  };
-  walk(root);
-  return out;
 }
 
 /** EPUB 封面图 → 缩小后的 dataURL */
@@ -552,131 +515,49 @@ export async function parseEpub(
     if (item) cover = await coverDataUrl(zip, item.href, budget);
   }
 
-  // 目录（nav 或 ncx）：href → 标题
-  const tocTitles = new Map<string, string>();
-  const navItem = [...manifest.values()].find(i => i.props.includes("nav"));
-  if (navItem) {
-    const navXml = await zipText(
-      zip,
-      navItem.href,
-      budget,
-      EPUB_LIMITS.tocBytes,
-      EPUB_LIMITS.tocCharacters,
-      "EPUB 目录"
+  // Read each content document once, including notes outside the spine.
+  const documents = new Map<string, Document>();
+  const contentItems = [...manifest.values()].filter(
+    item =>
+      item.type === "application/xhtml+xml" ||
+      item.type === "application/x-dtbncx+xml"
+  );
+  for (let i = 0; i < contentItems.length; i++) {
+    const item = contentItems[i];
+    onProgress?.(
+      "解析章节与注释",
+      0.2 + (0.75 * i) / Math.max(1, contentItems.length)
     );
-    if (navXml) {
-      const nav = new DOMParser().parseFromString(
-        navXml,
-        "application/xhtml+xml"
-      );
-      for (const a of Array.from(nav.querySelectorAll("nav a"))) {
-        const href = a.getAttribute("href");
-        if (href)
-          tocTitles.set(
-            resolvePath(dirname(navItem.href), href),
-            (a.textContent ?? "")
-              .trim()
-              .slice(0, EPUB_LIMITS.metadataCharacters)
-          );
-      }
-    }
-  } else {
-    const ncxItem = [...manifest.values()].find(i => i.href.endsWith(".ncx"));
-    if (ncxItem) {
-      const ncxXml = await zipText(
-        zip,
-        ncxItem.href,
-        budget,
-        EPUB_LIMITS.tocBytes,
-        EPUB_LIMITS.tocCharacters,
-        "EPUB NCX 目录"
-      );
-      if (ncxXml) {
-        const ncx = new DOMParser().parseFromString(ncxXml, "application/xml");
-        for (const np of Array.from(ncx.querySelectorAll("navPoint"))) {
-          const label = np.querySelector("navLabel text")?.textContent?.trim();
-          const src = np.querySelector("content")?.getAttribute("src");
-          if (label && src)
-            tocTitles.set(
-              resolvePath(dirname(ncxItem.href), src),
-              label.slice(0, EPUB_LIMITS.metadataCharacters)
-            );
-        }
-      }
-    }
-  }
-
-  onProgress?.("解析章节", 0.2);
-  const chapters: Chapter[] = [];
-  let bookCharacters = title.length + author.length;
-  for (let i = 0; i < spine.length; i++) {
-    const chaptersBefore = chapters.length;
-    if (i % 3 === 0)
-      onProgress?.("解析章节", 0.2 + 0.75 * (i / Math.max(1, spine.length)));
-    const html = await zipText(
+    const content = await zipText(
       zip,
-      spine[i],
+      item.href,
       budget,
       EPUB_LIMITS.chapterBytes,
       EPUB_LIMITS.chapterCharacters,
-      `EPUB 章节 ${i + 1}`
+      "EPUB 正文与注释"
     );
-    if (!html) continue;
-    const doc = new DOMParser().parseFromString(html, "application/xhtml+xml");
-    const body = doc.querySelector("body");
-    if (!body) continue;
-    const blocks = collectBlocks(body);
-    if (blocks.length === 0) continue;
-
-    let cur: Chapter = {
-      id: uid(),
-      title: tocTitles.get(spine[i]) || `第 ${chapters.length + 1} 节`,
-      paragraphs: [],
-    };
-    let started = false;
-    for (const b of blocks) {
-      if (b.heading > 0 && b.heading <= 2) {
-        // 跳过与目录标题重复的首个标题
-        if (
-          !started &&
-          (b.text === cur.title || cur.title === `第 ${chapters.length + 1} 节`)
-        ) {
-          if (cur.title.startsWith("第 ") && cur.title.endsWith(" 节"))
-            cur.title = b.text;
-          started = true;
-          continue;
-        }
-        if (cur.paragraphs.length > 0) {
-          chapters.push(cur);
-          if (chapters.length > EPUB_LIMITS.outputChapters) {
-            throw new Error(
-              `EPUB 识别出的章节超过 ${EPUB_LIMITS.outputChapters} 个`
-            );
-          }
-          cur = { id: uid(), title: b.text, paragraphs: [] };
-        } else {
-          cur.title = b.text;
-        }
-        started = true;
-      } else {
-        cur.paragraphs.push(b.text);
-        started = true;
-      }
-    }
-    if (cur.paragraphs.length > 0) chapters.push(cur);
-    for (const chapter of chapters.slice(chaptersBefore)) {
-      bookCharacters += chapter.title.length;
-      for (const paragraph of chapter.paragraphs)
-        bookCharacters += paragraph.length;
-    }
-    if (bookCharacters > EPUB_LIMITS.bookCharacters) {
-      throw new Error("EPUB 正文超过 2400 万字符");
-    }
-    if (chapters.length > EPUB_LIMITS.outputChapters) {
-      throw new Error(`EPUB 识别出的章节超过 ${EPUB_LIMITS.outputChapters} 个`);
-    }
+    if (!content) continue;
+    const document = new DOMParser().parseFromString(
+      content,
+      "application/xhtml+xml"
+    );
+    if (document.querySelector("parsererror"))
+      throw new Error(`EPUB 文档无法解析：${item.href}`);
+    documents.set(item.href, document);
   }
-
+  const navigation =
+    contentItems.find(item => item.props.split(/\s+/).includes("nav")) ??
+    contentItems.find(item => item.type === "application/x-dtbncx+xml");
+  const navDoc = navigation ? documents.get(navigation.href) : undefined;
+  const toc = navigation && navDoc ? readEpubToc(navDoc, navigation.href) : [];
+  const { chapters, outline } = parseEpubContent(documents, spine, toc);
   if (chapters.length === 0) throw new Error("未能从 EPUB 中识别出正文");
-  return { title, author, cover, chapters, metadata };
+  return {
+    title,
+    author,
+    cover,
+    chapters,
+    metadata,
+    ...(outline.length ? { outline } : {}),
+  };
 }

@@ -42,6 +42,36 @@ extensions are outside the current web scope.
   and the reader toolbar. Manage the MySQL-backed local username and password
   from the account panel.
 
+## EPUB Navigation, Notes, and Typography
+
+EPUB imports preserve navigation entries and paragraph anchors, including notes
+stored in separate content documents. Recognized footnote references appear as
+superscripts at 65% of the body font size. Click a reference to open its note;
+press Escape or use the close button to dismiss it without leaving the text.
+Footnotes are retained in the local book and the chunked MySQL mirror, whose
+validation checks paragraph indexes, text ranges, and upload size limits.
+
+Open **Aa 排版** in the reader toolbar to adjust the font, font size, line
+spacing, paragraph spacing, letter spacing, page margins, and background.
+Changes apply immediately and are saved in this browser. The settings panel
+scrolls when needed and remains accessible outside clipped split panes.
+
+- Paragraph spacing ranges from 0 to 3 em.
+- Single-page continuous reading fills the available reading pane instead of
+  being capped at 680 px. Bilingual and reference panes also use their available
+  width.
+- Page margins range from 16 to 480 px per side, capped at 25% of the pane width
+  to retain space for text in narrow panes. Increase the margin for shorter lines
+  on wide screens; existing preferences are preserved.
+- These typography controls apply to reflowed text. For original-layout PDFs,
+  switch to reflow mode to adjust text typography.
+
+Parser, note interaction, upload validation, and EPUB-to-mirror regression tests
+include a small synthetic EPUB fixture. To additionally test a local EPUB, set
+`EPUB_MIRROR_TEST_FILE` to its absolute path and run
+`npm test -- src/lib/epubMirror.test.ts` from `app/` (use `npm.cmd` on Windows).
+This test does not write to MySQL or upload the source file.
+
 ## Architecture and Data Storage
 
 The application is in [`app/`](app/):

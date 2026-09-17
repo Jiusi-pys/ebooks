@@ -113,7 +113,7 @@
   margin: 0;
 }
 .reader-body p + p {
-  margin-top: 0.4em;
+  margin-top: var(--reader-paragraph-spacing, 0.4em);
 }
 
 /* 笔记 markdown-lite 渲染 */

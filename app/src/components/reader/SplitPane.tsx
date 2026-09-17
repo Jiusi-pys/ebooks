@@ -1,3 +1,4 @@
+import { EpubText } from "./EpubText";
 import { useEffect, useRef } from "react";
 import { BookOpen, Columns2, X } from "lucide-react";
 import type { Book, ReaderTheme, TypeSettings } from "@/types";
@@ -158,7 +159,7 @@ export function SplitPane({
       ) : (
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
           <article
-            className="mx-auto max-w-[620px] pb-20 pt-8"
+            className="w-full pb-20 pt-8"
             style={{ paddingInline: readerPagePadding(type.pageMargin) }}
           >
             <div
@@ -173,16 +174,24 @@ export function SplitPane({
             <div
               className="reader-body"
               style={{
+                ...{
+                  "--reader-paragraph-spacing": `${type.paragraphSpacing}em`,
+                },
                 fontFamily: fontStack(type.fontId),
-                fontSize: Math.max(15, type.fontSize - 1),
+                fontSize: type.fontSize,
                 lineHeight: type.lineHeight,
                 letterSpacing: `${type.letterSpacing}em`,
                 fontWeight: type.fontWeight,
               }}
             >
               {chapter.paragraphs.map((p, i) => (
-                <p key={i} className="mb-4">
-                  {p}
+                <p key={i}>
+                  <EpubText
+                    text={p}
+                    notes={chapter.footnotes?.filter(
+                      note => note.paraIndex === i
+                    )}
+                  />
                 </p>
               ))}
             </div>

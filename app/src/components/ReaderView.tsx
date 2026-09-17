@@ -1,3 +1,4 @@
+import * as Popover from "@radix-ui/react-popover";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -63,6 +64,7 @@ import {
 import { PdfCanvasViewer, type PdfSelectInfo } from "./reader/PdfCanvasViewer";
 import { PdfSelectionToolbar } from "./reader/PdfSelectionToolbar";
 import { BilingualReader } from "./reader/BilingualReader";
+import { EpubText } from "./reader/EpubText";
 import { inferTargetLanguage, type BilingualLanguage } from "@/lib/bilingual";
 import { SplitWorkspace } from "./reader/SplitWorkspace";
 import {
@@ -780,6 +782,7 @@ export function ReaderView({
     type.fontWeight,
     type.letterSpacing,
     type.lineHeight,
+    type.paragraphSpacing,
     type.pageMargin,
     type.pageTurnMode,
   ]);
@@ -1694,30 +1697,41 @@ export function ReaderView({
                 </div>
                 {/* 排版按钮（原版版面下无效，隐藏） */}
                 {!isOriginal && (
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowType(v => !v)}
-                      className={`flex items-center gap-1 rounded-full border px-3 py-1 text-[12.5px] transition-colors ${
-                        showType ? "border-primary text-primary" : ""
-                      }`}
-                      style={{
-                        borderColor: showType ? undefined : theme.border,
-                        color: showType ? undefined : theme.muted,
-                      }}
-                    >
-                      <span className="text-[11px]">A</span>
-                      <span className="font-reading text-[15px] leading-none">
-                        文
-                      </span>
-                    </button>
-                    {showType && (
-                      <TypePanel
-                        value={type}
-                        onChange={updateTypeSettings}
-                        onClose={() => setShowType(false)}
-                      />
-                    )}
-                  </div>
+                  <Popover.Root open={showType} onOpenChange={setShowType}>
+                    <Popover.Trigger asChild>
+                      <button
+                        aria-label="排版设置"
+                        title="字号、字体与阅读间距"
+                        className={`flex items-center gap-1 rounded-full border px-3 py-1 text-[12.5px] transition-colors ${
+                          showType ? "border-primary text-primary" : ""
+                        }`}
+                        style={{
+                          borderColor: showType ? undefined : theme.border,
+                          color: showType ? undefined : theme.muted,
+                        }}
+                      >
+                        <span className="text-[11px]">Aa</span>
+                        <span className="font-reading text-[15px] leading-none">
+                          排版
+                        </span>
+                      </button>
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      <Popover.Content
+                        align="end"
+                        sideOffset={8}
+                        collisionPadding={12}
+                        aria-label="排版设置"
+                        className="z-[100] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
+                      >
+                        <TypePanel
+                          value={type}
+                          onChange={updateTypeSettings}
+                          onClose={() => setShowType(false)}
+                        />
+                      </Popover.Content>
+                    </Popover.Portal>
+                  </Popover.Root>
                 )}
                 {readerPanelAvailable && !readerPanelVisible && (
                   <button
@@ -1974,7 +1988,7 @@ export function ReaderView({
                               columnCount: type.columns,
                             } as React.CSSProperties)
                           : {
-                              maxWidth: type.columns === 2 ? 1080 : 680,
+                              maxWidth: type.columns === 2 ? 1080 : undefined,
                               paddingInline: readerPagePadding(type.pageMargin),
                             }
                       }
@@ -1996,6 +2010,9 @@ export function ReaderView({
                             : ""
                         }`}
                         style={{
+                          ...{
+                            "--reader-paragraph-spacing": `${type.paragraphSpacing}em`,
+                          },
                           fontFamily: fontStack(type.fontId),
                           fontSize: type.fontSize,
                           lineHeight: type.lineHeight,
@@ -2008,6 +2025,9 @@ export function ReaderView({
                             key={`${chapter.id}:${i}:${posture === "recall" ? "recall" : "normal"}`}
                             index={i}
                             text={p}
+                            footnotes={chapter.footnotes?.filter(
+                              note => note.paraIndex === i
+                            )}
                             ranges={rangesByPara.get(i) ?? []}
                             associationRanges={
                               associationRangesByPara.get(i) ?? []
@@ -2642,6 +2662,7 @@ function MarkCard({
 export function Paragraph({
   index,
   text,
+  footnotes,
   ranges,
   associationRanges,
   recall,
@@ -2650,6 +2671,7 @@ export function Paragraph({
 }: {
   index: number;
   text: string;
+  footnotes?: import("@/types").EpubFootnote[];
   ranges: { h: Highlight; start: number; end: number }[];
   associationRanges: AssociationRange[];
   recall: boolean;
@@ -2708,7 +2730,15 @@ export function Paragraph({
         const h = segment.highlight;
         const firstAssociation = segment.associations[0];
         if (!h && !firstAssociation)
-          return <span key={segment.start}>{segment.text}</span>;
+          return (
+            <span key={segment.start}>
+              <EpubText
+                text={segment.text}
+                offset={segment.start}
+                notes={footnotes}
+              />
+            </span>
+          );
         const isConcealed = h
           ? isRecallHighlightConcealed(recall, revealed, h.id)
           : false;
@@ -2812,7 +2842,15 @@ export function Paragraph({
               } else openAssociation(e);
             }}
           >
-            {segment.text}
+            {isConcealed ? (
+              segment.text
+            ) : (
+              <EpubText
+                text={segment.text}
+                offset={segment.start}
+                notes={footnotes}
+              />
+            )}
             {h?.noteId && segment.endingHighlight && (
               <Quote
                 aria-label="引用标记"

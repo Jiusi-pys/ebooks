@@ -1,3 +1,4 @@
+import { EpubText } from "./EpubText";
 import {
   useCallback,
   useEffect,
@@ -360,6 +361,7 @@ export function BilingualReader({
   const previous = book.chapters[chapterIndex - 1];
   const next = book.chapters[chapterIndex + 1];
   const readerStyle = {
+    "--reader-paragraph-spacing": `${type.paragraphSpacing}em`,
     fontFamily: fontStack(type.fontId),
     fontSize: type.fontSize,
     lineHeight: type.lineHeight,
@@ -600,7 +602,7 @@ function ChapterBody({
 }) {
   return (
     <article
-      className="mx-auto max-w-[680px] pb-20 pt-9"
+      className="w-full pb-20 pt-9"
       style={{ paddingInline: pagePadding }}
     >
       <h2 className="font-reading mb-2 text-center text-[22px] font-bold tracking-wide">
@@ -619,7 +621,14 @@ function ChapterBody({
             data-bilingual-paragraph={index}
             className="whitespace-pre-wrap"
           >
-            {paragraph}
+            <EpubText
+              text={paragraph}
+              notes={
+                paragraphs === chapter.paragraphs
+                  ? chapter.footnotes?.filter(note => note.paraIndex === index)
+                  : undefined
+              }
+            />
           </p>
         ))}
       </div>

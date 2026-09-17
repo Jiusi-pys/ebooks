@@ -290,6 +290,7 @@ export function useLibrary() {
             cover: parsed.cover,
             coverTone: toneForTitle(parsed.title),
             chapters: parsed.chapters,
+            outline: parsed.outline,
             createdAt: Date.now(),
             metadata: parsed.metadata,
             progress: { chapterId: parsed.chapters[0]?.id ?? "", ratio: 0 },

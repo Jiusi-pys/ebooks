@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { ArrowLeftRight, ArrowUpDown } from "lucide-react";
 import type { TypeSettings } from "@/types";
 import {
@@ -32,6 +31,7 @@ function Row({
 }
 
 function Slider({
+  label,
   min,
   max,
   step,
@@ -39,6 +39,7 @@ function Slider({
   onChange,
   format,
 }: {
+  label: string;
   min: number;
   max: number;
   step: number;
@@ -50,6 +51,7 @@ function Slider({
     <div className="flex items-center gap-2.5">
       <input
         type="range"
+        aria-label={label}
         min={min}
         max={max}
         step={step}
@@ -66,27 +68,22 @@ function Slider({
 
 /** Apple Books 式排版面板 */
 export function TypePanel({ value, onChange, onClose }: Props) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [onClose]);
-
   const set = (patch: Partial<TypeSettings>) =>
     onChange({ ...value, ...patch });
 
   return (
-    <div
-      ref={ref}
-      className="float-pop absolute right-0 top-11 z-40 w-[300px] rounded-lg border border-border bg-popover p-4"
-    >
+    <div className="w-[300px] max-w-[calc(100vw-24px)] p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-medium">阅读排版</h2>
+        <button type="button" onClick={onClose} aria-label="关闭排版设置">
+          关闭
+        </button>
+      </div>
       {/* 字号 */}
       <Row label="字号">
         <div className="flex items-center justify-between rounded-md border border-border">
           <button
+            aria-label="减小字号"
             onClick={() => set({ fontSize: Math.max(14, value.fontSize - 1) })}
             className="flex-1 py-1.5 text-[13px] text-muted-foreground hover:bg-secondary"
           >
@@ -94,6 +91,7 @@ export function TypePanel({ value, onChange, onClose }: Props) {
           </button>
           <span className="font-meta text-[12px]">{value.fontSize}px</span>
           <button
+            aria-label="增大字号"
             onClick={() => set({ fontSize: Math.min(26, value.fontSize + 1) })}
             className="flex-1 py-1.5 text-[16px] text-muted-foreground hover:bg-secondary"
           >
@@ -125,6 +123,7 @@ export function TypePanel({ value, onChange, onClose }: Props) {
       {/* 行距 / 字距 */}
       <Row label="行间距">
         <Slider
+          label="行间距"
           min={14}
           max={26}
           step={1}
@@ -133,8 +132,20 @@ export function TypePanel({ value, onChange, onClose }: Props) {
           format={v => (v / 10).toFixed(1)}
         />
       </Row>
+      <Row label="段间距">
+        <Slider
+          label="段间距"
+          min={0}
+          max={30}
+          step={1}
+          value={value.paragraphSpacing * 10}
+          onChange={v => set({ paragraphSpacing: v / 10 })}
+          format={v => `${(v / 10).toFixed(1)}em`}
+        />
+      </Row>
       <Row label="字间距">
         <Slider
+          label="字间距"
           min={0}
           max={12}
           step={1}
@@ -145,6 +156,7 @@ export function TypePanel({ value, onChange, onClose }: Props) {
       </Row>
       <Row label="页边距">
         <Slider
+          label="页边距"
           min={PAGE_MARGIN_MIN}
           max={PAGE_MARGIN_MAX}
           step={4}
