@@ -113,29 +113,58 @@ export function BookMetadataDialog({
             </h3>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="书名 *">
-                <input autoFocus maxLength={255} className={inputClass} {...field("title")} />
+                <input
+                  autoFocus
+                  maxLength={255}
+                  className={inputClass}
+                  {...field("title")}
+                />
               </Field>
               <Field label="副标题">
-                <input maxLength={255} className={inputClass} {...field("subtitle")} />
+                <input
+                  maxLength={255}
+                  className={inputClass}
+                  {...field("subtitle")}
+                />
               </Field>
               <Field
                 label="作者"
                 hint="多位作者请用分号分隔；不会把旧数据中的逗号擅自拆开。"
                 wide
               >
-                <input maxLength={4096} className={inputClass} {...field("authors")} />
+                <input
+                  maxLength={4096}
+                  className={inputClass}
+                  {...field("authors")}
+                />
               </Field>
               <Field label="编者">
-                <input maxLength={4096} className={inputClass} {...field("editors")} />
+                <input
+                  maxLength={4096}
+                  className={inputClass}
+                  {...field("editors")}
+                />
               </Field>
               <Field label="译者">
-                <input maxLength={4096} className={inputClass} {...field("translators")} />
+                <input
+                  maxLength={4096}
+                  className={inputClass}
+                  {...field("translators")}
+                />
               </Field>
               <Field label="插画者">
-                <input maxLength={4096} className={inputClass} {...field("illustrators")} />
+                <input
+                  maxLength={4096}
+                  className={inputClass}
+                  {...field("illustrators")}
+                />
               </Field>
               <Field label="其他贡献者">
-                <input maxLength={4096} className={inputClass} {...field("otherContributors")} />
+                <input
+                  maxLength={4096}
+                  className={inputClass}
+                  {...field("otherContributors")}
+                />
               </Field>
             </div>
           </section>
@@ -146,7 +175,11 @@ export function BookMetadataDialog({
             </h3>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="出版社">
-                <input maxLength={255} className={inputClass} {...field("publisher")} />
+                <input
+                  maxLength={255}
+                  className={inputClass}
+                  {...field("publisher")}
+                />
               </Field>
               <Field
                 label="出版日期"
@@ -159,17 +192,32 @@ export function BookMetadataDialog({
                   {...field("publishedDate")}
                 />
               </Field>
-              <Field label="语言" hint="使用 BCP 47 标签，多项用逗号分隔，例如 zh-Hans, en-US。">
+              <Field
+                label="语言"
+                hint="使用 BCP 47 标签，多项用逗号分隔，例如 zh-Hans, en-US。"
+              >
                 <input className={inputClass} {...field("languages")} />
               </Field>
               <Field label="版次">
-                <input maxLength={128} className={inputClass} {...field("edition")} />
+                <input
+                  maxLength={128}
+                  className={inputClass}
+                  {...field("edition")}
+                />
               </Field>
               <Field label="系列">
-                <input maxLength={255} className={inputClass} {...field("series")} />
+                <input
+                  maxLength={255}
+                  className={inputClass}
+                  {...field("series")}
+                />
               </Field>
               <Field label="系列序号">
-                <input inputMode="decimal" className={inputClass} {...field("seriesIndex")} />
+                <input
+                  inputMode="decimal"
+                  className={inputClass}
+                  {...field("seriesIndex")}
+                />
               </Field>
             </div>
           </section>
@@ -180,19 +228,43 @@ export function BookMetadataDialog({
             </h3>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="ISBN">
-                <input maxLength={255} className={inputClass} {...field("isbn")} />
+                <input
+                  maxLength={255}
+                  className={inputClass}
+                  {...field("isbn")}
+                />
               </Field>
               <Field label="DOI">
-                <input maxLength={255} className={inputClass} {...field("doi")} />
+                <input
+                  maxLength={255}
+                  className={inputClass}
+                  {...field("doi")}
+                />
               </Field>
               <Field label="ASIN">
-                <input maxLength={255} className={inputClass} {...field("asin")} />
+                <input
+                  maxLength={255}
+                  className={inputClass}
+                  {...field("asin")}
+                />
               </Field>
               <Field label="个人评分（0–5）">
-                <input inputMode="decimal" className={inputClass} {...field("rating")} />
+                <input
+                  inputMode="decimal"
+                  className={inputClass}
+                  {...field("rating")}
+                />
               </Field>
-              <Field label="其他标识符" hint="每行一项，例如 UUID: 1234-abcd。" wide>
-                <textarea rows={2} className={inputClass} {...field("otherIdentifiers")} />
+              <Field
+                label="其他标识符"
+                hint="每行一项，例如 UUID: 1234-abcd。"
+                wide
+              >
+                <textarea
+                  rows={2}
+                  className={inputClass}
+                  {...field("otherIdentifiers")}
+                />
               </Field>
               <Field label="主题 / 标签" hint="多项用逗号分隔。" wide>
                 <input className={inputClass} {...field("subjects")} />
@@ -202,16 +274,26 @@ export function BookMetadataDialog({
 
           <section className="grid gap-4 border-t border-border pt-5 md:grid-cols-2">
             <Field label="简介" wide>
-              <textarea rows={5} maxLength={20_000} className={inputClass} {...field("description")} />
+              <textarea
+                rows={5}
+                maxLength={20_000}
+                className={inputClass}
+                {...field("description")}
+              />
             </Field>
             <Field label="版权信息" wide>
-              <textarea rows={3} maxLength={2_000} className={inputClass} {...field("rights")} />
+              <textarea
+                rows={3}
+                maxLength={2_000}
+                className={inputClass}
+                {...field("rights")}
+              />
             </Field>
           </section>
 
           <div className="rounded-[12px] bg-muted/45 px-3 py-2 text-[10.5px] text-muted-foreground">
-            只读技术信息：{book.format.toUpperCase()} · {book.chapters.length} 章 ·
-            导入于 {new Date(book.createdAt).toLocaleString()}
+            只读技术信息：{book.format.toUpperCase()} · {book.chapters.length}{" "}
+            章 · 导入于 {new Date(book.createdAt).toLocaleString()}
           </div>
 
           {error && (

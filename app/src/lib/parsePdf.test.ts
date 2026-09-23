@@ -115,9 +115,7 @@ describe("parsePdf", () => {
         publisher: "Example Press",
         publishedDate: "2023-07-04",
         languages: ["en-US"],
-        identifiers: [
-          { scheme: "ISBN", value: "978-1-4028-9462-6" },
-        ],
+        identifiers: [{ scheme: "ISBN", value: "978-1-4028-9462-6" }],
         subjects: ["History", "Reference", "Archive"],
         description: "An example PDF.",
         rights: "Copyright holder",

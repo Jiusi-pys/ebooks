@@ -152,9 +152,7 @@ function joinedText(
 
 export function normalizeImportedDate(value: string): string | undefined {
   const text = boundedText(value, 128);
-  const match = text?.match(
-    /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?=$|T|\s)/
-  );
+  const match = text?.match(/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?=$|T|\s)/);
   if (!match) return undefined;
   const normalized = [match[1], match[2], match[3]]
     .filter((part): part is string => Boolean(part))
@@ -179,9 +177,10 @@ function normalizeLanguage(value: string): string | undefined {
   }
 }
 
-function normalizeIdentifier(
-  identifier: { scheme?: string; value: string }
-): BookIdentifier | undefined {
+function normalizeIdentifier(identifier: {
+  scheme?: string;
+  value: string;
+}): BookIdentifier | undefined {
   let value = boundedText(identifier.value, 255);
   if (!value) return undefined;
   const hint = boundedText(identifier.scheme, 32)?.toLowerCase() ?? "";
@@ -191,7 +190,10 @@ function normalizeIdentifier(
   if (hint === "isbn" || /^urn:isbn:/i.test(value)) {
     scheme = "ISBN";
     value = value.replace(/^urn:isbn:/i, "");
-  } else if (hint === "doi" || /^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:)/i.test(value)) {
+  } else if (
+    hint === "doi" ||
+    /^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:)/i.test(value)
+  ) {
     scheme = "DOI";
     value = value.replace(/^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:)/i, "");
   } else if (hint === "asin" || /^asin:/i.test(value)) {
@@ -227,7 +229,8 @@ export function importedBookMetadata(
     const key = `${contributor.role}\0${name.toLowerCase()}`;
     if (contributorKeys.has(key)) continue;
     if (contributor.role === "author") {
-      const nextLength = authorCharacters + (authorCharacters ? 1 : 0) + name.length;
+      const nextLength =
+        authorCharacters + (authorCharacters ? 1 : 0) + name.length;
       if (nextLength > 255) continue;
       authorCharacters = nextLength;
     }

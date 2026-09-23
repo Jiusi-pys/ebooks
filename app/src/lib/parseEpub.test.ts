@@ -157,19 +157,23 @@ describe("extractEpubPackageFields", () => {
         property: "role",
       }),
     ];
-    const metadata = fakeElement("", {}, {
-      title: [mainTitle, subtitle],
-      creator: creators,
-      contributor: contributors,
-      meta: metas,
-      publisher: [fakeElement("Example Press")],
-      date: [conversionDate, publicationDate],
-      language: [fakeElement("en_US"), fakeElement("zh-Hans")],
-      identifier: [isbn, doi],
-      subject: [fakeElement("History"), fakeElement("Reference")],
-      description: [fakeElement("An example description.")],
-      rights: [fakeElement("Copyright holder")],
-    });
+    const metadata = fakeElement(
+      "",
+      {},
+      {
+        title: [mainTitle, subtitle],
+        creator: creators,
+        contributor: contributors,
+        meta: metas,
+        publisher: [fakeElement("Example Press")],
+        date: [conversionDate, publicationDate],
+        language: [fakeElement("en_US"), fakeElement("zh-Hans")],
+        identifier: [isbn, doi],
+        subject: [fakeElement("History"), fakeElement("Reference")],
+        description: [fakeElement("An example description.")],
+        rights: [fakeElement("Copyright holder")],
+      }
+    );
     const opf = fakeElement("", {}, { metadata: [metadata] });
 
     expect(

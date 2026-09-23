@@ -39,8 +39,9 @@ extensions are outside the current web scope.
 - Use Codex through a local ChatGPT login, or select the optional DeepSeek API
   provider from the AI settings panel.
 - Pin or auto-hide both reading sidebars; immersive mode hides both sidebars
-  and the reader toolbar. Manage the MySQL-backed local username and password
-  from the account panel.
+  and the reader toolbar. The right panel can combine excerpts, annotations,
+  and AI Q&A into one colour-coded chronological feed. Manage the MySQL-backed
+  local username and password from the account panel.
 
 ## Global Search
 
@@ -55,6 +56,11 @@ removed; regular expressions and semantic search are not supported.
 | 本书 (This book) | The current book's title, author, chapter titles, text, highlights, annotations, and notes linked through citations. Disabled when no book is open. |
 | 本合集 (This study set) | Books belonging to the selected **study set**, their highlights and annotations, and citation-linked notes. Membership is independent of bookshelf folders; choose the set below the search input. |
 | 文库全部内容 (Entire library) | All books, highlights, annotations, and notes loaded in the current workspace, including standalone notes. |
+
+The **Result type** selector is independent of the scope selector. Choose
+**书摘 (Excerpts)** to search only saved excerpts, **批注 (Annotations)** to
+search annotation text, or **问答 (Q&A)** to search both questions and answers
+recorded by AI; choose **全部内容 (All content)** to keep the complete search.
 
 Reading defaults to the current book; a specific study-set page defaults to
 that set; other pages default to the entire library. Results show their source
@@ -73,6 +79,26 @@ extraction failures, and pages without extractable text are reported while other
 content remains searchable. Text inside images is not searched; OCR is not
 included. No database migration or additional search-service configuration is
 required.
+
+## Reader Workspace and Navigation
+
+The left navigation displays feature icons by default; hover an icon to reveal
+its name. Counts remain visible as small badges. Recent-reading rows reserve a
+fixed cover column, truncate long titles in the remaining space, and clip the
+vertical title label inside generated covers.
+
+Both sidebars can be pinned or set to auto-hide. On desktop, opening an
+auto-hidden left sidebar shifts the top search bar and reader outline to the
+right; opening the auto-hidden right reader panel reserves page space instead
+of covering the text. Use the right-panel **合并 (Combine)** control to switch
+between separate tabs and a single time-ordered feed. In the feed, excerpts,
+annotations, and individual Q&A records are interleaved and marked in orange,
+blue, and purple respectively.
+
+Keyboard hints are kept out of the reading controls. Open **应用设置 (App
+settings)** from the left sidebar to view the shortcut reference: `Ctrl/⌘ + K`
+opens global search, `Esc` closes transient UI or exits immersive reading, and
+`←/→` or `PageUp/PageDown` turn pages in paged reading.
 
 ## EPUB Navigation, Notes, and Typography
 

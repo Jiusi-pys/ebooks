@@ -58,9 +58,7 @@
       "compositePrimaryKeys": {
         "app_users_id": {
           "name": "app_users_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -126,17 +124,13 @@
       "compositePrimaryKeys": {
         "book_digests_id": {
           "name": "book_digests_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {
         "book_digests_content_hash_unique": {
           "name": "book_digests_content_hash_unique",
-          "columns": [
-            "content_hash"
-          ]
+          "columns": ["content_hash"]
         }
       },
       "checkConstraint": {}
@@ -211,9 +205,7 @@
       "compositePrimaryKeys": {
         "webhook_subscriptions_id": {
           "name": "webhook_subscriptions_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {},
@@ -410,16 +402,12 @@
       "indexes": {
         "idx_mirror_assoc_source_book": {
           "name": "idx_mirror_assoc_source_book",
-          "columns": [
-            "source_book_ext_id"
-          ],
+          "columns": ["source_book_ext_id"],
           "isUnique": false
         },
         "idx_mirror_assoc_target_book": {
           "name": "idx_mirror_assoc_target_book",
-          "columns": [
-            "target_book_ext_id"
-          ],
+          "columns": ["target_book_ext_id"],
           "isUnique": false
         }
       },
@@ -427,26 +415,18 @@
         "mirror_associations_source_book_ext_id_mirror_books_ext_id_fk": {
           "name": "mirror_associations_source_book_ext_id_mirror_books_ext_id_fk",
           "tableFrom": "mirror_associations",
-          "columnsFrom": [
-            "source_book_ext_id"
-          ],
+          "columnsFrom": ["source_book_ext_id"],
           "tableTo": "mirror_books",
-          "columnsTo": [
-            "ext_id"
-          ],
+          "columnsTo": ["ext_id"],
           "onUpdate": "cascade",
           "onDelete": "cascade"
         },
         "mirror_associations_target_book_ext_id_mirror_books_ext_id_fk": {
           "name": "mirror_associations_target_book_ext_id_mirror_books_ext_id_fk",
           "tableFrom": "mirror_associations",
-          "columnsFrom": [
-            "target_book_ext_id"
-          ],
+          "columnsFrom": ["target_book_ext_id"],
           "tableTo": "mirror_books",
-          "columnsTo": [
-            "ext_id"
-          ],
+          "columnsTo": ["ext_id"],
           "onUpdate": "cascade",
           "onDelete": "cascade"
         }
@@ -454,23 +434,17 @@
       "compositePrimaryKeys": {
         "mirror_associations_id": {
           "name": "mirror_associations_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {
         "mirror_associations_ext_id_unique": {
           "name": "mirror_associations_ext_id_unique",
-          "columns": [
-            "ext_id"
-          ]
+          "columns": ["ext_id"]
         },
         "mirror_associations_pair_key_hash_unique": {
           "name": "mirror_associations_pair_key_hash_unique",
-          "columns": [
-            "pair_key_hash"
-          ]
+          "columns": ["pair_key_hash"]
         }
       },
       "checkConstraint": {}
@@ -499,9 +473,7 @@
       "compositePrimaryKeys": {
         "mirror_book_tombstones_ext_id": {
           "name": "mirror_book_tombstones_ext_id",
-          "columns": [
-            "ext_id"
-          ]
+          "columns": ["ext_id"]
         }
       },
       "uniqueConstraints": {},
@@ -628,9 +600,7 @@
       "indexes": {
         "idx_mirror_book_uploads_updated": {
           "name": "idx_mirror_book_uploads_updated",
-          "columns": [
-            "updated_at"
-          ],
+          "columns": ["updated_at"],
           "isUnique": false
         }
       },
@@ -638,11 +608,7 @@
       "compositePrimaryKeys": {
         "pk_mirror_book_upload_chunks": {
           "name": "pk_mirror_book_upload_chunks",
-          "columns": [
-            "book_ext_id",
-            "upload_id",
-            "chunk_index"
-          ]
+          "columns": ["book_ext_id", "upload_id", "chunk_index"]
         }
       },
       "uniqueConstraints": {},
@@ -739,9 +705,7 @@
       "indexes": {
         "idx_mirror_books_hash": {
           "name": "idx_mirror_books_hash",
-          "columns": [
-            "content_hash"
-          ],
+          "columns": ["content_hash"],
           "isUnique": false
         }
       },
@@ -749,17 +713,13 @@
       "compositePrimaryKeys": {
         "mirror_books_id": {
           "name": "mirror_books_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {
         "mirror_books_ext_id_unique": {
           "name": "mirror_books_ext_id_unique",
-          "columns": [
-            "ext_id"
-          ]
+          "columns": ["ext_id"]
         }
       },
       "checkConstraint": {}
@@ -800,9 +760,7 @@
       "indexes": {
         "idx_mirror_event_receipts_created": {
           "name": "idx_mirror_event_receipts_created",
-          "columns": [
-            "created_at"
-          ],
+          "columns": ["created_at"],
           "isUnique": false
         }
       },
@@ -810,9 +768,7 @@
       "compositePrimaryKeys": {
         "mirror_event_receipts_delivery_id": {
           "name": "mirror_event_receipts_delivery_id",
-          "columns": [
-            "delivery_id"
-          ]
+          "columns": ["delivery_id"]
         }
       },
       "uniqueConstraints": {},
@@ -856,17 +812,13 @@
       "compositePrimaryKeys": {
         "mirror_folders_id": {
           "name": "mirror_folders_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {
         "mirror_folders_ext_id_unique": {
           "name": "mirror_folders_ext_id_unique",
-          "columns": [
-            "ext_id"
-          ]
+          "columns": ["ext_id"]
         }
       },
       "checkConstraint": {}
@@ -1032,17 +984,12 @@
       "indexes": {
         "idx_mirror_hl_book": {
           "name": "idx_mirror_hl_book",
-          "columns": [
-            "book_ext_id"
-          ],
+          "columns": ["book_ext_id"],
           "isUnique": false
         },
         "idx_mirror_hl_chapter": {
           "name": "idx_mirror_hl_chapter",
-          "columns": [
-            "book_ext_id",
-            "chapter_id"
-          ],
+          "columns": ["book_ext_id", "chapter_id"],
           "isUnique": false
         }
       },
@@ -1050,26 +997,18 @@
         "mirror_highlights_book_ext_id_mirror_books_ext_id_fk": {
           "name": "mirror_highlights_book_ext_id_mirror_books_ext_id_fk",
           "tableFrom": "mirror_highlights",
-          "columnsFrom": [
-            "book_ext_id"
-          ],
+          "columnsFrom": ["book_ext_id"],
           "tableTo": "mirror_books",
-          "columnsTo": [
-            "ext_id"
-          ],
+          "columnsTo": ["ext_id"],
           "onUpdate": "cascade",
           "onDelete": "cascade"
         },
         "mirror_highlights_note_ext_id_mirror_notes_ext_id_fk": {
           "name": "mirror_highlights_note_ext_id_mirror_notes_ext_id_fk",
           "tableFrom": "mirror_highlights",
-          "columnsFrom": [
-            "note_ext_id"
-          ],
+          "columnsFrom": ["note_ext_id"],
           "tableTo": "mirror_notes",
-          "columnsTo": [
-            "ext_id"
-          ],
+          "columnsTo": ["ext_id"],
           "onUpdate": "cascade",
           "onDelete": "set null"
         }
@@ -1077,17 +1016,13 @@
       "compositePrimaryKeys": {
         "mirror_highlights_id": {
           "name": "mirror_highlights_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {
         "mirror_highlights_ext_id_unique": {
           "name": "mirror_highlights_ext_id_unique",
-          "columns": [
-            "ext_id"
-          ]
+          "columns": ["ext_id"]
         }
       },
       "checkConstraint": {}
@@ -1159,9 +1094,7 @@
       "indexes": {
         "idx_mirror_mindmaps_book": {
           "name": "idx_mirror_mindmaps_book",
-          "columns": [
-            "book_ext_id"
-          ],
+          "columns": ["book_ext_id"],
           "isUnique": false
         }
       },
@@ -1169,13 +1102,9 @@
         "mirror_mindmaps_book_ext_id_mirror_books_ext_id_fk": {
           "name": "mirror_mindmaps_book_ext_id_mirror_books_ext_id_fk",
           "tableFrom": "mirror_mindmaps",
-          "columnsFrom": [
-            "book_ext_id"
-          ],
+          "columnsFrom": ["book_ext_id"],
           "tableTo": "mirror_books",
-          "columnsTo": [
-            "ext_id"
-          ],
+          "columnsTo": ["ext_id"],
           "onUpdate": "cascade",
           "onDelete": "cascade"
         }
@@ -1183,17 +1112,13 @@
       "compositePrimaryKeys": {
         "mirror_mindmaps_id": {
           "name": "mirror_mindmaps_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {
         "mirror_mindmaps_ext_id_unique": {
           "name": "mirror_mindmaps_ext_id_unique",
-          "columns": [
-            "ext_id"
-          ]
+          "columns": ["ext_id"]
         }
       },
       "checkConstraint": {}
@@ -1222,9 +1147,7 @@
       "compositePrimaryKeys": {
         "mirror_note_tombstones_ext_id": {
           "name": "mirror_note_tombstones_ext_id",
-          "columns": [
-            "ext_id"
-          ]
+          "columns": ["ext_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1292,17 +1215,13 @@
       "compositePrimaryKeys": {
         "mirror_notes_id": {
           "name": "mirror_notes_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {
         "mirror_notes_ext_id_unique": {
           "name": "mirror_notes_ext_id_unique",
-          "columns": [
-            "ext_id"
-          ]
+          "columns": ["ext_id"]
         }
       },
       "checkConstraint": {}
@@ -1390,9 +1309,7 @@
       "indexes": {
         "idx_mirror_translations_book": {
           "name": "idx_mirror_translations_book",
-          "columns": [
-            "book_ext_id"
-          ],
+          "columns": ["book_ext_id"],
           "isUnique": false
         }
       },
@@ -1400,13 +1317,9 @@
         "mirror_translations_book_ext_id_mirror_books_ext_id_fk": {
           "name": "mirror_translations_book_ext_id_mirror_books_ext_id_fk",
           "tableFrom": "mirror_translations",
-          "columnsFrom": [
-            "book_ext_id"
-          ],
+          "columnsFrom": ["book_ext_id"],
           "tableTo": "mirror_books",
-          "columnsTo": [
-            "ext_id"
-          ],
+          "columnsTo": ["ext_id"],
           "onUpdate": "cascade",
           "onDelete": "cascade"
         }
@@ -1414,17 +1327,13 @@
       "compositePrimaryKeys": {
         "mirror_translations_id": {
           "name": "mirror_translations_id",
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         }
       },
       "uniqueConstraints": {
         "mirror_translations_ext_id_unique": {
           "name": "mirror_translations_ext_id_unique",
-          "columns": [
-            "ext_id"
-          ]
+          "columns": ["ext_id"]
         }
       },
       "checkConstraint": {}

@@ -38,29 +38,28 @@ describe("parseBookFile", () => {
     ["azw3", "mobi"],
     ["fb2", "fb2"],
     ["txt", "txt"],
-  ] as const)("routes %s files through the %s parser", async (format, parser) => {
-    const file = { name: `book.${format}` } as File;
-    const onProgress = vi.fn();
+  ] as const)(
+    "routes %s files through the %s parser",
+    async (format, parser) => {
+      const file = { name: `book.${format}` } as File;
+      const onProgress = vi.fn();
 
-    await expect(
-      parseBookFile(file, format, onProgress, { pdfMode: "original" })
-    ).resolves.toBe(parsedBook);
+      await expect(
+        parseBookFile(file, format, onProgress, { pdfMode: "original" })
+      ).resolves.toBe(parsedBook);
 
-    expect(parserMocks[parser]).toHaveBeenCalledOnce();
-    if (format === "pdf") {
-      expect(parserMocks.pdf).toHaveBeenCalledWith(
-        file,
-        onProgress,
-        "original"
-      );
-    } else if (format === "mobi" || format === "azw3") {
-      expect(parserMocks.mobi).toHaveBeenCalledWith(
-        file,
-        format,
-        onProgress
-      );
-    } else {
-      expect(parserMocks[parser]).toHaveBeenCalledWith(file, onProgress);
+      expect(parserMocks[parser]).toHaveBeenCalledOnce();
+      if (format === "pdf") {
+        expect(parserMocks.pdf).toHaveBeenCalledWith(
+          file,
+          onProgress,
+          "original"
+        );
+      } else if (format === "mobi" || format === "azw3") {
+        expect(parserMocks.mobi).toHaveBeenCalledWith(file, format, onProgress);
+      } else {
+        expect(parserMocks[parser]).toHaveBeenCalledWith(file, onProgress);
+      }
     }
-  });
+  );
 });

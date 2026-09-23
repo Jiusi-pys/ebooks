@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { CheckSquare, Square, X } from 'lucide-react';
+import type { ReactNode } from "react";
+import { CheckSquare, Square, X } from "lucide-react";
 
 /** 底部悬浮批量操作条：多选模式下出现 */
 export function BatchBar({
@@ -25,8 +25,12 @@ export function BatchBar({
         onClick={onSelectAll}
         className="flex items-center gap-1 rounded-full px-2 py-1 text-[12px] text-muted-foreground hover:bg-secondary hover:text-foreground"
       >
-        {allSelected ? <CheckSquare size={13} className="text-primary" /> : <Square size={13} />}
-        {allSelected ? '全不选' : '全选'}
+        {allSelected ? (
+          <CheckSquare size={13} className="text-primary" />
+        ) : (
+          <Square size={13} />
+        )}
+        {allSelected ? "全不选" : "全选"}
       </button>
       <span className="h-4 w-px bg-border" />
       {children}
@@ -58,7 +62,9 @@ export function BatchAction({
       onClick={onClick}
       disabled={disabled}
       className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] transition-colors disabled:opacity-35 ${
-        danger ? 'text-destructive hover:bg-destructive/10' : 'text-foreground hover:bg-secondary'
+        danger
+          ? "text-destructive hover:bg-destructive/10"
+          : "text-foreground hover:bg-secondary"
       }`}
     >
       {children}
@@ -71,12 +77,19 @@ export function SelectDot({ checked }: { checked: boolean }) {
   return (
     <span
       className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${
-        checked ? 'border-primary bg-primary text-primary-foreground' : 'border-foreground/30 bg-card'
+        checked
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-foreground/30 bg-card"
       }`}
     >
       {checked && (
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <path d="M1.5 5.5L4 8L8.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          <path
+            d="M1.5 5.5L4 8L8.5 2.5"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
         </svg>
       )}
     </span>

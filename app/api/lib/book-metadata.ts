@@ -73,7 +73,9 @@ export const bookMetadataSchema = z
         message: "combined author display exceeds 255 characters",
       });
     }
-    if (Buffer.byteLength(JSON.stringify(value), "utf8") > MAX_BOOK_METADATA_BYTES) {
+    if (
+      Buffer.byteLength(JSON.stringify(value), "utf8") > MAX_BOOK_METADATA_BYTES
+    ) {
       context.addIssue({
         code: "custom",
         message: `book metadata exceeds ${MAX_BOOK_METADATA_BYTES} UTF-8 bytes`,

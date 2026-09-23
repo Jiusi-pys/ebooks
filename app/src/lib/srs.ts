@@ -1,4 +1,4 @@
-import type { Highlight, ReviewState } from '@/types';
+import type { Highlight, ReviewState } from "@/types";
 
 /**
  * 间隔重复调度（SM-2 血统的简化 FSRS）：
@@ -12,14 +12,23 @@ const DAY = 86_400_000;
 
 export type Rating = 1 | 2 | 3 | 4;
 
-export const RATING_LABEL: Record<Rating, string> = { 1: '重复', 2: '难', 3: '中', 4: '易' };
+export const RATING_LABEL: Record<Rating, string> = {
+  1: "重复",
+  2: "难",
+  3: "中",
+  4: "易",
+};
 
 export function newReviewState(now = Date.now()): ReviewState {
   return { due: now, reps: 0, lapses: 0, interval: 0, addedAt: now };
 }
 
 /** 按评分推进复习状态，返回新状态（不改动原对象） */
-export function gradeCard(state: ReviewState, rating: Rating, now = Date.now()): ReviewState {
+export function gradeCard(
+  state: ReviewState,
+  rating: Rating,
+  now = Date.now()
+): ReviewState {
   const s: ReviewState = { ...state, lastRating: rating, lastReviewedAt: now };
   if (rating === 1) {
     s.reps = 0;
@@ -49,9 +58,12 @@ export function gradeCard(state: ReviewState, rating: Rating, now = Date.now()):
 }
 
 /** 到期队列：已加入复习且到期 */
-export function dueCards(highlights: Highlight[], now = Date.now()): Highlight[] {
+export function dueCards(
+  highlights: Highlight[],
+  now = Date.now()
+): Highlight[] {
   return highlights
-    .filter((h) => h.review && h.review.due <= now)
+    .filter(h => h.review && h.review.due <= now)
     .sort((a, b) => a.review!.due - b.review!.due);
 }
 
@@ -61,14 +73,14 @@ export function applyCloze(text: string, cloze?: string[]): string {
   let out = text;
   for (const c of cloze) {
     if (!c) continue;
-    out = out.split(c).join('［＿＿］');
+    out = out.split(c).join("［＿＿］");
   }
   return out;
 }
 
 export function formatDue(due: number, now = Date.now()): string {
   const diff = due - now;
-  if (diff <= 0) return '现在到期';
+  if (diff <= 0) return "现在到期";
   if (diff < 60 * MIN) return `${Math.ceil(diff / MIN)} 分钟后`;
   if (diff < DAY) return `${Math.ceil(diff / (60 * MIN))} 小时后`;
   return `${Math.round(diff / DAY)} 天后`;

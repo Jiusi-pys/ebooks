@@ -1,5 +1,5 @@
-import type { Book, MindMap, MindNode } from '@/types';
-import { uid } from './db';
+import type { Book, MindMap, MindNode } from "@/types";
+import { uid } from "./db";
 
 export interface LayoutMindNode {
   node: MindNode;
@@ -36,14 +36,17 @@ export function createMindFromBook(book: Book): MindMap {
       text: book.title,
       children: book.chapters.map((c, i) => ({
         id: uid(),
-        text: `${String(i + 1).padStart(2, '0')} ${c.title}`,
+        text: `${String(i + 1).padStart(2, "0")} ${c.title}`,
         chapterId: c.id,
         collapsed: c.paragraphs.length > 1,
         children: c.paragraphs.slice(0, 3).map((p, j) => {
-          const clean = p.trim().replace(/\s+/g, ' ');
+          const clean = p.trim().replace(/\s+/g, " ");
           return {
             id: uid(),
-            text: clean.length > 26 ? clean.slice(0, 26) + '…' : clean || `段落 ${j + 1}`,
+            text:
+              clean.length > 26
+                ? clean.slice(0, 26) + "…"
+                : clean || `段落 ${j + 1}`,
             children: [],
           };
         }),
@@ -75,24 +78,41 @@ export function findParent(root: MindNode, id: string): MindNode | null {
 }
 
 function mapTree(node: MindNode, fn: (n: MindNode) => MindNode): MindNode {
-  const next = fn({ ...node, children: node.children.map((c) => mapTree(c, fn)) });
+  const next = fn({
+    ...node,
+    children: node.children.map(c => mapTree(c, fn)),
+  });
   return next;
 }
 
-export function updateNode(root: MindNode, id: string, patch: Partial<MindNode>): MindNode {
-  return mapTree(root, (n) => (n.id === id ? { ...n, ...patch } : n));
+export function updateNode(
+  root: MindNode,
+  id: string,
+  patch: Partial<MindNode>
+): MindNode {
+  return mapTree(root, n => (n.id === id ? { ...n, ...patch } : n));
 }
 
-export function appendChild(root: MindNode, parentId: string, child: MindNode): MindNode {
-  return mapTree(root, (n) =>
-    n.id === parentId ? { ...n, collapsed: false, children: [...n.children, child] } : n,
+export function appendChild(
+  root: MindNode,
+  parentId: string,
+  child: MindNode
+): MindNode {
+  return mapTree(root, n =>
+    n.id === parentId
+      ? { ...n, collapsed: false, children: [...n.children, child] }
+      : n
   );
 }
 
-export function appendSibling(root: MindNode, id: string, sibling: MindNode): MindNode {
+export function appendSibling(
+  root: MindNode,
+  id: string,
+  sibling: MindNode
+): MindNode {
   const parent = findParent(root, id);
   if (!parent) return root;
-  const index = parent.children.findIndex((c) => c.id === id);
+  const index = parent.children.findIndex(c => c.id === id);
   const nextChildren = [...parent.children];
   nextChildren.splice(index + 1, 0, sibling);
   return updateNode(root, parent.id, { children: nextChildren });
@@ -101,20 +121,24 @@ export function appendSibling(root: MindNode, id: string, sibling: MindNode): Mi
 export function removeNode(root: MindNode, id: string): MindNode {
   const parent = findParent(root, id);
   if (!parent) return root;
-  return updateNode(root, parent.id, { children: parent.children.filter((c) => c.id !== id) });
+  return updateNode(root, parent.id, {
+    children: parent.children.filter(c => c.id !== id),
+  });
 }
 
 function nodeSize(node: MindNode, depth: number) {
   const len = Array.from(node.text).length;
-  if (depth === 0) return { w: Math.min(220, Math.max(140, len * 15 + 34)), h: 48 };
-  if (depth === 1) return { w: Math.min(190, Math.max(126, len * 13 + 28)), h: 40 };
+  if (depth === 0)
+    return { w: Math.min(220, Math.max(140, len * 15 + 34)), h: 48 };
+  if (depth === 1)
+    return { w: Math.min(190, Math.max(126, len * 13 + 28)), h: 40 };
   return { w: Math.min(180, Math.max(112, len * 12 + 24)), h: 34 };
 }
 
 /** 横向树布局：父节点垂直居中于可见子树，折叠节点只显示 +N */
 export function layoutMind(root: MindNode): MindLayout {
   const nodes: LayoutMindNode[] = [];
-  const links: MindLayout['links'] = [];
+  const links: MindLayout["links"] = [];
   const rowGap = 18;
   const colGap = 86;
   let cursorY = 44;
