@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { AlertTriangle, PanelLeftOpen, RefreshCw } from "lucide-react";
 import { useLibrary } from "@/hooks/useLibrary";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -297,7 +303,17 @@ function WorkspaceApp({
           )}
         </>
       )}
-      <main className="flex min-w-0 flex-1 flex-col bg-background">
+      <main
+        className="flex min-w-0 flex-1 flex-col bg-background"
+        style={
+          {
+            "--reader-outline-offset":
+              sidebarMode === "auto" && sidebarOpen && !isMobile
+                ? "232px"
+                : "0px",
+          } as CSSProperties
+        }
+      >
         <GlobalSearch
           key={`${lib.route.view}:${lib.route.bookId ?? ""}:${lib.route.studySetId ?? ""}:${lib.route.noteId ?? ""}`}
           lib={lib}

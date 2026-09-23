@@ -186,7 +186,7 @@ export function Sidebar({
         </div>
       </div>
 
-      <nav className="px-3">
+      <nav className="flex flex-wrap gap-1 px-3">
         {NAV.map(({ view, label, icon: Icon }) => {
           const active =
             route.view === view ||
@@ -196,7 +196,9 @@ export function Sidebar({
             <button
               key={view}
               onClick={() => go({ view })}
-              className={`group mb-0.5 flex w-full items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13.5px] transition-colors ${
+              aria-label={label}
+              title={label}
+              className={`group relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
                 active
                   ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
@@ -209,9 +211,9 @@ export function Sidebar({
               >
                 <Icon size={15} strokeWidth={1.8} aria-hidden="true" />
               </span>
-              <span className="flex-1 text-left">{label}</span>
+              <span className="sr-only">{label}</span>
               {counts[view] !== undefined && (
-                <span className="font-meta text-[10px] text-muted-foreground/70">
+                <span className="font-meta absolute -right-0.5 -top-0.5 rounded-full bg-sidebar px-1 text-[9px] text-muted-foreground/70">
                   {counts[view]}
                 </span>
               )}
@@ -231,7 +233,7 @@ export function Sidebar({
               lib.openReader(b.id);
               onNavigate();
             }}
-            className={`mb-1 flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-sidebar-accent/60 ${
+            className={`mb-1 grid w-full grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-sidebar-accent/60 ${
               route.view === "reader" && route.bookId === b.id
                 ? "bg-sidebar-accent"
                 : ""

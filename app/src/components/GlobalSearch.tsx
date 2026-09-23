@@ -5,6 +5,7 @@ import {
   searchLibrary,
   type SearchResponse,
   type SearchResult,
+  type SearchContentType,
   type SearchScope,
 } from "@/lib/search";
 import {
@@ -36,6 +37,7 @@ export function GlobalSearch({
   const [scope, setScope] = useState<SearchScope>(
     currentBook ? "book" : currentSet ? "studySet" : "all"
   );
+  const [contentType, setContentType] = useState<SearchContentType>("all");
   const [setId, setSetId] = useState(
     currentSet?.id ?? (candidateSets.length === 1 ? candidateSets[0].id : "")
   );
@@ -84,7 +86,12 @@ export function GlobalSearch({
       const result = await searchLibrary(
         lib,
         query,
-        { scope, bookId: currentBook?.id, studySetId: setId },
+        {
+          scope,
+          bookId: currentBook?.id,
+          studySetId: setId,
+          contentType,
+        },
         {
           signal: run.signal,
           onProgress: message => {
@@ -147,7 +154,12 @@ export function GlobalSearch({
         className={
           immersive
             ? "sr-only focus-within:not-sr-only"
-            : "flex shrink-0 items-center border-b border-border/60 px-4 py-2 pl-16 md:pl-4"
+            : "flex shrink-0 items-center border-b border-border/60 px-4 py-2 pl-16 transition-[margin] duration-200 motion-reduce:transition-none md:pl-4"
+        }
+        style={
+          immersive
+            ? undefined
+            : { marginLeft: "var(--reader-outline-offset, 0px)" }
         }
       >
         <DialogTrigger asChild>
@@ -157,8 +169,7 @@ export function GlobalSearch({
             className="flex w-full max-w-xl items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Search size={16} />
-            <span className="flex-1 truncate">搜索书籍、正文、笔记和批注</span>
-            <kbd className="hidden text-xs sm:inline">Ctrl / ⌘ K</kbd>
+            <span className="flex-1 truncate">搜索书摘、批注、问答与正文</span>
           </button>
         </DialogTrigger>
       </div>
@@ -166,7 +177,7 @@ export function GlobalSearch({
         <DialogHeader>
           <DialogTitle>全局搜索</DialogTitle>
           <DialogDescription>
-            搜索书名、作者、章节、正文、笔记和划线批注。
+            按书籍范围和内容类型搜索书摘、批注、问答与正文。
           </DialogDescription>
         </DialogHeader>
         <form
@@ -216,6 +227,22 @@ export function GlobalSearch({
               </option>
               <option value="all">文库全部内容</option>
             </select>
+            <label htmlFor="global-search-content-type">结果类型</label>
+            <select
+              id="global-search-content-type"
+              aria-label="结果类型"
+              value={contentType}
+              onChange={event => {
+                invalidate();
+                setContentType(event.target.value as SearchContentType);
+              }}
+              className="rounded-md border bg-background px-2 py-1.5"
+            >
+              <option value="all">全部内容</option>
+              <option value="mark">书摘</option>
+              <option value="note">批注</option>
+              <option value="qa">问答</option>
+            </select>
             {scope === "book" && (
               <span className="truncate text-muted-foreground">
                 {currentBook?.title}
@@ -242,7 +269,7 @@ export function GlobalSearch({
               </select>
             )}
           </div>
-          {scope !== "all" && (
+          {scope !== "all" && contentType === "all" && (
             <p className="text-xs text-muted-foreground">
               笔记按书籍引用关联纳入范围；未关联的笔记请在“文库全部内容”中搜索。
             </p>

@@ -67,8 +67,12 @@ export function OutlinePanel({
 
   return (
     <div
-      className="flex w-64 shrink-0 flex-col border-r"
-      style={{ background: theme.panel, borderColor: theme.border }}
+      className="flex w-64 shrink-0 flex-col border-r transition-[margin] duration-200 motion-reduce:transition-none"
+      style={{
+        background: theme.panel,
+        borderColor: theme.border,
+        marginLeft: "var(--reader-outline-offset, 0px)",
+      }}
     >
       <div
         className="flex items-center justify-between gap-2 border-b px-3 py-2.5"

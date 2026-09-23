@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Keyboard, Search } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,31 @@ export function AppSettingsDialog({
               </button>
             ))}
           </div>
+        </section>
+        <section className="border-t border-border pt-4">
+          <h3 className="flex items-center gap-1.5 text-[13px] font-medium">
+            <Keyboard size={14} className="text-primary" /> 快捷键说明
+          </h3>
+          <dl className="mt-2 space-y-1.5 text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-between gap-4">
+              <dt>打开全局搜索</dt>
+              <dd className="rounded border bg-muted px-1.5 py-0.5 text-foreground">
+                Ctrl / ⌘ K
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <dt>退出浮层或沉浸阅读</dt>
+              <dd className="rounded border bg-muted px-1.5 py-0.5 text-foreground">
+                Esc
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <dt>翻页阅读</dt>
+              <dd className="rounded border bg-muted px-1.5 py-0.5 text-foreground">
+                ← / → 或 PageUp / PageDown
+              </dd>
+            </div>
+          </dl>
         </section>
       </DialogContent>
     </Dialog>

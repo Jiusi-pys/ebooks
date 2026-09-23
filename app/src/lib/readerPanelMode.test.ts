@@ -5,6 +5,7 @@ import {
   parseReaderPanelMode,
   readerPanelIsVisible,
   readerPanelOccupiesLayout,
+  readerPanelReservesLayout,
   READER_PANEL_MODE_STORAGE_KEY,
   saveReaderPanelMode,
   toggleReaderPanelMode,
@@ -63,5 +64,12 @@ describe("reader right panel mode", () => {
     expect(readerPanelIsVisible(true, "pinned", true)).toBe(true);
     expect(readerPanelIsVisible(false, "pinned", true)).toBe(false);
     expect(toggleReaderPanelMode("pinned")).toBe("auto");
+  });
+
+  it("lets an opened auto panel move the wide reader content aside", () => {
+    expect(readerPanelReservesLayout("auto", true, true)).toBe(true);
+    expect(readerPanelReservesLayout("auto", false, true)).toBe(false);
+    expect(readerPanelReservesLayout("auto", true, false)).toBe(false);
+    expect(readerPanelReservesLayout("pinned", true, true)).toBe(true);
   });
 });

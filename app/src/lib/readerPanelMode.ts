@@ -59,6 +59,15 @@ export function readerPanelOccupiesLayout(
   return mode === "pinned" && wideScreen;
 }
 
+/** An opened auto panel still makes room for itself on wide screens. */
+export function readerPanelReservesLayout(
+  mode: ReaderPanelMode,
+  visible: boolean,
+  wideScreen: boolean
+): boolean {
+  return readerPanelOccupiesLayout(mode, wideScreen) || (visible && wideScreen);
+}
+
 export function readerPanelIsVisible(
   available: boolean,
   mode: ReaderPanelMode,

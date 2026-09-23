@@ -35,6 +35,7 @@ import type {
   Note,
   OutlineItem,
   PassageAnchor,
+  ReaderTheme,
   TextPassageAnchor,
   TypeSettings,
 } from "@/types";
@@ -108,11 +109,18 @@ import {
   parseReaderPanelMode,
   readerPanelIsVisible,
   readerPanelOccupiesLayout,
+  readerPanelReservesLayout,
   READER_PANEL_MODE_STORAGE_KEY,
   saveReaderPanelMode,
   toggleReaderPanelMode,
   type ReaderPanelMode,
 } from "@/lib/readerPanelMode";
+import {
+  loadReaderPanelContentMode,
+  saveReaderPanelContentMode,
+  type ReaderPanelContentMode,
+} from "@/lib/readerPanelContentMode";
+import { buildCombinedReaderPanelItems } from "@/lib/readerPanelItems";
 
 interface SelInfo {
   paraIndex: number;
@@ -165,6 +173,8 @@ export function ReaderView({
   const [showCite, setShowCite] = useState(false);
   const [translationSel, setTranslationSel] = useState<SelInfo | null>(null);
   const [tab, setTab] = useState<PanelTab>("marks");
+  const [panelContentMode, setPanelContentMode] =
+    useState<ReaderPanelContentMode>(loadReaderPanelContentMode);
   const [toast, setToast] = useState("");
   const [pdfSel, setPdfSel] = useState<PdfSelectInfo | null>(null);
   const [pdfCitationPopup, setPdfCitationPopup] = useState<HlPopup | null>(
@@ -1542,15 +1552,25 @@ export function ReaderView({
   );
   const panelNotes = contentHighlights.filter(h => h.note);
   const panelQa = contentHighlights.filter(h => (h.aiQa?.length ?? 0) > 0);
-  const readerPanelAvailable = posture === "read" || Boolean(aiTarget);
-  const readerPanelPinned = readerPanelOccupiesLayout(
-    readerPanelMode,
-    wideReaderPanel
+  const combinedPanelItems = buildCombinedReaderPanelItems(
+    panelMarks,
+    panelNotes,
+    panelQa
   );
+  const changePanelContentMode = (mode: ReaderPanelContentMode) => {
+    setPanelContentMode(mode);
+    saveReaderPanelContentMode(mode);
+  };
+  const readerPanelAvailable = posture === "read" || Boolean(aiTarget);
   const readerPanelVisible = readerPanelIsVisible(
     readerPanelAvailable,
     readerPanelMode,
     readerPanelTransientOpen
+  );
+  const readerPanelReservesSpace = readerPanelReservesLayout(
+    readerPanelMode,
+    readerPanelVisible,
+    wideReaderPanel
   );
   const popupHl = hlPopup
     ? (lib.highlights.find(h => h.id === hlPopup.id) ?? null)
@@ -2427,7 +2447,7 @@ export function ReaderView({
             className={`flex h-full shrink-0 flex-col border-l transition-[transform,opacity] duration-200 motion-reduce:transition-none ${
               aiTarget ? "w-[340px]" : "w-72"
             } ${
-              readerPanelPinned
+              readerPanelReservesSpace
                 ? "relative"
                 : "absolute inset-y-0 right-0 z-40 max-w-[calc(100%-3rem)] shadow-2xl"
             } ${
@@ -2467,28 +2487,63 @@ export function ReaderView({
                   className="flex shrink-0 border-b"
                   style={{ borderColor: theme.border }}
                 >
-                  {(
-                    [
-                      ["marks", `书摘 ${panelMarks.length}`],
-                      ["notes", `批注 ${panelNotes.length}`],
-                      ["qa", `问答 ${panelQa.length}`],
-                    ] as [PanelTab, string][]
-                  ).map(([t, label]) => (
-                    <button
-                      key={t}
-                      onClick={() => setTab(t)}
-                      className={`flex-1 py-2.5 text-[12px] ${tab === t ? "font-medium" : ""}`}
-                      style={{
-                        color: tab === t ? theme.text : theme.muted,
-                        borderBottom:
-                          tab === t
-                            ? "2px solid #f54001"
-                            : "2px solid transparent",
-                      }}
+                  {panelContentMode === "separate" ? (
+                    (
+                      [
+                        ["marks", `书摘 ${panelMarks.length}`],
+                        ["notes", `批注 ${panelNotes.length}`],
+                        ["qa", `问答 ${panelQa.length}`],
+                      ] as [PanelTab, string][]
+                    ).map(([t, label]) => (
+                      <button
+                        key={t}
+                        onClick={() => setTab(t)}
+                        className={`flex-1 py-2.5 text-[12px] ${tab === t ? "font-medium" : ""}`}
+                        style={{
+                          color: tab === t ? theme.text : theme.muted,
+                          borderBottom:
+                            tab === t
+                              ? "2px solid #f54001"
+                              : "2px solid transparent",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))
+                  ) : (
+                    <div
+                      className="flex flex-1 items-center px-3 text-[12px] font-medium"
+                      style={{ color: theme.text }}
                     >
-                      {label}
-                    </button>
-                  ))}
+                      合并时间流 · {combinedPanelItems.length} 条
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="flex h-9 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] transition-colors hover:bg-foreground/5"
+                    style={{ color: theme.muted }}
+                    aria-pressed={panelContentMode === "combined"}
+                    aria-label={
+                      panelContentMode === "combined"
+                        ? "切换为分开显示"
+                        : "切换为合并显示"
+                    }
+                    title={
+                      panelContentMode === "combined"
+                        ? "分开显示书摘、批注与问答"
+                        : "合并显示书摘、批注与问答"
+                    }
+                    onClick={() =>
+                      changePanelContentMode(
+                        panelContentMode === "combined"
+                          ? "separate"
+                          : "combined"
+                      )
+                    }
+                  >
+                    <ListPlus size={14} aria-hidden="true" />
+                    {panelContentMode === "combined" ? "分开" : "合并"}
+                  </button>
                   <ReaderPanelModeButton
                     mode={readerPanelMode}
                     color={theme.muted}
@@ -2500,53 +2555,63 @@ export function ReaderView({
                   />
                 </div>
                 <div className="flex-1 overflow-y-auto p-3">
-                  {tab === "marks" &&
-                    (panelMarks.length === 0 ? (
-                      <PanelEmpty text="选中正文即可划线：下划线、背景色、字色三种样式五种颜色。" />
+                  {panelContentMode === "combined" ? (
+                    combinedPanelItems.length === 0 ? (
+                      <PanelEmpty text="选中正文即可保存书摘、批注或问答，它们会按时间混合显示在这里。" />
                     ) : (
-                      panelMarks.map(h => (
-                        <MarkCard
-                          key={h.id}
-                          h={h}
-                          onLocate={() =>
-                            lib.navigate({
-                              view: "reader",
-                              bookId: book.id,
-                              chapterId: h.chapterId,
-                              highlightId: h.id,
-                            })
-                          }
-                          onAskAi={() => setAiTargetId(h.id)}
-                        />
-                      ))
-                    ))}
-                  {tab === "notes" &&
-                    (panelNotes.length === 0 ? (
-                      <PanelEmpty text="选中文字后点「批注」，在文段旁直接写下想法，不打断阅读。" />
-                    ) : (
-                      panelNotes.map(h => (
-                        <div
-                          key={h.id}
-                          className="mb-3 rounded-md p-3 shadow-sm"
-                          style={{ background: theme.bg }}
+                      combinedPanelItems.map(item => (
+                        <CombinedPanelCard
+                          key={`${item.kind}:${item.highlight.id}:${item.kind === "qa" ? item.qaIndex : ""}`}
+                          kind={item.kind}
                         >
-                          {h.name && (
-                            <div className="font-meta mb-1 text-[10px] uppercase tracking-wider text-primary">
-                              {h.name}
-                            </div>
+                          {item.kind === "mark" ? (
+                            <MarkCard
+                              h={item.highlight}
+                              onLocate={() =>
+                                lib.navigate({
+                                  view: "reader",
+                                  bookId: book.id,
+                                  chapterId: item.highlight.chapterId,
+                                  highlightId: item.highlight.id,
+                                })
+                              }
+                              onAskAi={() => setAiTargetId(item.highlight.id)}
+                            />
+                          ) : item.kind === "note" ? (
+                            <AnnotationCard
+                              h={item.highlight}
+                              theme={theme}
+                              onLocate={() =>
+                                lib.navigate({
+                                  view: "reader",
+                                  bookId: book.id,
+                                  chapterId: item.highlight.chapterId,
+                                  highlightId: item.highlight.id,
+                                })
+                              }
+                            />
+                          ) : (
+                            <QaCard
+                              h={item.highlight}
+                              qaIndex={item.qaIndex}
+                              theme={theme}
+                              onOpen={() => setAiTargetId(item.highlight.id)}
+                            />
                           )}
-                          <p className="font-reading text-[12.5px] leading-6 opacity-70">
-                            「{h.text}」
-                          </p>
-                          <p className="mt-2 text-[13px] leading-6">{h.note}</p>
-                          <div
-                            className="font-meta mt-2 flex items-center justify-between text-[10px]"
-                            style={{ color: theme.muted }}
-                          >
-                            <span>{h.chapterTitle}</span>
-                            <button
-                              className="hover:text-primary"
-                              onClick={() =>
+                        </CombinedPanelCard>
+                      ))
+                    )
+                  ) : (
+                    <>
+                      {tab === "marks" &&
+                        (panelMarks.length === 0 ? (
+                          <PanelEmpty text="选中正文即可划线：下划线、背景色、字色三种样式五种颜色。" />
+                        ) : (
+                          panelMarks.map(h => (
+                            <MarkCard
+                              key={h.id}
+                              h={h}
+                              onLocate={() =>
                                 lib.navigate({
                                   view: "reader",
                                   bookId: book.id,
@@ -2554,37 +2619,45 @@ export function ReaderView({
                                   highlightId: h.id,
                                 })
                               }
-                            >
-                              定位
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    ))}
-                  {tab === "qa" &&
-                    (panelQa.length === 0 ? (
-                      <PanelEmpty text="选中文字后点「问 AI」，Codex 会结合全书作答，回答记录在该文段上。" />
-                    ) : (
-                      panelQa.map(h => (
-                        <button
-                          key={h.id}
-                          onClick={() => setAiTargetId(h.id)}
-                          className="mb-3 block w-full rounded-md p-3 text-left shadow-sm"
-                          style={{ background: theme.bg }}
-                        >
-                          <p className="font-reading text-[12.5px] leading-6 opacity-70">
-                            「{h.text.slice(0, 50)}
-                            {h.text.length > 50 ? "…" : ""}」
-                          </p>
-                          <div className="font-meta mt-2 flex items-center gap-1.5 text-[10.5px] text-primary">
-                            <Sparkles size={11} /> {h.aiQa!.length} 条问答
-                          </div>
-                          <p className="mt-1 truncate text-[12px]">
-                            {h.aiQa![h.aiQa!.length - 1].q}
-                          </p>
-                        </button>
-                      ))
-                    ))}
+                              onAskAi={() => setAiTargetId(h.id)}
+                            />
+                          ))
+                        ))}
+                      {tab === "notes" &&
+                        (panelNotes.length === 0 ? (
+                          <PanelEmpty text="选中文字后点「批注」，在文段旁直接写下想法，不打断阅读。" />
+                        ) : (
+                          panelNotes.map(h => (
+                            <AnnotationCard
+                              key={h.id}
+                              h={h}
+                              theme={theme}
+                              onLocate={() =>
+                                lib.navigate({
+                                  view: "reader",
+                                  bookId: book.id,
+                                  chapterId: h.chapterId,
+                                  highlightId: h.id,
+                                })
+                              }
+                            />
+                          ))
+                        ))}
+                      {tab === "qa" &&
+                        (panelQa.length === 0 ? (
+                          <PanelEmpty text="选中文字后点「问 AI」，Codex 会结合全书作答，回答记录在该文段上。" />
+                        ) : (
+                          panelQa.map(h => (
+                            <QaCard
+                              key={h.id}
+                              h={h}
+                              theme={theme}
+                              onOpen={() => setAiTargetId(h.id)}
+                            />
+                          ))
+                        ))}
+                    </>
+                  )}
 
                   {/* 引用本书的笔记（backlinks） */}
                   {citingNotes.length > 0 && (
@@ -2696,6 +2769,34 @@ function PanelEmpty({ text }: { text: string }) {
   return <p className="px-1 text-xs leading-6 opacity-60">{text}</p>;
 }
 
+function CombinedPanelCard({
+  kind,
+  children,
+}: {
+  kind: "mark" | "note" | "qa";
+  children: React.ReactNode;
+}) {
+  const styles = {
+    mark: { label: "书摘", color: "#d97706" },
+    note: { label: "批注", color: "#2563eb" },
+    qa: { label: "问答", color: "#7c3aed" },
+  }[kind];
+  return (
+    <section
+      className="mb-3 border-l-2 pl-2.5"
+      style={{ borderColor: styles.color }}
+    >
+      <h3
+        className="font-meta mb-1 text-[10px] font-medium uppercase tracking-[0.16em]"
+        style={{ color: styles.color }}
+      >
+        {styles.label}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
 /** 书摘卡片 */
 function MarkCard({
   h,
@@ -2747,6 +2848,74 @@ function MarkCard({
         )}
       </div>
     </div>
+  );
+}
+
+function AnnotationCard({
+  h,
+  theme,
+  onLocate,
+}: {
+  h: Highlight;
+  theme: ReaderTheme;
+  onLocate: () => void;
+}) {
+  return (
+    <div
+      className="mb-3 rounded-md p-3 shadow-sm"
+      style={{ background: theme.bg }}
+    >
+      {h.name && (
+        <div className="font-meta mb-1 text-[10px] uppercase tracking-wider text-primary">
+          {h.name}
+        </div>
+      )}
+      <p className="font-reading text-[12.5px] leading-6 opacity-70">
+        「{h.text}」
+      </p>
+      <p className="mt-2 text-[13px] leading-6">{h.note}</p>
+      <div
+        className="font-meta mt-2 flex items-center justify-between text-[10px]"
+        style={{ color: theme.muted }}
+      >
+        <span>{h.chapterTitle}</span>
+        <button className="hover:text-primary" onClick={onLocate}>
+          定位
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function QaCard({
+  h,
+  qaIndex,
+  theme,
+  onOpen,
+}: {
+  h: Highlight;
+  qaIndex?: number;
+  theme: ReaderTheme;
+  onOpen: () => void;
+}) {
+  const index = qaIndex ?? (h.aiQa?.length ?? 1) - 1;
+  const qa = h.aiQa?.[index];
+  if (!qa) return null;
+  return (
+    <button
+      onClick={onOpen}
+      className="mb-3 block w-full rounded-md p-3 text-left shadow-sm"
+      style={{ background: theme.bg }}
+    >
+      <p className="font-reading text-[12.5px] leading-6 opacity-70">
+        「{h.text.slice(0, 50)}
+        {h.text.length > 50 ? "…" : ""}」
+      </p>
+      <div className="font-meta mt-2 flex items-center gap-1.5 text-[10.5px] text-primary">
+        <Sparkles size={11} /> 问：{qa.q}
+      </div>
+      <p className="mt-1 line-clamp-2 text-[12px]">答：{qa.a}</p>
+    </button>
   );
 }
 

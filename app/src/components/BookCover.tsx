@@ -39,7 +39,7 @@ export function BookCover({
       />
       {/* 题签 */}
       <div
-        className="absolute right-[10%] top-[9%] flex max-h-[82%] flex-col items-center px-1.5 py-2"
+        className="absolute right-[10%] top-[9%] flex max-h-[82%] flex-col items-center overflow-hidden px-1.5 py-2"
         style={{ background: tone.fg, boxShadow: "0 1px 3px rgba(0,0,0,0.25)" }}
       >
         <span

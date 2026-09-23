@@ -62,6 +62,14 @@ describe("Sidebar display mode control", () => {
     expect(html).not.toContain("切换为自动隐藏");
   });
 
+  it("keeps navigation names available as hover labels while showing icons by default", () => {
+    const html = renderSidebar("pinned");
+
+    expect(html).toContain('aria-label="书架"');
+    expect(html).toContain('title="书架"');
+    expect(html).toContain('class="sr-only">书架</span>');
+  });
+
   it("shows reading items from most recently opened to oldest", () => {
     const book = (
       id: string,

@@ -140,6 +140,45 @@ describe("global library search", () => {
     const result = await searchLibrary(data, "批注", { scope: "all" });
     expect(result.results[0].route.highlightId).toBe("h");
   });
+  it("can search excerpts, annotations and AI Q&A independently", async () => {
+    const categorized: SearchData = {
+      ...data,
+      highlights: [
+        {
+          ...highlights[0],
+          text: "书摘关键词",
+          note: "批注关键词",
+          aiQa: [{ q: "问答问题关键词", a: "问答回答关键词", ts: 1 }],
+        },
+      ],
+    };
+
+    await expect(
+      searchLibrary(categorized, "关键词", {
+        scope: "all",
+        contentType: "mark",
+      })
+    ).resolves.toMatchObject({ results: [{ kind: "书摘" }] });
+    await expect(
+      searchLibrary(categorized, "关键词", {
+        scope: "all",
+        contentType: "note",
+      })
+    ).resolves.toMatchObject({ results: [{ kind: "批注" }] });
+    await expect(
+      searchLibrary(categorized, "关键词", {
+        scope: "all",
+        contentType: "qa",
+      })
+    ).resolves.toMatchObject({ results: [{ kind: "问答" }] });
+
+    const answer = await searchLibrary(categorized, "回答关键词", {
+      scope: "all",
+      contentType: "qa",
+    });
+    expect(answer.results).toHaveLength(1);
+    expect(answer.results[0].route.highlightId).toBe("h");
+  });
   it("caps results explicitly and supports cancellation", async () => {
     const result = await searchLibrary(
       data,
