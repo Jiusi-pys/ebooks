@@ -474,6 +474,55 @@ npm run start
 fails fast when `DATABASE_URL` is missing. `APP_ID` and `APP_SECRET` are also
 needed only for the first login while the user table is empty.
 
+### Server administrator installation and updates
+
+Administrators do not need Codex or Claude Code. Install Git, Node.js 22.13+
+and MySQL on the server, then clone this repository and configure `app/.env`.
+The file contains deployment-specific secrets and must never be committed or
+replaced by Git.
+
+```bash
+git clone https://github.com/Jiusi-pys/ebooks.git shufang
+cd shufang/app
+cp .env.example .env
+# Edit .env: DATABASE_URL, APP_DATA_SECRET, APP_SESSION_SECRET, PUBLIC_ORIGIN, …
+npm ci
+npm run db:migrate
+npm run build
+```
+
+To update an existing server, first back up its MySQL database. Keep the
+existing `app/.env` and, when secrets are not configured through environment
+variables, keep the persistent `app/.runtime/` directory. Then run:
+
+```bash
+cd /srv/shufang
+git pull --ff-only origin main
+cd app
+npm ci
+npm run db:migrate
+npm run build
+```
+
+Restart the process using the same supervisor that runs the deployment. For
+example:
+
+```bash
+# systemd: replace shufang with the actual service name
+sudo systemctl restart shufang
+sudo systemctl status shufang
+
+# PM2
+pm2 restart shufang
+```
+
+For Docker deployments, rebuild the image and recreate the container using the
+existing `--env-file app/.env` and persistent database configuration. Do not
+use `db:push` for production upgrades; `npm run db:migrate` records completed
+migrations and applies only the pending ones. After the server restarts, users
+only need to refresh the browser; their MySQL-backed books and accounts remain
+in place.
+
 ### Optional container build
 
 The image deliberately does not contain `.env` or Codex credentials:

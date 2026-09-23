@@ -11,5 +11,6 @@ ENV NODE_ENV=production
 COPY --from=build /app/package.json /app/package-lock.json* ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/db/migrations ./db/migrations
 EXPOSE 3000
 CMD ["npm", "run", "start"]
