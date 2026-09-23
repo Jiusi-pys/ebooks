@@ -8,7 +8,7 @@ import {
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from "d3-force";
-import { Network } from "lucide-react";
+import { Minus, Network, RotateCcw, ZoomIn } from "lucide-react";
 import type { Library } from "@/hooks/useLibrary";
 import { buildGraph, type GraphEdge, type GraphNode } from "@/lib/links";
 
@@ -20,8 +20,20 @@ export function GraphView({ lib }: { lib: Library }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 900, h: 600 });
   const [, setTick] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
   const dragNode = useRef<SimNode | null>(null);
   const dragMoved = useRef(false);
+  const changeZoom = (change: number) => {
+    setZoom(current => {
+      const next = Math.min(
+        2.5,
+        Math.max(0.5, Number((current + change).toFixed(2)))
+      );
+      zoomRef.current = next;
+      return next;
+    });
+  };
 
   const graph = useMemo(
     () => buildGraph(lib.books, lib.notes, lib.highlights, lib.associations),
@@ -88,8 +100,9 @@ export function GraphView({ lib }: { lib: Library }) {
       dragMoved.current = true;
       const rect = wrapRef.current?.getBoundingClientRect();
       if (!rect) return;
-      n.fx = e.clientX - rect.left;
-      n.fy = e.clientY - rect.top;
+      const scale = zoomRef.current;
+      n.fx = (e.clientX - rect.left - (size.w / 2) * (1 - scale)) / scale;
+      n.fy = (e.clientY - rect.top - (size.h / 2) * (1 - scale)) / scale;
       sim.alphaTarget(0.25).restart();
     };
     const onPointerUp = () => {
@@ -147,7 +160,14 @@ export function GraphView({ lib }: { lib: Library }) {
           图谱
         </h1>
       </header>
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden">
+      <div
+        ref={wrapRef}
+        className="relative flex-1 overflow-hidden"
+        onWheel={event => {
+          event.preventDefault();
+          changeZoom(event.deltaY < 0 ? 0.1 : -0.1);
+        }}
+      >
         {graph.nodes.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
             <Network size={28} strokeWidth={1.4} />
@@ -171,187 +191,230 @@ export function GraphView({ lib }: { lib: Library }) {
                 <path d="M 0 0 L 8 4 L 0 8 z" fill="#0369a1" />
               </marker>
             </defs>
-            {simLinks.map((l, i) => {
-              const s = l.source as SimNode;
-              const t = l.target as SimNode;
-              if (s.x == null || s.y == null || t.x == null || t.y == null)
-                return null;
-              const edge = l as typeof l &
-                Pick<
-                  GraphEdge,
-                  "kind" | "associationId" | "directed" | "label"
-                >;
-              const association = edge.kind === "association";
-              return (
-                <g
-                  key={edge.associationId ?? i}
-                  data-edge-kind={edge.kind}
-                  data-association-id={edge.associationId}
-                >
-                  <line
-                    x1={s.x}
-                    y1={s.y}
-                    x2={t.x}
-                    y2={t.y}
-                    stroke={association ? "#0369a1" : "#8a7d6b"}
-                    strokeOpacity={association ? 0.8 : 0.35}
-                    strokeWidth={association ? 1.7 : 1}
-                    strokeDasharray={association ? "5 4" : undefined}
-                    markerStart={
-                      association && !edge.directed
-                        ? "url(#association-arrow)"
-                        : undefined
-                    }
-                    markerEnd={
-                      association ? "url(#association-arrow)" : undefined
-                    }
-                  />
-                  {association && edge.label && (
-                    <text
-                      x={(s.x + t.x) / 2}
-                      y={(s.y + t.y) / 2 - 5}
-                      textAnchor="middle"
-                      fontSize={9.5}
-                      fill="#075985"
-                      stroke="rgba(255,255,255,0.9)"
-                      strokeWidth={3}
-                      paintOrder="stroke"
-                    >
-                      {edge.label.length > 16
-                        ? `${edge.label.slice(0, 16)}…`
-                        : edge.label}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-            {simNodes.map(n => {
-              if (n.x == null || n.y == null) return null;
-              const isBook = n.kind === "book";
-              const isChapter = n.kind === "chapter";
-              const isContent = n.kind === "content";
-              const kindLabel = isBook
-                ? "书籍"
-                : isChapter
-                  ? "章节"
-                  : isContent
-                    ? "内容"
-                    : "笔记";
-              const w = Math.max(30, n.label.length * 12 + 16);
-              return (
-                <g
-                  key={n.id}
-                  transform={`translate(${n.x},${n.y})`}
-                  className="cursor-pointer select-none"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${kindLabel}：${n.label}`}
-                  onPointerDown={() => {
-                    dragMoved.current = false;
-                    dragNode.current =
-                      simNodes.find(x => x.id === n.id) ?? null;
-                  }}
-                  onClick={() => void openNode(n)}
-                  onKeyDown={event => {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.preventDefault();
-                    void openNode(n);
-                  }}
-                >
-                  {isBook ? (
-                    <rect
-                      x={-w / 2}
-                      y={-15}
-                      width={w}
-                      height={30}
-                      rx={3}
-                      fill="#f54001"
-                      stroke="rgba(0,0,0,0.18)"
+            <g
+              transform={`translate(${(size.w / 2) * (1 - zoom)},${
+                (size.h / 2) * (1 - zoom)
+              }) scale(${zoom})`}
+            >
+              {simLinks.map((l, i) => {
+                const s = l.source as SimNode;
+                const t = l.target as SimNode;
+                if (s.x == null || s.y == null || t.x == null || t.y == null)
+                  return null;
+                const edge = l as typeof l &
+                  Pick<
+                    GraphEdge,
+                    "kind" | "associationId" | "directed" | "label"
+                  >;
+                const association = edge.kind === "association";
+                return (
+                  <g
+                    key={edge.associationId ?? i}
+                    data-edge-kind={edge.kind}
+                    data-association-id={edge.associationId}
+                  >
+                    <line
+                      x1={s.x}
+                      y1={s.y}
+                      x2={t.x}
+                      y2={t.y}
+                      stroke={association ? "#0369a1" : "#8a7d6b"}
+                      strokeOpacity={association ? 0.8 : 0.35}
+                      strokeWidth={association ? 1.7 : 1}
+                      strokeDasharray={association ? "5 4" : undefined}
+                      markerStart={
+                        association && !edge.directed
+                          ? "url(#association-arrow)"
+                          : undefined
+                      }
+                      markerEnd={
+                        association ? "url(#association-arrow)" : undefined
+                      }
                     />
-                  ) : isChapter ? (
-                    <rect
-                      x={-Math.min(w, 126) / 2}
-                      y={-12}
-                      width={Math.min(w, 126)}
-                      height={24}
-                      rx={8}
-                      fill="#fff1e8"
-                      stroke="#f54001"
-                      strokeWidth={1.2}
-                    />
-                  ) : isContent ? (
-                    <rect
-                      x={-8}
-                      y={-8}
-                      width={16}
-                      height={16}
-                      rx={2}
-                      transform="rotate(45)"
-                      fill="#ffe3cf"
-                      stroke="#b45309"
-                      strokeWidth={1.2}
-                    />
-                  ) : (
-                    <circle
-                      r={10 + n.degree * 2.5}
-                      fill="#ffc198"
-                      stroke="#f54001"
-                      strokeWidth={1.4}
-                    />
-                  )}
-                  {isBook && (
-                    <text
-                      textAnchor="middle"
-                      y={4.5}
-                      fontSize={12}
-                      fill="#fffbf5"
-                      fontWeight={600}
-                    >
-                      {n.label.length > 10
-                        ? n.label.slice(0, 10) + "…"
-                        : n.label}
-                    </text>
-                  )}
-                  {isChapter && (
-                    <text
-                      textAnchor="middle"
-                      y={4}
-                      fontSize={10.5}
-                      fill="#7c2d12"
-                    >
-                      {n.label.length > 10
-                        ? n.label.slice(0, 10) + "…"
-                        : n.label}
-                    </text>
-                  )}
-                  {isContent && (
-                    <text
-                      textAnchor="middle"
-                      y={26}
-                      fontSize={10}
-                      fill="#6b5f50"
-                    >
-                      {n.label.length > 12
-                        ? n.label.slice(0, 12) + "…"
-                        : n.label}
-                    </text>
-                  )}
-                  {n.kind === "note" && (
-                    <text
-                      textAnchor="middle"
-                      y={26 + n.degree * 2.5}
-                      fontSize={11}
-                      fill="#4f483e"
-                    >
-                      {n.label.length > 12
-                        ? n.label.slice(0, 12) + "…"
-                        : n.label}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
+                    {association && edge.label && (
+                      <text
+                        x={(s.x + t.x) / 2}
+                        y={(s.y + t.y) / 2 - 5}
+                        textAnchor="middle"
+                        fontSize={9.5}
+                        fill="#075985"
+                        stroke="rgba(255,255,255,0.9)"
+                        strokeWidth={3}
+                        paintOrder="stroke"
+                      >
+                        {edge.label.length > 16
+                          ? `${edge.label.slice(0, 16)}…`
+                          : edge.label}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+              {simNodes.map(n => {
+                if (n.x == null || n.y == null) return null;
+                const isBook = n.kind === "book";
+                const isChapter = n.kind === "chapter";
+                const isContent = n.kind === "content";
+                const kindLabel = isBook
+                  ? "书籍"
+                  : isChapter
+                    ? "章节"
+                    : isContent
+                      ? "内容"
+                      : "笔记";
+                const w = Math.max(30, n.label.length * 12 + 16);
+                return (
+                  <g
+                    key={n.id}
+                    transform={`translate(${n.x},${n.y})`}
+                    className="cursor-pointer select-none"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${kindLabel}：${n.label}`}
+                    onPointerDown={() => {
+                      dragMoved.current = false;
+                      dragNode.current =
+                        simNodes.find(x => x.id === n.id) ?? null;
+                    }}
+                    onClick={() => void openNode(n)}
+                    onKeyDown={event => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      void openNode(n);
+                    }}
+                  >
+                    {isBook ? (
+                      <rect
+                        x={-w / 2}
+                        y={-15}
+                        width={w}
+                        height={30}
+                        rx={3}
+                        fill="#f54001"
+                        stroke="rgba(0,0,0,0.18)"
+                      />
+                    ) : isChapter ? (
+                      <rect
+                        x={-Math.min(w, 126) / 2}
+                        y={-12}
+                        width={Math.min(w, 126)}
+                        height={24}
+                        rx={8}
+                        fill="#fff1e8"
+                        stroke="#f54001"
+                        strokeWidth={1.2}
+                      />
+                    ) : isContent ? (
+                      <rect
+                        x={-8}
+                        y={-8}
+                        width={16}
+                        height={16}
+                        rx={2}
+                        transform="rotate(45)"
+                        fill="#ffe3cf"
+                        stroke="#b45309"
+                        strokeWidth={1.2}
+                      />
+                    ) : (
+                      <circle
+                        r={10 + n.degree * 2.5}
+                        fill="#ffc198"
+                        stroke="#f54001"
+                        strokeWidth={1.4}
+                      />
+                    )}
+                    {isBook && (
+                      <text
+                        textAnchor="middle"
+                        y={4.5}
+                        fontSize={12}
+                        fill="#fffbf5"
+                        fontWeight={600}
+                      >
+                        {n.label.length > 10
+                          ? n.label.slice(0, 10) + "…"
+                          : n.label}
+                      </text>
+                    )}
+                    {isChapter && (
+                      <text
+                        textAnchor="middle"
+                        y={4}
+                        fontSize={10.5}
+                        fill="#7c2d12"
+                      >
+                        {n.label.length > 10
+                          ? n.label.slice(0, 10) + "…"
+                          : n.label}
+                      </text>
+                    )}
+                    {isContent && (
+                      <text
+                        textAnchor="middle"
+                        y={26}
+                        fontSize={10}
+                        fill="#6b5f50"
+                      >
+                        {n.label.length > 12
+                          ? n.label.slice(0, 12) + "…"
+                          : n.label}
+                      </text>
+                    )}
+                    {n.kind === "note" && (
+                      <text
+                        textAnchor="middle"
+                        y={26 + n.degree * 2.5}
+                        fontSize={11}
+                        fill="#4f483e"
+                      >
+                        {n.label.length > 12
+                          ? n.label.slice(0, 12) + "…"
+                          : n.label}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </g>
           </svg>
+        )}
+        {graph.nodes.length > 0 && (
+          <div className="absolute right-5 top-5 z-10 flex items-center gap-1 rounded-lg border bg-card/90 p-1 shadow-sm backdrop-blur">
+            <button
+              type="button"
+              className="app-icon-button h-8 w-8"
+              onClick={() => changeZoom(-0.1)}
+              aria-label="缩小图谱"
+              title="缩小"
+            >
+              <Minus size={15} />
+            </button>
+            <span className="font-meta w-10 text-center text-[10px] text-muted-foreground">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              type="button"
+              className="app-icon-button h-8 w-8"
+              onClick={() => changeZoom(0.1)}
+              aria-label="放大图谱"
+              title="放大"
+            >
+              <ZoomIn size={15} />
+            </button>
+            <button
+              type="button"
+              className="app-icon-button h-8 w-8"
+              onClick={() => {
+                zoomRef.current = 1;
+                setZoom(1);
+              }}
+              aria-label="重置图谱缩放"
+              title="重置缩放"
+            >
+              <RotateCcw size={14} />
+            </button>
+          </div>
         )}
         <div className="font-meta pointer-events-none absolute bottom-4 left-6 text-[10.5px] leading-5 text-muted-foreground/70">
           <span className="mr-4 inline-flex items-center gap-1.5">

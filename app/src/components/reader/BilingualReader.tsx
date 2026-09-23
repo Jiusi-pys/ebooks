@@ -427,7 +427,7 @@ export function BilingualReader({
               className="ml-auto flex overflow-hidden rounded-full border"
               style={{ borderColor: theme.border }}
             >
-              {(["中文", "English"] as const).map(language => (
+              {(["中文", "现代汉语"] as const).map(language => (
                 <button
                   key={language}
                   type="button"
@@ -444,7 +444,7 @@ export function BilingualReader({
                       : { color: theme.muted }
                   }
                 >
-                  {language === "中文" ? "中" : "EN"}
+                  {language === "中文" ? "英→中" : "古→今"}
                 </button>
               ))}
             </div>

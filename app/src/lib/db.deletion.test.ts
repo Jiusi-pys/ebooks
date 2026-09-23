@@ -235,6 +235,34 @@ describe("local book deletion cascade", () => {
     expect(updated.content.match(/具体内容/g)).toHaveLength(1);
   });
 
+  it("deletes a note whose only citations belong to the deleted book", async () => {
+    const deletedBook = book("delete-note-owner");
+    const note: Note = {
+      id: "book-only-note",
+      title: "Book-only note",
+      content: citationBlock({
+        level: "content",
+        highlightId: "book-only-citation",
+        bookTitle: deletedBook.title,
+        chapterTitle: "Chapter",
+        text: "Text",
+      }),
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    await putBook(deletedBook);
+    await putNote(note);
+    await putHighlight({
+      ...highlight("book-only-citation", deletedBook.id),
+      noteId: note.id,
+      citation: { level: "content" },
+    });
+
+    await deleteBook(deletedBook.id);
+
+    expect(await getAllNotes()).toEqual([]);
+  });
+
   it("removes a highlight and its generated citation block together", async () => {
     const sourceBook = { ...book("citation-book"), title: "Source Book" };
     const note: Note = {

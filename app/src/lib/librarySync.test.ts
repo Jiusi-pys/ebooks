@@ -12,7 +12,12 @@ import {
   cacheServerBook,
   putImportedBook,
 } from "./db";
-import { synchronizeLibrary, flushReaderStates } from "./librarySync";
+import {
+  synchronizeLibrary,
+  flushReaderStates,
+  syncBrowserToMySql,
+  syncMySqlToBrowser,
+} from "./librarySync";
 import { syncBookMirror } from "./mirrorSync";
 
 vi.mock("./mirrorSync", () => ({
@@ -34,9 +39,51 @@ const book: Book = {
 afterEach(async () => {
   await deleteBook(book.id);
   vi.unstubAllGlobals();
+  vi.clearAllMocks();
 });
 
 describe("server-backed library", () => {
+  it("uploads browser books without reading a MySQL book back into the cache", async () => {
+    await putBook(book);
+    const fetchMock = vi.fn(async (path: string) => {
+      if (path.endsWith("/books"))
+        return Response.json({
+          books: [{ id: book.id, hasReaderData: true, source: null }],
+          deletedBookIds: [],
+          folders: [],
+        });
+      return Response.json({ ok: true });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await syncBrowserToMySql();
+
+    expect(syncBookMirror).toHaveBeenCalledWith(
+      expect.objectContaining({ extId: book.id })
+    );
+    expect(fetchMock.mock.calls.map(([path]) => path)).not.toContain(
+      `/api/library/books/${book.id}`
+    );
+  });
+
+  it("downloads MySQL books without uploading browser content", async () => {
+    const fetchMock = vi.fn(async (path: string) => {
+      if (path.endsWith(`/books/${book.id}`))
+        return Response.json({ book, source: null });
+      return Response.json({
+        books: [{ id: book.id, hasReaderData: true, source: null }],
+        deletedBookIds: [],
+        folders: [],
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await syncMySqlToBrowser();
+
+    expect(await getAllBooks()).toContainEqual(book);
+    expect(syncBookMirror).not.toHaveBeenCalled();
+  });
+
   it("migrates a local-only book and uploads its complete source in bounded chunks", async () => {
     const bytes = new Uint8Array(300 * 1024).fill(42);
     await putImportedBook(book, {

@@ -42,7 +42,7 @@ export function AiSettingsPanel({
   > | null>(null);
   if (!codexRequests.current) codexRequests.current = createLatestRequestGate();
   const testConnection = trpc.ai.testConnection.useMutation();
-  const options = AI_PROVIDERS[value.provider];
+  const options = AI_PROVIDERS.deepseek;
 
   const switchProvider = (provider: AiProviderId) => {
     setTestResult("");

@@ -110,9 +110,7 @@ export function AiDrawer({
         }
         setDigestLine("首次提问：正在通读全书，提炼结构…");
         const structure = JSON.stringify(scanBookStructure(book), null, 1);
-        setDigestLine(
-          `正在请 ${AI_PROVIDERS[aiConfig.provider].label} 为全书写导读…`
-        );
+        setDigestLine(`正在请 ${AI_PROVIDERS.deepseek.label} 为全书写导读…`);
         let overview = "";
         try {
           const resp = await utils.client.ai.chat.mutate({
@@ -256,12 +254,13 @@ export function AiDrawer({
         {headerAction}
         <button
           onClick={() => setShowSettings(value => !value)}
-          className={`rounded p-1 ${headerAction ? "" : "ml-auto"} ${showSettings ? "bg-primary/10 text-primary" : "hover:opacity-70"}`}
+          className={`flex items-center gap-1 rounded px-1.5 py-1 text-[11px] ${headerAction ? "" : "ml-auto"} ${showSettings ? "bg-primary/10 text-primary" : "hover:opacity-70"}`}
           style={{ color: showSettings ? undefined : theme.muted }}
           title="AI 后台设置"
           aria-label="AI 后台设置"
         >
           <Settings2 size={15} />
+          设置
         </button>
         <button
           onClick={onClose}

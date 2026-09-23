@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { Book } from "@/types";
 import {
   contentHashOfBook,
+  clampSelectionToolbarLeft,
   DEFAULT_TYPE,
   horizontalReaderPageState,
+  isPagedReaderMode,
   loadTypeSettings,
   normalizePageMargin,
   planReaderChapterEntry,
@@ -84,6 +86,13 @@ describe("reader page margin", () => {
     expect(loadTypeSettings(storage).pageTurnMode).toBe("vertical");
   });
 
+  it("keeps the realistic page-turn mode when restoring preferences", () => {
+    const storage = { getItem: () => JSON.stringify({ pageTurnMode: "curl" }) };
+    expect(loadTypeSettings(storage).pageTurnMode).toBe("curl");
+    expect(isPagedReaderMode("curl")).toBe(true);
+    expect(isPagedReaderMode("vertical")).toBe(false);
+  });
+
   it("clamps invalid or out-of-range persisted margins", () => {
     expect(normalizePageMargin(Number.NaN)).toBe(DEFAULT_TYPE.pageMargin);
     expect(normalizePageMargin(4)).toBe(16);
@@ -104,7 +113,9 @@ describe("reader page margin", () => {
       { setItem: (key, value) => values.set(key, value) }
     );
 
-    expect(JSON.parse(values.get("shufang-type2") ?? "{}").pageMargin).toBe(200);
+    expect(JSON.parse(values.get("shufang-type2") ?? "{}").pageMargin).toBe(
+      200
+    );
   });
 
   it("produces responsive padding for narrow split panes", () => {
@@ -148,6 +159,14 @@ describe("reader page-turn metrics", () => {
         scrollWidth: 2370,
       })
     ).toEqual({ page: 3, pageCount: 3, atStart: false, atEnd: true });
+  });
+});
+
+describe("selection toolbar positioning", () => {
+  it("keeps the toolbar fully inside the reading pane at both edges", () => {
+    expect(clampSelectionToolbarLeft(20, 900)).toBe(164);
+    expect(clampSelectionToolbarLeft(880, 900)).toBe(736);
+    expect(clampSelectionToolbarLeft(450, 900)).toBe(450);
   });
 });
 

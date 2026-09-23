@@ -6,6 +6,7 @@ import {
   MessageSquarePlus,
   Quote,
   Sparkles,
+  Search,
   Underline,
   Highlighter,
   Type as TypeIcon,
@@ -33,6 +34,7 @@ interface Props {
   /** 把当前选区作为段落级锚点加入自定义目录。 */
   onAddToOutline: () => void;
   onAskAi: () => void;
+  onSearch: () => void;
   onClose: () => void;
 }
 
@@ -49,6 +51,7 @@ export function SelectionToolbar({
   onTranslate,
   onAddToOutline,
   onAskAi,
+  onSearch,
   onClose,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -128,6 +131,12 @@ export function SelectionToolbar({
               icon={<Languages size={14} />}
               label="翻译"
               onClick={onTranslate}
+              className="w-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+            />
+            <ExpandableSelectionAction
+              icon={<Search size={14} />}
+              label="搜索"
+              onClick={onSearch}
               className="w-full text-muted-foreground hover:bg-secondary hover:text-foreground"
             />
             <ExpandableSelectionAction

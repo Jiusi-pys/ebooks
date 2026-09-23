@@ -195,13 +195,19 @@ function BookCard({
           <DropdownMenuTrigger asChild>
             <button
               onClick={e => e.stopPropagation()}
-              className="absolute right-2 top-2 hidden rounded-full bg-card/90 p-1.5 text-muted-foreground shadow hover:text-foreground group-hover:block"
+              className="absolute right-2 top-2 rounded-full bg-card/90 p-1.5 text-muted-foreground opacity-0 shadow transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
               title="更多操作"
             >
               <MoreHorizontal size={13} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48 bg-card">
+          <DropdownMenuContent
+            side="bottom"
+            align="end"
+            sideOffset={8}
+            collisionPadding={12}
+            className="w-48 bg-card"
+          >
             <DropdownMenuItem onClick={() => setMetadataEditing(true)}>
               <Pencil size={13} className="mr-2" /> 编辑元数据
             </DropdownMenuItem>
@@ -273,7 +279,7 @@ function BookCard({
               onClick={() => {
                 if (
                   !confirm(
-                    `确定删除《${book.title}》？相关书摘、译文、脑图和文段关联会一并移除。`
+                    `确定删除《${book.title}》？相关书摘、译文、脑图、专属笔记和文段关联会一并移除。`
                   )
                 )
                   return;
@@ -388,13 +394,19 @@ function FolderCard({
         <DropdownMenuTrigger asChild>
           <button
             onClick={e => e.stopPropagation()}
-            className="absolute right-2 top-2 hidden rounded-full bg-card/90 p-1.5 text-muted-foreground shadow hover:text-foreground group-hover:block"
+            className="absolute right-2 top-2 rounded-full bg-card/90 p-1.5 text-muted-foreground opacity-0 shadow transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
             title="更多操作"
           >
             <MoreHorizontal size={13} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44 bg-card">
+        <DropdownMenuContent
+          side="bottom"
+          align="end"
+          sideOffset={8}
+          collisionPadding={12}
+          className="w-44 bg-card"
+        >
           <DropdownMenuItem onClick={() => setRenaming(true)}>
             <Pencil size={13} className="mr-2" /> 重命名
           </DropdownMenuItem>
@@ -498,7 +510,7 @@ export function LibraryView({ lib }: { lib: Library }) {
     if (n === 0 || batchDeleting) return;
     if (
       confirm(
-        `确定删除选中的 ${n} 本书？相关书摘、译文、脑图和文段关联会一并移除。`
+        `确定删除选中的 ${n} 本书？相关书摘、译文、脑图、专属笔记和文段关联会一并移除。`
       )
     ) {
       const ids = [...sel.selected];
@@ -589,7 +601,8 @@ export function LibraryView({ lib }: { lib: Library }) {
           )}
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <LibrarySyncButton
-              onSync={lib.syncLibrary}
+              onPush={lib.pushLibraryToMySql}
+              onPull={lib.pullLibraryFromMySql}
               disabled={lib.imports.some(task => task.status === "working")}
             />
             {/* 多选开关 */}

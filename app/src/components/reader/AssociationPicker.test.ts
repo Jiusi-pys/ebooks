@@ -141,6 +141,7 @@ describe("AssociationPicker", () => {
         onTranslate: callback,
         onAddToOutline: callback,
         onAskAi: callback,
+        onSearch: callback,
         onClose: callback,
       })
     );

@@ -58,6 +58,8 @@ import { toneForTitle } from "@/lib/covers";
 import {
   flushReaderStates,
   persistImportedBook,
+  syncBrowserToMySql,
+  syncMySqlToBrowser,
   synchronizeLibrary,
 } from "@/lib/librarySync";
 import { emitEvent } from "@/lib/events";
@@ -220,6 +222,34 @@ export function useLibrary() {
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : "服务端书库同步失败"
+      );
+      return false;
+    }
+  }, [reload]);
+
+  const pushLibraryToMySql = useCallback(async () => {
+    try {
+      await syncBrowserToMySql();
+      await reload();
+      setSyncError(null);
+      return true;
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : "上传书籍到 MySQL 失败"
+      );
+      return false;
+    }
+  }, [reload]);
+
+  const pullLibraryFromMySql = useCallback(async () => {
+    try {
+      await syncMySqlToBrowser();
+      await reload();
+      setSyncError(null);
+      return true;
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : "从 MySQL 下载书籍失败"
       );
       return false;
     }
@@ -1015,6 +1045,8 @@ export function useLibrary() {
     retryInitialization,
     syncError,
     syncLibrary,
+    pushLibraryToMySql,
+    pullLibraryFromMySql,
     books,
     notes,
     highlights,

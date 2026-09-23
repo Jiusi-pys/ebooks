@@ -1,7 +1,6 @@
 import * as Popover from "@radix-ui/react-popover";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft,
   BookOpenText,
   ChevronLeft,
   ChevronRight,
@@ -15,6 +14,7 @@ import {
   Pin,
   Quote,
   RefreshCw,
+  Settings2,
   Sparkles,
   Tag,
   Trash2,
@@ -40,7 +40,9 @@ import type {
 } from "@/types";
 import {
   fontStack,
+  clampSelectionToolbarLeft,
   horizontalReaderPageState,
+  isPagedReaderMode,
   loadTypeSettings,
   locateHighlight,
   planReaderChapterEntry,
@@ -53,7 +55,10 @@ import {
 } from "@/lib/reading";
 import { formatDate } from "@/lib/covers";
 import { emitEvent } from "@/lib/events";
+import { useAiConfig } from "@/lib/aiConfig";
+import { searchUrl, useSearchEngine } from "@/lib/searchEngine";
 import { TypePanel } from "./reader/TypePanel";
+import { AiSettingsPanel } from "./reader/AiSettingsPanel";
 import { SelectionToolbar } from "./reader/SelectionToolbar";
 import { AiDrawer } from "./reader/AiDrawer";
 import { CiteBrowser, type CitationTarget } from "./reader/CiteBrowser";
@@ -150,6 +155,8 @@ export function ReaderView({
   onImmersiveChange?: (active: boolean) => void;
 }) {
   const [type, setType] = useState<TypeSettings>(loadTypeSettings);
+  const [aiConfig, setAiConfig] = useAiConfig();
+  const [searchEngine] = useSearchEngine();
   const [showToc, setShowToc] = useState(true);
   const [showType, setShowType] = useState(false);
   const [sel, setSel] = useState<SelInfo | null>(null);
@@ -190,14 +197,17 @@ export function ReaderView({
   const modeSwitchRatioRef = useRef<number | null>(null);
   const chapterEntryRatioRef = useRef<number | null>(null);
   const lastWheelTurnRef = useRef(0);
+  const selectingPointerRef = useRef(false);
   const [horizontalPage, setHorizontalPage] = useState({
     page: 1,
     pageCount: 1,
     atStart: true,
     atEnd: true,
   });
+  const [pageTurning, setPageTurning] = useState(false);
 
   const theme = themeById(type.themeId);
+  const pagedReader = isPagedReaderMode(type.pageTurnMode);
   /** 原版 PDF 版面模式（保留排版逐页阅读） */
   const isOriginal =
     book.format === "pdf" && resolvePdfReaderMode(book) === "original";
@@ -435,11 +445,11 @@ export function ReaderView({
           entryRatio
         );
         container.scrollTo(
-          type.pageTurnMode === "horizontal"
+          isPagedReaderMode(type.pageTurnMode)
             ? { left: offset, top: 0 }
             : { left: 0, top: offset }
         );
-        if (type.pageTurnMode === "horizontal")
+        if (isPagedReaderMode(type.pageTurnMode))
           setHorizontalPage(horizontalReaderPageState(container));
       });
     });
@@ -465,11 +475,11 @@ export function ReaderView({
         if (!container) return;
         const offset = readerScrollOffset(container, type.pageTurnMode, ratio);
         container.scrollTo(
-          type.pageTurnMode === "horizontal"
+          isPagedReaderMode(type.pageTurnMode)
             ? { left: offset, top: 0 }
             : { left: 0, top: offset }
         );
-        if (type.pageTurnMode === "horizontal")
+        if (isPagedReaderMode(type.pageTurnMode))
           setHorizontalPage(horizontalReaderPageState(container));
       });
     });
@@ -639,7 +649,7 @@ export function ReaderView({
   const saveTimer = useRef<number | null>(null);
   const onScroll = useCallback(() => {
     const current = scrollRef.current;
-    if (current && type.pageTurnMode === "horizontal") {
+    if (current && isPagedReaderMode(type.pageTurnMode)) {
       const next = horizontalReaderPageState(current);
       setHorizontalPage(previous =>
         previous.page === next.page &&
@@ -682,6 +692,10 @@ export function ReaderView({
     (direction: -1 | 1) => {
       const container = scrollRef.current;
       if (!container) return;
+      if (type.pageTurnMode === "curl") {
+        setPageTurning(true);
+        window.setTimeout(() => setPageTurning(false), 360);
+      }
       const state = horizontalReaderPageState(container);
       if (direction < 0 && state.atStart) {
         navigateToChapter(chapterIdx - 1, 1);
@@ -701,7 +715,7 @@ export function ReaderView({
         behavior: "smooth",
       });
     },
-    [chapterIdx, navigateToChapter]
+    [chapterIdx, navigateToChapter, type.pageTurnMode]
   );
 
   const onHorizontalWheel = useCallback(
@@ -742,7 +756,11 @@ export function ReaderView({
   );
 
   useEffect(() => {
-    if (type.pageTurnMode !== "horizontal" || isOriginal || bilingualLanguage)
+    if (
+      !isPagedReaderMode(type.pageTurnMode) ||
+      isOriginal ||
+      bilingualLanguage
+    )
       return;
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
@@ -766,7 +784,7 @@ export function ReaderView({
   }, [bilingualLanguage, isOriginal, turnHorizontalPage, type.pageTurnMode]);
 
   useEffect(() => {
-    if (type.pageTurnMode !== "horizontal" || isOriginal) return;
+    if (!isPagedReaderMode(type.pageTurnMode) || isOriginal) return;
     const container = scrollRef.current;
     if (!container) return;
     let frame = requestAnimationFrame(() => {
@@ -944,6 +962,7 @@ export function ReaderView({
   /* ---------- 划选 ---------- */
 
   const onMouseUp = useCallback(() => {
+    selectingPointerRef.current = false;
     setHlPopup(null);
     setTranslationSel(null);
     const s = window.getSelection();
@@ -965,7 +984,7 @@ export function ReaderView({
       return;
     }
     const text = range.toString();
-    if (text.trim().length < 2) {
+    if (text.trim().length < 1) {
       setSel(null);
       return;
     }
@@ -981,9 +1000,32 @@ export function ReaderView({
       end: start + text.length,
       text,
       top: rect.top - wrect.top - 10,
-      left: rect.left - wrect.left + rect.width / 2,
+      left: clampSelectionToolbarLeft(
+        rect.left - wrect.left + rect.width / 2,
+        scrollRef.current?.clientWidth ?? wrect.width
+      ),
     });
   }, []);
+
+  // selectionchange also covers keyboard selection and touch selection, where
+  // mouseup alone is not dispatched reliably by every browser.
+  useEffect(() => {
+    let frame = 0;
+    const sync = () => {
+      // A browser emits selectionchange continuously while the pointer drags.
+      // Wait for pointerup so the action menu appears only after selection ends.
+      if (selectingPointerRef.current) return;
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(onMouseUp);
+    };
+    document.addEventListener("selectionchange", sync);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("selectionchange", sync);
+    };
+  }, [onMouseUp]);
 
   const clearSelection = () => {
     window.getSelection()?.removeAllRanges();
@@ -1093,6 +1135,15 @@ export function ReaderView({
     setSel(null);
     window.getSelection()?.removeAllRanges();
   }, [sel]);
+
+  const searchSelection = useCallback(() => {
+    if (!sel) return;
+    window.open(
+      searchUrl(searchEngine, sel.text),
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }, [searchEngine, sel]);
 
   /** 把译文保存成带名称的批注，仍锚定在原文位置 */
   const saveTranslation = useCallback(
@@ -1560,19 +1611,20 @@ export function ReaderView({
                 }`}
                 style={{ borderColor: theme.border }}
               >
-                <button
-                  onClick={() =>
-                    lib.navigate(
-                      activeStudySet
-                        ? { view: "studyset", studySetId: activeStudySet.id }
-                        : { view: "library" }
-                    )
-                  }
-                  className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] hover:opacity-70"
-                  style={{ color: theme.muted }}
-                >
-                  <ArrowLeft size={15} /> {activeStudySet ? "学习集" : "书架"}
-                </button>
+                {activeStudySet && (
+                  <button
+                    onClick={() =>
+                      lib.navigate({
+                        view: "studyset",
+                        studySetId: activeStudySet.id,
+                      })
+                    }
+                    className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] hover:opacity-70"
+                    style={{ color: theme.muted }}
+                  >
+                    返回学习集
+                  </button>
+                )}
                 {!isOriginal && (
                   <button
                     onClick={() => setShowToc(v => !v)}
@@ -1618,7 +1670,9 @@ export function ReaderView({
                   >
                     <Languages size={12} />
                     {bilingualLanguage
-                      ? `双语 · ${bilingualLanguage === "中文" ? "中" : "EN"}`
+                      ? `双语 · ${
+                          bilingualLanguage === "中文" ? "英→中" : "古→今"
+                        }`
                       : "双语"}
                   </button>
                 )}
@@ -1706,6 +1760,34 @@ export function ReaderView({
                     </div>
                   )}
                 </div>
+                <Popover.Root>
+                  <Popover.Trigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 rounded-full border px-3 py-1 text-[12.5px] transition-colors hover:text-foreground"
+                      style={{ borderColor: theme.border, color: theme.muted }}
+                      aria-label="AI 设置"
+                      title="配置 DeepSeek API 与模型"
+                    >
+                      <Settings2 size={12} /> AI 设置
+                    </button>
+                  </Popover.Trigger>
+                  <Popover.Portal>
+                    <Popover.Content
+                      align="end"
+                      sideOffset={8}
+                      collisionPadding={12}
+                      aria-label="AI 设置"
+                      className="z-[100] max-h-[calc(100vh-24px)] w-[360px] overflow-y-auto rounded-lg border shadow-lg"
+                    >
+                      <AiSettingsPanel
+                        value={aiConfig}
+                        onChange={setAiConfig}
+                        theme={theme}
+                      />
+                    </Popover.Content>
+                  </Popover.Portal>
+                </Popover.Root>
                 {/* 排版按钮（原版版面下无效，隐藏） */}
                 {!isOriginal && (
                   <Popover.Root open={showType} onOpenChange={setShowType}>
@@ -1967,31 +2049,25 @@ export function ReaderView({
                     ref={scrollRef}
                     data-reader-page-mode={type.pageTurnMode}
                     className={`relative min-h-0 flex-1 ${
-                      type.pageTurnMode === "horizontal"
+                      pagedReader
                         ? "overflow-x-auto overflow-y-hidden overscroll-x-contain"
                         : "overflow-y-auto overflow-x-hidden"
-                    }`}
+                    } ${type.pageTurnMode === "curl" && pageTurning ? "reader-page-curl" : ""}`}
                     style={
-                      type.pageTurnMode === "horizontal"
-                        ? { containerType: "inline-size" }
-                        : undefined
+                      pagedReader ? { containerType: "inline-size" } : undefined
                     }
                     onScroll={onScroll}
-                    onWheel={
-                      type.pageTurnMode === "horizontal"
-                        ? onHorizontalWheel
-                        : onVerticalWheel
-                    }
+                    onWheel={pagedReader ? onHorizontalWheel : onVerticalWheel}
                   >
                     <div
                       ref={wrapRef}
                       className={`relative ${
-                        type.pageTurnMode === "horizontal"
+                        pagedReader
                           ? "reader-horizontal-pages"
                           : "mx-auto pb-28 pt-12"
                       }`}
                       style={
-                        type.pageTurnMode === "horizontal"
+                        pagedReader
                           ? ({
                               "--reader-page-margin": readerPagePadding(
                                 type.pageMargin
@@ -2003,7 +2079,13 @@ export function ReaderView({
                               paddingInline: readerPagePadding(type.pageMargin),
                             }
                       }
-                      onMouseUp={onMouseUp}
+                      onPointerDown={() => {
+                        selectingPointerRef.current = true;
+                      }}
+                      onPointerCancel={() => {
+                        selectingPointerRef.current = false;
+                      }}
+                      onPointerUp={onMouseUp}
                     >
                       <h1 className="font-reading mb-2 text-center text-[26px] font-bold tracking-wide">
                         {chapter.title}
@@ -2016,9 +2098,7 @@ export function ReaderView({
                       </div>
                       <div
                         className={`reader-body${
-                          type.pageTurnMode === "vertical" && type.columns === 2
-                            ? " cols-2"
-                            : ""
+                          !pagedReader && type.columns === 2 ? " cols-2" : ""
                         }`}
                         style={{
                           ...{
@@ -2121,6 +2201,7 @@ export function ReaderView({
                         onTranslate={openTranslation}
                         onAddToOutline={() => void addSelectionToOutline()}
                         onAskAi={() => askAiOn()}
+                        onSearch={searchSelection}
                         onClose={() => setSel(null)}
                       />
                     )}
@@ -2244,7 +2325,7 @@ export function ReaderView({
                     )}
                   </div>
 
-                  {type.pageTurnMode === "horizontal" && (
+                  {pagedReader && (
                     <>
                       <button
                         type="button"

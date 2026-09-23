@@ -1,4 +1,4 @@
-export type BilingualLanguage = "中文" | "English";
+export type BilingualLanguage = "中文" | "现代汉语";
 
 export interface ParagraphAnchor {
   /** Zero-based paragraph index in the pane that emitted the anchor. */
@@ -19,7 +19,7 @@ export function inferTargetLanguage(
   paragraphs: readonly string[]
 ): BilingualLanguage {
   const sample = paragraphs.join(" ").slice(0, 12_000);
-  return /[\u3400-\u9fff]/.test(sample) ? "English" : "中文";
+  return /[\u3400-\u9fff]/.test(sample) ? "现代汉语" : "中文";
 }
 
 /**

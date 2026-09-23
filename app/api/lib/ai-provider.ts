@@ -1,10 +1,4 @@
-import {
-  askCodex,
-  CODEX_MODEL,
-  CODEX_REASONING_EFFORT,
-  getCodexAuthStatus,
-  type ChatMessage,
-} from "./codex";
+import { askCodex, getCodexAuthStatus, type ChatMessage } from "./codex";
 
 export const CODEX_MODELS = [
   "gpt-5.6-sol",
@@ -27,9 +21,9 @@ export interface AiRuntimeConfig {
 }
 
 export const DEFAULT_AI_CONFIG: AiRuntimeConfig = {
-  provider: "codex",
-  model: CODEX_MODEL as (typeof CODEX_MODELS)[number],
-  effort: CODEX_REASONING_EFFORT as (typeof CODEX_EFFORTS)[number],
+  provider: "deepseek",
+  model: "deepseek-v4-flash",
+  effort: "none",
 };
 
 interface DeepSeekResponse {

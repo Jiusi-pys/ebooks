@@ -16,13 +16,7 @@ import { env } from "./lib/env";
 import { getMemoryDigest, setMemoryDigest } from "./lib/digest-cache";
 import { saveDigestIfReferenced } from "./lib/book-digest-lifecycle";
 
-const targetLanguageSchema = z.enum([
-  "中文",
-  "English",
-  "日本語",
-  "Français",
-  "Deutsch",
-]);
+const targetLanguageSchema = z.enum(["中文", "现代汉语"]);
 
 const aiConfigSchema = z
   .object({
@@ -208,7 +202,11 @@ export const aiRouter = createRouter({
           {
             role: "system",
             content:
-              `你是专业的文学与学术翻译。把用户给出的文字翻译成${input.targetLang}。${boundaryRule}` +
+              `你是专业的文学与学术翻译。${
+                input.targetLang === "现代汉语"
+                  ? "将文言文、古汉语译为忠实、通顺的现代汉语。"
+                  : "将英文译为准确、自然的中文。"
+              }${boundaryRule}` +
               "只输出译文本身，不输出解释、评论、前言或 Markdown 代码块。",
           },
           { role: "user", content: `${source}待翻译文本：\n${input.text}` },

@@ -31,6 +31,87 @@ interface Catalog {
   deletedBookIds: string[];
   folders: Folder[];
 }
+
+/**
+ * Upload only: local browser data is the source of truth. This intentionally
+ * never reads individual server books, so a manual upload cannot overwrite
+ * the browser cache with a server-side version.
+ */
+export async function syncBrowserToMySql() {
+  const catalog = (await (await libraryRequest("/books")).json()) as Catalog;
+  for (const folder of await getAllFolders()) {
+    if (!catalog.folders.some(remote => remote.id === folder.id))
+      await emitEvent("folder.created", {
+        extId: folder.id,
+        name: folder.name,
+      });
+  }
+  for (const book of await getAllBooks()) {
+    if (catalog.deletedBookIds.includes(book.id))
+      throw new Error(`《${book.title}》已在 MySQL 删除，不能重新上传`);
+    await syncBookMirror({
+      extId: book.id,
+      title: book.title,
+      author: book.author,
+      format: book.format,
+      folder: book.folderId,
+      contentHash: book.contentHash,
+      metadata: book.metadata,
+      chapters: book.chapters,
+    });
+    await saveReaderState(book);
+    const remote = catalog.books.find(item => item.id === book.id);
+    if (!remote?.source) {
+      const file = await getFile(book.id);
+      if (file) await uploadBookSource(book, file);
+    }
+  }
+  await flushPendingReaderStates();
+}
+
+/**
+ * Download only: MySQL is the source of incoming book data. Local-only books
+ * are deliberately retained; this is a safe restore operation rather than a
+ * destructive browser reset.
+ */
+export async function syncMySqlToBrowser() {
+  const catalog = (await (await libraryRequest("/books")).json()) as Catalog;
+  for (const folder of catalog.folders) await putFolder(folder);
+  const localFolders = await getAllFolders();
+  for (const summary of catalog.books) {
+    const { book, source } = (await (
+      await libraryRequest(`/books/${encodeURIComponent(summary.id)}`)
+    ).json()) as { book: Book; source: SourceManifest | null };
+    if (
+      book.folderId &&
+      !localFolders.some(folder => folder.id === book.folderId)
+    )
+      await putFolder({
+        id: book.folderId,
+        name: "已恢复的文件夹",
+        createdAt: Date.now(),
+      });
+    if (source && !(await getFile(book.id))) {
+      const response = await libraryRequest(
+        `/books/${encodeURIComponent(book.id)}/source`,
+        { signal: AbortSignal.timeout(10 * 60_000) }
+      );
+      const bytes = await response.arrayBuffer();
+      const hash = Array.from(
+        new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+        byte => byte.toString(16).padStart(2, "0")
+      ).join("");
+      if (bytes.byteLength !== source.size || hash !== source.sha256)
+        throw new Error("服务端原文件校验失败，请重试同步");
+      await cacheServerBook(book, {
+        id: book.id,
+        type: book.format,
+        name: source.name,
+        data: new Blob([bytes], { type: source.type }),
+      });
+    } else await cacheServerBook(book);
+  }
+}
 export async function libraryRequest(
   path: string,
   init?: RequestInit,

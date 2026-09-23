@@ -154,13 +154,32 @@ export function normalizeTypeSettings(value: unknown): TypeSettings {
         ? Math.min(3, Math.max(0, saved.paragraphSpacing))
         : DEFAULT_TYPE.paragraphSpacing,
     pageTurnMode:
-      saved.pageTurnMode === "horizontal" ? "horizontal" : "vertical",
+      saved.pageTurnMode === "horizontal" || saved.pageTurnMode === "curl"
+        ? saved.pageTurnMode
+        : "vertical",
   };
 }
 
 /** Responsive padding: honour the preference while retaining room in narrow split panes. */
 export function readerPagePadding(pageMargin: number): string {
   return `clamp(${PAGE_MARGIN_MIN}px, ${normalizePageMargin(pageMargin)}px, 25%)`;
+}
+
+/** Horizontal and curled modes share the same stable column pagination. */
+export function isPagedReaderMode(mode: TypeSettings["pageTurnMode"]): boolean {
+  return mode === "horizontal" || mode === "curl";
+}
+
+/** Keep the 304px selection menu clear of the reader pane's side edges. */
+export function clampSelectionToolbarLeft(
+  requestedLeft: number,
+  paneWidth: number,
+  toolbarWidth = 304,
+  gutter = 12
+): number {
+  const half = toolbarWidth / 2 + gutter;
+  const upper = Math.max(half, paneWidth - half);
+  return Math.min(upper, Math.max(half, requestedLeft));
 }
 
 export interface ReaderChapterEntryPlan {

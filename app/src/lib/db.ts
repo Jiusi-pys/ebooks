@@ -470,14 +470,25 @@ export async function deleteBook(id: string): Promise<Note[]> {
   for (const [noteId, highlights] of linkedByNote) {
     const note = (await noteStore.get(noteId)) as Note | undefined;
     if (!note) continue;
+    const survivors = allHighlights.filter(
+      highlight => highlight.noteId === noteId && highlight.bookId !== id
+    );
+    const hasBookCitation = highlights.some(highlight => {
+      const markerId = encodeURIComponent(highlight.id).replace(/-/g, "%2D");
+      return note.content.includes(`shufang-citation-id:${markerId}`);
+    });
+    // Delete only a still-linked, book-only note. A user may have edited a
+    // former citation into independent writing, in which case its reference
+    // marker is gone and it must survive the book deletion.
+    if (survivors.length === 0 && hasBookCitation) {
+      await noteStore.delete(noteId);
+      continue;
+    }
     let content = removeCitationBlocks(
       note.content,
       highlights.map(highlight =>
         citationDescriptorForHighlight(highlight, book.title)
       )
-    );
-    const survivors = allHighlights.filter(
-      highlight => highlight.noteId === noteId && highlight.bookId !== id
     );
     for (const survivor of survivors) {
       const survivorBook = (await bookStore.get(survivor.bookId)) as

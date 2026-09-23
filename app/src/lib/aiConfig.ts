@@ -2,14 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { AiConfig, AiEffort, AiProviderId } from "@/types";
 
 export const AI_PROVIDERS: Record<
-  AiProviderId,
+  Exclude<AiProviderId, "codex">,
   { label: string; models: string[]; efforts: AiEffort[] }
 > = {
-  codex: {
-    label: "Codex（ChatGPT 登录）",
-    models: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
-    efforts: ["low", "medium", "high", "xhigh", "max"],
-  },
   deepseek: {
     label: "DeepSeek API",
     models: [
@@ -26,13 +21,13 @@ const KEY_KEY = "shufang:deepseek-api-key";
 const CHANGE_EVENT = "shufang:ai-config-change";
 
 export const DEFAULT_AI_CONFIG: AiConfig = {
-  provider: "codex",
-  model: "gpt-5.6-terra",
-  effort: "medium",
+  provider: "deepseek",
+  model: "deepseek-v4-flash",
+  effort: "none",
 };
 
 export function defaultAiConfigFor(provider: AiProviderId): AiConfig {
-  if (provider === DEFAULT_AI_CONFIG.provider) return { ...DEFAULT_AI_CONFIG };
+  if (provider === "codex") return { ...DEFAULT_AI_CONFIG };
   const options = AI_PROVIDERS[provider];
   return {
     provider,
@@ -47,8 +42,7 @@ export function loadAiConfig(): AiConfig {
     const saved = JSON.parse(
       localStorage.getItem(CONFIG_KEY) ?? "{}"
     ) as Partial<AiConfig>;
-    const provider =
-      saved.provider && AI_PROVIDERS[saved.provider] ? saved.provider : "codex";
+    const provider = "deepseek" as const;
     const options = AI_PROVIDERS[provider];
     const defaults = defaultAiConfigFor(provider);
     const model =

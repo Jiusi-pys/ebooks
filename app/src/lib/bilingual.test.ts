@@ -9,8 +9,8 @@ import {
 } from "./bilingual";
 
 describe("bilingual reader helpers", () => {
-  it("defaults to the opposite Chinese or English reading language", () => {
-    expect(inferTargetLanguage(["这是中文章节。"])).toBe("English");
+  it("defaults to English-to-Chinese or classical-to-modern translation", () => {
+    expect(inferTargetLanguage(["这是中文章节。"])).toBe("现代汉语");
     expect(inferTargetLanguage(["An English chapter."])).toBe("中文");
   });
 

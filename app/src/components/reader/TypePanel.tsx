@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ArrowUpDown } from "lucide-react";
+import { ArrowLeftRight, ArrowUpDown, BookOpen } from "lucide-react";
 import type { TypeSettings } from "@/types";
 import {
   PAGE_MARGIN_MAX,
@@ -167,11 +167,12 @@ export function TypePanel({ value, onChange, onClose }: Props) {
       </Row>
 
       <Row label="翻页方式">
-        <div className="grid grid-cols-2 gap-2 rounded-xl bg-secondary/50 p-1">
+        <div className="grid grid-cols-3 gap-2 rounded-xl bg-secondary/50 p-1">
           {(
             [
               ["vertical", "上下连续", ArrowUpDown],
               ["horizontal", "左右翻页", ArrowLeftRight],
+              ["curl", "仿真翻页", BookOpen],
             ] as const
           ).map(([mode, label, Icon]) => (
             <button
@@ -187,7 +188,9 @@ export function TypePanel({ value, onChange, onClose }: Props) {
               title={
                 mode === "vertical"
                   ? "上下连续滚动，到章节边界后继续滚轮可切章"
-                  : "按屏幕宽度左右逐页阅读"
+                  : mode === "horizontal"
+                    ? "按屏幕宽度左右逐页阅读"
+                    : "保留逐页阅读，并加入翻书般的过渡效果"
               }
             >
               <Icon size={14} />

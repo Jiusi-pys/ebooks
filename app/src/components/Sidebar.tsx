@@ -12,6 +12,7 @@ import {
   PanelLeftClose,
   PanelLeftDashed,
   Pin,
+  Settings2,
   StickyNote,
   UserRound,
 } from "lucide-react";
@@ -31,6 +32,7 @@ import {
   AccountSettingsDialog,
   type AccountUpdateInput,
 } from "./AccountSettingsDialog";
+import { AppSettingsDialog } from "./AppSettingsDialog";
 
 const NAV = [
   { view: "library" as const, label: "书架", icon: LibraryBig },
@@ -78,6 +80,7 @@ export function Sidebar({
   const [pendingPdfs, setPendingPdfs] = useState<File[] | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [appSettingsOpen, setAppSettingsOpen] = useState(false);
 
   const go = (next: Route) => {
     navigate(next);
@@ -297,6 +300,15 @@ export function Sidebar({
           <button
             type="button"
             className="app-icon-button h-8 w-8 rounded-[10px]"
+            aria-label="应用设置"
+            title="应用设置"
+            onClick={() => setAppSettingsOpen(true)}
+          >
+            <Settings2 size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="app-icon-button h-8 w-8 rounded-[10px]"
             disabled={loggingOut}
             aria-label="退出登录"
             title="退出登录"
@@ -324,6 +336,10 @@ export function Sidebar({
         username={userId}
         onOpenChange={setAccountSettingsOpen}
         onUpdate={onUpdateProfile}
+      />
+      <AppSettingsDialog
+        open={appSettingsOpen}
+        onOpenChange={setAppSettingsOpen}
       />
     </aside>
   );

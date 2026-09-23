@@ -5,10 +5,9 @@ import { trpc } from "@/lib/trpc-client";
 import { friendlyAiError } from "@/lib/aiError";
 import { useAiConfig } from "@/lib/aiConfig";
 
-export type TranslationLang =
-  "中文" | "English" | "日本語" | "Français" | "Deutsch";
+export type TranslationLang = "中文" | "现代汉语";
 
-const LANGS: TranslationLang[] = ["中文", "English", "日本語"];
+const LANGS: TranslationLang[] = ["中文", "现代汉语"];
 
 interface Props {
   top: number;
@@ -21,7 +20,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** 划选即时翻译气泡：自动判断中英方向，可切换目标语言并保存为批注 */
+/** 划选即时翻译气泡：英译中或文言文译今。 */
 export function TranslationPopup({
   top,
   left,
@@ -33,7 +32,7 @@ export function TranslationPopup({
   onClose,
 }: Props) {
   const defaultLang: TranslationLang = /[\u3400-\u9fff]/.test(sourceText)
-    ? "English"
+    ? "现代汉语"
     : "中文";
   const [lang, setLang] = useState<TranslationLang>(defaultLang);
   const [result, setResult] = useState("");
@@ -101,7 +100,7 @@ export function TranslationPopup({
         style={{ borderColor: theme.border }}
       >
         <Languages size={14} className="text-primary" />
-        <span className="text-[12.5px] font-medium">即时翻译</span>
+        <span className="text-[12.5px] font-medium">翻译</span>
         <div className="ml-auto flex items-center gap-1">
           {LANGS.map(l => (
             <button
@@ -113,7 +112,7 @@ export function TranslationPopup({
               }`}
               style={lang === l ? undefined : { color: theme.muted }}
             >
-              {l === "中文" ? "中" : l === "English" ? "EN" : "日"}
+              {l === "中文" ? "英→中" : "古→今"}
             </button>
           ))}
           <button
@@ -150,7 +149,7 @@ export function TranslationPopup({
               className="flex items-center gap-2 text-[12px]"
               style={{ color: theme.muted }}
             >
-              <Loader2 size={14} className="animate-spin text-primary" /> Codex
+              <Loader2 size={14} className="animate-spin text-primary" />{" "}
               正在翻译…
             </span>
           ) : error ? (

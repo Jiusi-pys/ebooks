@@ -361,7 +361,7 @@ export interface TypeSettings {
   fontWeight: 300 | 400 | 600;
   columns: 1 | 2;
   /** 重排正文的阅读方式：纵向连续滚动或横向逐页翻阅。 */
-  pageTurnMode: "vertical" | "horizontal";
+  pageTurnMode: "vertical" | "horizontal" | "curl";
   themeId: string;
 }
 
