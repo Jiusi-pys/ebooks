@@ -8,19 +8,23 @@ describe("TypePanel page-turn controls", () => {
   it("offers continuous vertical and horizontal page modes", () => {
     const html = renderToStaticMarkup(
       createElement(TypePanel, {
-        value: DEFAULT_TYPE,
-        onChange: vi.fn(),
+        generalValue: DEFAULT_TYPE,
+        onGeneralChange: vi.fn(),
+        onBookChange: vi.fn(),
+        onClearBook: vi.fn(),
         onClose: vi.fn(),
       })
     );
 
     expect(html).toContain("翻页方式");
+    expect(html).toContain("通用排版");
+    expect(html).toContain("本书专用");
     expect(html).toContain('aria-label="段间距"');
     expect(html).toContain('aria-label="行间距"');
     expect(html).toContain('aria-label="页边距"');
     expect(html).toContain("上下连续");
     expect(html).toContain("左右翻页");
     expect(html).toContain('title="上下连续滚动，到章节边界后继续滚轮可切章"');
-    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(2);
   });
 });

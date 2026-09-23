@@ -49,6 +49,28 @@ describe("server library restoration", () => {
       progress: { chapterId: "", ratio: 0 },
     });
   });
+
+  it("accepts a complete book-specific typesetting override", () => {
+    expect(
+      readerStateSchema.safeParse({
+        typeSettings: {
+          fontId: "kai",
+          fontSize: 22,
+          lineHeight: 2,
+          paragraphSpacing: 0.4,
+          letterSpacing: 0.02,
+          pageMargin: 32,
+          fontWeight: 400,
+          columns: 1,
+          pageTurnMode: "vertical",
+          themeId: "warm",
+        },
+      }).success
+    ).toBe(true);
+    expect(readerStateSchema.safeParse({ typeSettings: null }).success).toBe(
+      true
+    );
+  });
   it("rejects invalid progress and executable cover URLs", () => {
     expect(
       readerStateSchema.safeParse({ progress: { chapterId: "c", ratio: 2 } })

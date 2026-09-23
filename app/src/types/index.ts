@@ -94,6 +94,8 @@ export interface Book {
    * 如同汉王阅读器：每个文件可自行选择是否重排，版式复杂的 PDF 适合原版。
    */
   readerMode?: "reflow" | "original";
+  /** 本书专用的阅读排版；缺省时继承通用排版。 */
+  typeSettings?: TypeSettings;
   /** 原版 PDF 页数 */
   pageCount?: number;
   /** 用户自定义导航目录；缺省时由 chapters 自动生成。 */

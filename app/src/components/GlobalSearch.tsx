@@ -41,6 +41,13 @@ export function GlobalSearch({
   const [setId, setSetId] = useState(
     currentSet?.id ?? (candidateSets.length === 1 ? candidateSets[0].id : "")
   );
+  const selectedSet = lib.studySets.find(set => set.id === setId);
+  const bookScopeLabel = currentBook
+    ? `本书：${currentBook.title}`
+    : "本书（未打开书籍）";
+  const studySetScopeLabel = selectedSet
+    ? `本合集：${selectedSet.name}`
+    : "本合集（请选择）";
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [opening, setOpening] = useState(false);
@@ -220,10 +227,10 @@ export function GlobalSearch({
               className="rounded-md border bg-background px-2 py-1.5"
             >
               <option value="book" disabled={!currentBook}>
-                本书
+                {bookScopeLabel}
               </option>
               <option value="studySet" disabled={!lib.studySets.length}>
-                本合集
+                {studySetScopeLabel}
               </option>
               <option value="all">文库全部内容</option>
             </select>

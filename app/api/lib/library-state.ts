@@ -8,6 +8,20 @@ const image = z
   .regex(
     /^data:image\/(?:png|jpeg|jpg|webp|gif|avif);base64,[A-Za-z0-9+/=\s]+$/
   );
+const typeSettings = z
+  .object({
+    fontId: z.string().max(64),
+    fontSize: z.number().min(14).max(26),
+    lineHeight: z.number().min(1.4).max(2.6),
+    paragraphSpacing: z.number().min(0).max(3),
+    letterSpacing: z.number().min(0).max(0.12),
+    pageMargin: z.number().int().min(16).max(480),
+    fontWeight: z.union([z.literal(300), z.literal(400), z.literal(600)]),
+    columns: z.union([z.literal(1), z.literal(2)]),
+    pageTurnMode: z.enum(["vertical", "horizontal", "curl"]),
+    themeId: z.string().max(64),
+  })
+  .strict();
 export const readerStateSchema = z
   .object({
     cover: image.nullable().optional(),
@@ -23,6 +37,7 @@ export const readerStateSchema = z
       .strict()
       .optional(),
     readerMode: z.enum(["reflow", "original"]).optional(),
+    typeSettings: typeSettings.nullable().optional(),
     pageCount: z.number().int().min(0).max(100_000).optional(),
     outline: z
       .array(
@@ -94,7 +109,7 @@ export function restoreBook(row: {
 }): Book {
   const chapters = JSON.parse(row.chapters) as Book["chapters"];
   const state = readerStateSchema.parse(JSON.parse(row.readerData ?? "{}"));
-  const { cover, customCover, ...rest } = state;
+  const { cover, customCover, typeSettings, ...rest } = state;
   return {
     id: row.extId,
     title: row.title,
@@ -104,6 +119,7 @@ export function restoreBook(row: {
     createdAt: row.createdAt.getTime(),
     progress: { chapterId: chapters[0]?.id ?? "", ratio: 0 },
     ...rest,
+    ...(typeSettings ? { typeSettings } : {}),
     ...(cover ? { cover } : {}),
     ...(customCover ? { customCover } : {}),
     chapters,

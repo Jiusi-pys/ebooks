@@ -103,11 +103,55 @@ it("defaults to the active study set and lets users explicitly choose another se
       '[aria-label="选择学习集"]'
     )!;
     expect(sets.value).toBe("s2");
+    expect(
+      document
+        .querySelector<HTMLOptionElement>('[value="studySet"]')!
+        .textContent
+    ).toBe("本合集：学习集二");
     await act(async () => {
       sets.value = "s1";
       sets.dispatchEvent(new Event("change", { bubbles: true }));
     });
     expect(sets.value).toBe("s1");
+    expect(
+      document
+        .querySelector<HTMLOptionElement>('[value="studySet"]')!
+        .textContent
+    ).toBe("本合集：学习集一");
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
+
+it("names the current book and selected study set in scope choices", async () => {
+  const lib = {
+    route: { view: "reader", bookId: "b1", studySetId: "s1" },
+    books: [
+      { id: "b1", title: "正在阅读的书", author: "", format: "txt", chapters: [] },
+    ],
+    notes: [],
+    highlights: [],
+    studySets: [{ id: "s1", name: "当前合集", bookIds: ["b1"] }],
+  } as unknown as Library;
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(createElement(GlobalSearch, { lib })));
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>("button")!.click()
+    );
+    const scope = document.querySelector<HTMLSelectElement>(
+      '[aria-label="搜索范围"]'
+    )!;
+    expect(
+      scope.querySelector<HTMLOptionElement>('[value="book"]')!.textContent
+    ).toBe("本书：正在阅读的书");
+    expect(
+      scope.querySelector<HTMLOptionElement>('[value="studySet"]')!
+        .textContent
+    ).toBe("本合集：当前合集");
   } finally {
     await act(async () => root.unmount());
     host.remove();

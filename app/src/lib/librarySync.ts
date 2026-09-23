@@ -138,6 +138,7 @@ export function bookReaderState(book: Book) {
     lastOpenedAt: book.lastOpenedAt,
     progress: book.progress,
     readerMode: book.readerMode,
+    typeSettings: book.typeSettings,
     pageCount: book.pageCount,
     outline: book.outline,
   };

@@ -12,6 +12,7 @@ import {
   readerPagePadding,
   readerScrollOffset,
   readerScrollRatio,
+  resolveTypeSettings,
   saveTypeSettings,
 } from "./reading";
 
@@ -47,6 +48,13 @@ describe("book content hash", () => {
 });
 
 describe("reader page margin", () => {
+  it("uses a book-specific typesetting override until it is cleared", () => {
+    const bookType = { ...DEFAULT_TYPE, fontSize: 24, themeId: "night" };
+
+    expect(resolveTypeSettings(DEFAULT_TYPE, bookType)).toEqual(bookType);
+    expect(resolveTypeSettings(DEFAULT_TYPE, undefined)).toEqual(DEFAULT_TYPE);
+  });
+
   it("restores paragraph spacing and upgrades older preferences", () => {
     expect(loadTypeSettings({ getItem: () => "{}" })).toHaveProperty(
       "paragraphSpacing",

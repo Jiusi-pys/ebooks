@@ -38,6 +38,7 @@ import {
   patchBookProgress,
   patchBookCustomCover,
   patchBookReaderMode,
+  patchBookTypeSettings,
   patchFolderIcon,
   patchFolderName,
   putAssociation,
@@ -484,6 +485,18 @@ export function useLibrary() {
       return true;
     },
     [books]
+  );
+
+  const setBookTypeSettings = useCallback(
+    async (bookId: string, typeSettings: Book["typeSettings"]) => {
+      const updated = await patchBookTypeSettings(bookId, typeSettings);
+      if (!updated) return false;
+      setBooks(current =>
+        current.map(book => (book.id === bookId ? updated : book))
+      );
+      return true;
+    },
+    []
   );
 
   const dismissImport = useCallback((id: string) => {
@@ -1059,6 +1072,7 @@ export function useLibrary() {
     navigate,
     importFiles,
     setReaderMode,
+    setBookTypeSettings,
     dismissImport,
     openReader,
     saveProgress,

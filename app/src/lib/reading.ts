@@ -160,6 +160,14 @@ export function normalizeTypeSettings(value: unknown): TypeSettings {
   };
 }
 
+/** A book override takes precedence; books without one inherit the global default. */
+export function resolveTypeSettings(
+  general: TypeSettings,
+  bookSpecific?: TypeSettings
+): TypeSettings {
+  return bookSpecific ?? general;
+}
+
 /** Responsive padding: honour the preference while retaining room in narrow split panes. */
 export function readerPagePadding(pageMargin: number): string {
   return `clamp(${PAGE_MARGIN_MIN}px, ${normalizePageMargin(pageMargin)}px, 25%)`;

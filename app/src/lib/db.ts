@@ -280,6 +280,7 @@ async function patchStoredBook(
     "customCover",
     "outline",
     "readerMode",
+    "typeSettings",
     "lastOpenedAt",
   ] as const) {
     if (JSON.stringify(current[field]) !== JSON.stringify(updated[field]))
@@ -338,6 +339,18 @@ export async function patchBookReaderMode(
   readerMode: "reflow" | "original"
 ): Promise<Book | undefined> {
   return patchStoredBook(bookId, current => ({ ...current, readerMode }));
+}
+
+export async function patchBookTypeSettings(
+  bookId: string,
+  typeSettings: Book["typeSettings"]
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => {
+    const updated = { ...current };
+    if (typeSettings) updated.typeSettings = typeSettings;
+    else delete updated.typeSettings;
+    return updated;
+  });
 }
 
 export async function patchBookTitle(
@@ -580,6 +593,7 @@ export async function cacheServerBook(book: Book, file?: StoredFile) {
   const merged = { ...book, ...pending?.patch };
   if (merged.cover === null) delete merged.cover;
   if (merged.customCover === null) delete merged.customCover;
+  if (merged.typeSettings === null) delete merged.typeSettings;
   await tx.objectStore("books").put(merged);
   if (file) await tx.objectStore("files").put(file);
   await tx.done;

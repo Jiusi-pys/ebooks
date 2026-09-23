@@ -1,4 +1,5 @@
 import { ArrowLeftRight, ArrowUpDown, BookOpen } from "lucide-react";
+import { useState } from "react";
 import type { TypeSettings } from "@/types";
 import {
   PAGE_MARGIN_MAX,
@@ -8,8 +9,11 @@ import {
 } from "@/lib/reading";
 
 interface Props {
-  value: TypeSettings;
-  onChange: (t: TypeSettings) => void;
+  generalValue: TypeSettings;
+  bookValue?: TypeSettings;
+  onGeneralChange: (t: TypeSettings) => void;
+  onBookChange: (t: TypeSettings) => void;
+  onClearBook: () => void;
   onClose: () => void;
 }
 
@@ -67,9 +71,23 @@ function Slider({
 }
 
 /** Apple Books 式排版面板 */
-export function TypePanel({ value, onChange, onClose }: Props) {
+export function TypePanel({
+  generalValue,
+  bookValue,
+  onGeneralChange,
+  onBookChange,
+  onClearBook,
+  onClose,
+}: Props) {
+  const [scope, setScope] = useState<"general" | "book">(
+    bookValue ? "book" : "general"
+  );
+  const value = scope === "book" ? (bookValue ?? generalValue) : generalValue;
   const set = (patch: Partial<TypeSettings>) =>
-    onChange({ ...value, ...patch });
+    (scope === "book" ? onBookChange : onGeneralChange)({
+      ...value,
+      ...patch,
+    });
 
   return (
     <div className="w-[300px] max-w-[calc(100vw-24px)] p-4">
@@ -78,6 +96,50 @@ export function TypePanel({ value, onChange, onClose }: Props) {
         <button type="button" onClick={onClose} aria-label="关闭排版设置">
           关闭
         </button>
+      </div>
+      <div className="mb-4 rounded-lg bg-secondary/60 p-1">
+        <div className="grid grid-cols-2 gap-1">
+          <button
+            type="button"
+            aria-pressed={scope === "general"}
+            onClick={() => setScope("general")}
+            className={`rounded-md px-2 py-1.5 text-[12px] ${
+              scope === "general"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground"
+            }`}
+          >
+            通用排版
+          </button>
+          <button
+            type="button"
+            aria-pressed={scope === "book"}
+            onClick={() => setScope("book")}
+            className={`rounded-md px-2 py-1.5 text-[12px] ${
+              scope === "book"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground"
+            }`}
+          >
+            本书专用
+          </button>
+        </div>
+        {scope === "book" && (
+          <div className="flex items-center justify-between px-1 pt-2 text-[11px] text-muted-foreground">
+            <span>
+              {bookValue ? "本书正在使用专用排版" : "首次调整将创建专用排版"}
+            </span>
+            {bookValue && (
+              <button
+                type="button"
+                onClick={onClearBook}
+                className="text-primary hover:opacity-75"
+              >
+                恢复通用
+              </button>
+            )}
+          </div>
+        )}
       </div>
       {/* 字号 */}
       <Row label="字号">

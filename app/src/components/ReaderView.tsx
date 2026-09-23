@@ -50,6 +50,7 @@ import {
   readerPagePadding,
   readerScrollOffset,
   readerScrollRatio,
+  resolveTypeSettings,
   saveTypeSettings,
   swatch,
   themeById,
@@ -162,7 +163,11 @@ export function ReaderView({
   book: Book;
   onImmersiveChange?: (active: boolean) => void;
 }) {
-  const [type, setType] = useState<TypeSettings>(loadTypeSettings);
+  const [generalType, setGeneralType] =
+    useState<TypeSettings>(loadTypeSettings);
+  const [bookType, setBookType] = useState<TypeSettings | undefined>(
+    book.typeSettings
+  );
   const [aiConfig, setAiConfig] = useAiConfig();
   const [searchEngine] = useSearchEngine();
   const [showToc, setShowToc] = useState(true);
@@ -203,6 +208,7 @@ export function ReaderView({
   const wrapRef = useRef<HTMLDivElement>(null);
   const activeChapterRef = useRef<string | null>(null);
   const readerPanelCloseTimerRef = useRef<number | null>(null);
+  const type = resolveTypeSettings(generalType, bookType);
   const previousPageTurnModeRef = useRef(type.pageTurnMode);
   const modeSwitchRatioRef = useRef<number | null>(null);
   const chapterEntryRatioRef = useRef<number | null>(null);
@@ -414,9 +420,13 @@ export function ReaderView({
     return () => window.removeEventListener("keydown", exitImmersive);
   }, [posture]);
 
-  useEffect(() => saveTypeSettings(type), [type]);
+  useEffect(() => saveTypeSettings(generalType), [generalType]);
 
-  const updateTypeSettings = useCallback(
+  useEffect(() => {
+    setBookType(book.typeSettings);
+  }, [book.id, book.typeSettings]);
+
+  const rememberPageTurnPosition = useCallback(
     (next: TypeSettings) => {
       if (next.pageTurnMode !== type.pageTurnMode && scrollRef.current) {
         modeSwitchRatioRef.current = readerScrollRatio(
@@ -424,10 +434,36 @@ export function ReaderView({
           type.pageTurnMode
         );
       }
-      setType(next);
     },
     [type.pageTurnMode]
   );
+
+  const updateGeneralTypeSettings = useCallback(
+    (next: TypeSettings) => {
+      if (!bookType) rememberPageTurnPosition(next);
+      setGeneralType(next);
+    },
+    [bookType, rememberPageTurnPosition]
+  );
+
+  const updateBookTypeSettings = useCallback(
+    (next: TypeSettings) => {
+      rememberPageTurnPosition(next);
+      setBookType(next);
+      void lib.setBookTypeSettings(book.id, next).then(saved => {
+        if (!saved) setToast("保存本书排版失败");
+      });
+    },
+    [book.id, lib, rememberPageTurnPosition]
+  );
+
+  const clearBookTypeSettings = useCallback(() => {
+    rememberPageTurnPosition(generalType);
+    setBookType(undefined);
+    void lib.setBookTypeSettings(book.id, undefined).then(saved => {
+      if (!saved) setToast("恢复通用排版失败");
+    });
+  }, [book.id, generalType, lib, rememberPageTurnPosition]);
 
   // 首次打开恢复章内进度；只有明确切章时才回到顶部并记录重置。
   useEffect(() => {
@@ -1838,8 +1874,11 @@ export function ReaderView({
                         className="z-[100] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
                       >
                         <TypePanel
-                          value={type}
-                          onChange={updateTypeSettings}
+                          generalValue={generalType}
+                          bookValue={bookType}
+                          onGeneralChange={updateGeneralTypeSettings}
+                          onBookChange={updateBookTypeSettings}
+                          onClearBook={clearBookTypeSettings}
                           onClose={() => setShowType(false)}
                         />
                       </Popover.Content>
