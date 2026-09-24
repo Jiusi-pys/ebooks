@@ -1,7 +1,29 @@
 import { describe, expect, it, vi } from "vitest";
-import { askDeepSeek } from "./ai-provider";
+import { askDeepSeek, fetchProviderModels } from "./ai-provider";
 
 describe("DeepSeek provider", () => {
+  it("loads available models from the provider endpoint without a static catalog", async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ data: [{ id: "deepseek-current" }] }), {
+          status: 200,
+        })
+    );
+    await expect(
+      fetchProviderModels(
+        "deepseek",
+        "secret-test-key",
+        fetchImpl as typeof fetch
+      )
+    ).resolves.toEqual(["deepseek-current"]);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.deepseek.com/models",
+      expect.objectContaining({
+        headers: { Authorization: "Bearer secret-test-key" },
+      })
+    );
+  });
+
   it("uses the official Chat Completions format with thinking effort", async () => {
     const requests: Array<[string | URL | Request, RequestInit | undefined]> =
       [];

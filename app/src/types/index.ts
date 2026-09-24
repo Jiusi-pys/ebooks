@@ -228,7 +228,7 @@ export interface AiQA {
   ts: number;
 }
 
-export type AiProviderId = "codex" | "deepseek";
+export type AiProviderId = "codex" | "deepseek" | "openai" | "kimi" | "minimax";
 export type AiEffort = "none" | "low" | "medium" | "high" | "xhigh" | "max";
 
 /** 浏览器端选择的全局 AI 后端；apiKey 只保存在当前浏览器会话。 */

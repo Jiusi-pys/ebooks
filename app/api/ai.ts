@@ -1,15 +1,14 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { createRouter, publicQuery } from "./middleware";
+import { createRouter, publicMutation, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { bookDigests } from "@db/schema";
 import {
   askModel,
   CODEX_EFFORTS,
-  CODEX_MODELS,
   DEEPSEEK_EFFORTS,
-  DEEPSEEK_MODELS,
+  fetchProviderModels,
   getAiStatus,
 } from "./lib/ai-provider";
 import { env } from "./lib/env";
@@ -20,22 +19,18 @@ const targetLanguageSchema = z.enum(["中文", "现代汉语"]);
 
 const aiConfigSchema = z
   .object({
-    provider: z.enum(["codex", "deepseek"]),
+    provider: z.enum(["codex", "deepseek", "openai", "kimi", "minimax"]),
     model: z.string().min(1).max(80),
     effort: z.enum(["none", "low", "medium", "high", "xhigh", "max"]),
     apiKey: z.string().max(512).optional(),
   })
   .superRefine((config, ctx) => {
-    const models = config.provider === "codex" ? CODEX_MODELS : DEEPSEEK_MODELS;
     const efforts =
-      config.provider === "codex" ? CODEX_EFFORTS : DEEPSEEK_EFFORTS;
-    if (!(models as readonly string[]).includes(config.model)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["model"],
-        message: "该 Provider 不支持此模型",
-      });
-    }
+      config.provider === "codex"
+        ? CODEX_EFFORTS
+        : config.provider === "deepseek"
+          ? DEEPSEEK_EFFORTS
+          : ["none", "low", "medium", "high", "xhigh", "max"];
     if (!(efforts as readonly string[]).includes(config.effort)) {
       ctx.addIssue({
         code: "custom",
@@ -140,6 +135,30 @@ export function parseStudyCard(raw: string, source: string): StudyCardDraft {
 }
 
 export const aiRouter = createRouter({
+  models: publicMutation
+    .input(
+      z.object({
+        provider: z.enum(["deepseek", "openai", "kimi", "minimax"]),
+        apiKey: z.string().max(512).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const envNames = {
+        deepseek: "DEEPSEEK_API_KEY",
+        openai: "OPENAI_API_KEY",
+        kimi: "KIMI_API_KEY",
+        minimax: "MINIMAX_API_KEY",
+      } as const;
+      const apiKey =
+        input.apiKey?.trim() || process.env[envNames[input.provider]]?.trim();
+      if (!apiKey)
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "请先填写 API Key",
+        });
+      return { models: await fetchProviderModels(input.provider, apiKey) };
+    }),
+
   status: publicQuery
     .input(aiConfigSchema.optional())
     .query(async ({ input }) => getAiStatus(input)),

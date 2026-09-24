@@ -10,6 +10,50 @@ afterEach(() => {
 });
 
 describe("EPUB note interaction", () => {
+  it("keeps wheel events inside an open note from reaching the reader", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const parentWheel = vi.fn();
+    const root = createRoot(host);
+    await act(async () =>
+      root.render(
+        createElement(
+          "div",
+          { onWheel: parentWheel },
+          createElement(EpubText, {
+            text: "正文[1]结束",
+            notes: [{ paraIndex: 0, start: 2, end: 5, content: "较长注释" }],
+          })
+        )
+      )
+    );
+    await act(async () => host.querySelector("button")!.click());
+    const note = document.querySelector('[aria-label="书内注释"]')!;
+    await act(async () =>
+      note.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 80 }))
+    );
+    expect(parentWheel).not.toHaveBeenCalled();
+    await act(async () => root.unmount());
+  });
+
+  it("closes an open note when the reader navigates to another page", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const render = (dismissSignal: number) =>
+      createElement(EpubText, {
+        text: "正文[1]结束",
+        notes: [{ paraIndex: 0, start: 2, end: 5, content: "注释" }],
+        dismissSignal,
+      });
+    await act(async () => root.render(render(0)));
+    await act(async () => host.querySelector("button")!.click());
+    expect(document.querySelector('[aria-label="书内注释"]')).not.toBeNull();
+    await act(async () => root.render(render(1)));
+    expect(document.querySelector('[aria-label="书内注释"]')).toBeNull();
+    await act(async () => root.unmount());
+  });
+
   it("opens an accessible note without navigation or parent click, then closes with Escape", async () => {
     const host = document.createElement("div");
     document.body.append(host);

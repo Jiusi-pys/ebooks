@@ -221,6 +221,7 @@ export function ReaderView({
     atEnd: true,
   });
   const [pageTurning, setPageTurning] = useState(false);
+  const [pageNavigationSignal, setPageNavigationSignal] = useState(0);
 
   const theme = themeById(type.themeId);
   const pagedReader = isPagedReaderMode(type.pageTurnMode);
@@ -738,6 +739,7 @@ export function ReaderView({
     (direction: -1 | 1) => {
       const container = scrollRef.current;
       if (!container) return;
+      setPageNavigationSignal(signal => signal + 1);
       if (type.pageTurnMode === "curl") {
         setPageTurning(true);
         window.setTimeout(() => setPageTurning(false), 360);
@@ -1834,7 +1836,7 @@ export function ReaderView({
                       sideOffset={8}
                       collisionPadding={12}
                       aria-label="AI 设置"
-                      className="z-[100] max-h-[calc(100vh-24px)] w-[360px] overflow-y-auto rounded-lg border shadow-lg"
+                      className="relative z-[100] h-[min(80vh,640px)] max-h-[calc(100vh-24px)] w-[360px] overflow-hidden rounded-lg border shadow-lg"
                     >
                       <AiSettingsPanel
                         value={aiConfig}
@@ -2175,6 +2177,7 @@ export function ReaderView({
                             key={`${chapter.id}:${i}:${posture === "recall" ? "recall" : "normal"}`}
                             index={i}
                             text={p}
+                            dismissSignal={pageNavigationSignal}
                             footnotes={chapter.footnotes?.filter(
                               note => note.paraIndex === i
                             )}
@@ -2963,6 +2966,7 @@ export function Paragraph({
   index,
   text,
   footnotes,
+  dismissSignal,
   ranges,
   associationRanges,
   recall,
@@ -2972,6 +2976,7 @@ export function Paragraph({
   index: number;
   text: string;
   footnotes?: import("@/types").EpubFootnote[];
+  dismissSignal?: number;
   ranges: { h: Highlight; start: number; end: number }[];
   associationRanges: AssociationRange[];
   recall: boolean;
@@ -3036,6 +3041,7 @@ export function Paragraph({
                 text={segment.text}
                 offset={segment.start}
                 notes={footnotes}
+                dismissSignal={dismissSignal}
               />
             </span>
           );
@@ -3149,6 +3155,7 @@ export function Paragraph({
                 text={segment.text}
                 offset={segment.start}
                 notes={footnotes}
+                dismissSignal={dismissSignal}
               />
             )}
             {h?.noteId && segment.endingHighlight && (

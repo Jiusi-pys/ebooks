@@ -10,7 +10,11 @@ import {
   XCircle,
 } from "lucide-react";
 import type { AiConfig, AiProviderId, ReaderTheme } from "@/types";
-import { AI_PROVIDERS, defaultAiConfigFor } from "@/lib/aiConfig";
+import {
+  AI_PROVIDERS,
+  defaultAiConfigFor,
+  readProviderApiKey,
+} from "@/lib/aiConfig";
 import { readCodexAuthJson } from "@/lib/codexAuthResponse";
 import { createLatestRequestGate } from "@/lib/latestRequest";
 import { trpc } from "@/lib/trpc-client";
@@ -27,27 +31,86 @@ export function AiSettingsPanel({
   value,
   onChange,
   theme,
+  inDrawer = false,
 }: {
   value: AiConfig;
   onChange: (config: AiConfig) => void;
   theme: ReaderTheme;
+  inDrawer?: boolean;
 }) {
   const [testResult, setTestResult] = useState<"" | "ok" | "error">("");
   const [testMessage, setTestMessage] = useState("");
   const [codexStatus, setCodexStatus] = useState<CodexAuthStatus | null>(null);
   const [codexStatusError, setCodexStatusError] = useState("");
   const [codexBusy, setCodexBusy] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsFor, setModelsFor] = useState("");
+  const [modelsError, setModelsError] = useState("");
   const codexRequests = useRef<ReturnType<
     typeof createLatestRequestGate
   > | null>(null);
   if (!codexRequests.current) codexRequests.current = createLatestRequestGate();
   const testConnection = trpc.ai.testConnection.useMutation();
-  const options = AI_PROVIDERS.deepseek;
+  const options =
+    value.provider === "codex"
+      ? AI_PROVIDERS.deepseek
+      : AI_PROVIDERS[value.provider];
+  const provider = (
+    value.provider === "codex" ? "deepseek" : value.provider
+  ) as Exclude<AiProviderId, "codex">;
+  const modelRequestKey = `${provider}:${value.apiKey ?? ""}`;
+  const availableModels = modelsFor === modelRequestKey ? models : [];
+  const modelQuery = trpc.ai.models.useMutation();
 
-  const switchProvider = (provider: AiProviderId) => {
+  const switchProvider = (provider: Exclude<AiProviderId, "codex">) => {
     setTestResult("");
-    onChange(defaultAiConfigFor(provider));
+    onChange({
+      ...defaultAiConfigFor(provider),
+      apiKey: readProviderApiKey(provider),
+    });
   };
+
+  const fetchModels = modelQuery.mutateAsync;
+  useEffect(() => {
+    let active = true;
+    const timer = window.setTimeout(() => {
+      fetchModels({ provider, apiKey: value.apiKey })
+        .then(result => {
+          if (active) {
+            setModels(result.models);
+            setModelsFor(modelRequestKey);
+            setModelsError("");
+            if (
+              result.models.length > 0 &&
+              !result.models.includes(value.model)
+            ) {
+              onChange({ ...value, model: result.models[0] });
+            }
+          }
+        })
+        .catch(error => {
+          if (active)
+            setModelsError(
+              error instanceof Error ? error.message : String(error)
+            );
+        });
+    }, 350);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [
+    fetchModels,
+    modelRequestKey,
+    onChange,
+    provider,
+    value.apiKey,
+    value.model,
+  ]);
+
+  useEffect(() => {
+    if (!value.model && models.length) onChange({ ...value, model: models[0] });
+  }, [models, onChange, value]);
 
   const refreshCodexStatus = useCallback(async (showBusy = true) => {
     const requests = codexRequests.current!;
@@ -162,7 +225,7 @@ export function AiSettingsPanel({
 
   return (
     <div
-      className="absolute inset-x-0 top-11 bottom-0 z-20 overflow-y-auto p-4"
+      className={`absolute inset-x-0 ${inDrawer ? "top-11 bottom-0" : "inset-y-0"} z-20 overflow-y-auto p-4`}
       style={{ background: theme.panel }}
     >
       <div className="mb-4">
@@ -178,7 +241,9 @@ export function AiSettingsPanel({
       <Field label="Provider">
         <select
           value={value.provider}
-          onChange={event => switchProvider(event.target.value as AiProviderId)}
+          onChange={event =>
+            switchProvider(event.target.value as Exclude<AiProviderId, "codex">)
+          }
           className="h-9 w-full rounded-md border bg-transparent px-2 text-[12px] outline-none"
           style={{ borderColor: theme.border }}
         >
@@ -280,10 +345,37 @@ export function AiSettingsPanel({
           className="h-9 w-full rounded-md border bg-transparent px-2 text-[12px] outline-none"
           style={{ borderColor: theme.border }}
         >
-          {options.models.map(model => (
+          {value.model && !availableModels.includes(value.model) && (
+            <option>{value.model}</option>
+          )}
+          {availableModels.map(model => (
             <option key={model}>{model}</option>
           ))}
         </select>
+        <button
+          type="button"
+          className="mt-1 text-[10px] text-primary"
+          onClick={() =>
+            void modelQuery
+              .mutateAsync({ provider, apiKey: value.apiKey })
+              .then(result => {
+                setModels(result.models);
+                setModelsFor(modelRequestKey);
+                setModelsError("");
+              })
+              .catch(error =>
+                setModelsError(
+                  error instanceof Error ? error.message : String(error)
+                )
+              )
+          }
+          disabled={modelQuery.isPending}
+        >
+          {modelQuery.isPending ? "正在获取模型列表…" : "刷新模型列表"}
+        </button>
+        {modelsError && (
+          <p className="mt-1 text-[10px] text-destructive">{modelsError}</p>
+        )}
       </Field>
 
       <Field label="Effort">
@@ -313,7 +405,7 @@ export function AiSettingsPanel({
         )}
       </Field>
 
-      {value.provider === "deepseek" && (
+      {value.provider !== "codex" && (
         <Field label="API Key">
           <div className="relative">
             <KeyRound
@@ -337,8 +429,8 @@ export function AiSettingsPanel({
             className="mt-1 text-[10px] leading-4"
             style={{ color: theme.muted }}
           >
-            密钥仅保存在当前浏览器会话；关闭浏览器后清除。也可配置
-            DEEPSEEK_API_KEY。
+            密钥仅保存在当前浏览器会话；关闭浏览器后清除。也可在服务端配置对应
+            Provider 的环境变量。
           </p>
         </Field>
       )}

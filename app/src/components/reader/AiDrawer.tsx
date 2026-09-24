@@ -276,6 +276,7 @@ export function AiDrawer({
           value={aiConfig}
           onChange={setAiConfig}
           theme={theme}
+          inDrawer
         />
       )}
 

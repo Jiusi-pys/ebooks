@@ -39,3 +39,4 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
 
 /** Kept as an alias so existing routers become protected without a flag day. */
 export const publicQuery = protectedProcedure;
+export const publicMutation = protectedProcedure;

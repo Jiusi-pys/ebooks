@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { EpubFootnote } from "@/types";
 
@@ -7,11 +7,18 @@ export function EpubText({
   text,
   notes = [],
   offset = 0,
+  dismissSignal,
 }: {
   text: string;
   notes?: readonly EpubFootnote[];
   offset?: number;
+  /** Incremented by the reader when page navigation starts. */
+  dismissSignal?: number;
 }) {
+  const [openNote, setOpenNote] = useState<{
+    key: string;
+    signal: number | undefined;
+  } | null>(null);
   const nodes: ReactNode[] = [];
   let cursor = 0;
   for (const note of [...notes].sort((a, b) => a.start - b.start)) {
@@ -21,7 +28,20 @@ export function EpubText({
     if (start > cursor) nodes.push(text.slice(cursor, start));
     const label = text.slice(start, end);
     nodes.push(
-      <Popover.Root key={`${note.start}:${note.end}`}>
+      <Popover.Root
+        key={`${note.start}:${note.end}`}
+        open={
+          openNote?.key === `${note.start}:${note.end}` &&
+          openNote.signal === dismissSignal
+        }
+        onOpenChange={open =>
+          setOpenNote(
+            open
+              ? { key: `${note.start}:${note.end}`, signal: dismissSignal }
+              : null
+          )
+        }
+      >
         <sup className="relative -top-[0.5em] align-baseline text-[0.65em] leading-[0]">
           <Popover.Trigger asChild>
             <button
@@ -43,6 +63,7 @@ export function EpubText({
             collisionPadding={12}
             className="z-[100] max-h-[50vh] w-80 max-w-[calc(100vw-24px)] overflow-auto rounded-lg border bg-popover p-4 text-popover-foreground shadow-lg"
             onClick={event => event.stopPropagation()}
+            onWheel={event => event.stopPropagation()}
           >
             <div className="mb-2 flex items-center justify-between text-sm font-medium">
               <span>注释</span>
