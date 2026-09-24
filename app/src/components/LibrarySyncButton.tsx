@@ -10,26 +10,38 @@ import {
 export function LibrarySyncButton({
   onPush,
   onPull,
+  onMirror,
   disabled = false,
 }: {
   onPush: () => Promise<boolean>;
   onPull: () => Promise<boolean>;
+  onMirror: () => Promise<boolean>;
   disabled?: boolean;
 }) {
   const running = useRef(false);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState("");
-  async function sync(direction: "push" | "pull") {
+  async function sync(direction: "push" | "pull" | "mirror") {
     if (running.current || disabled) return;
     running.current = true;
     setSyncing(true);
     setMessage("");
     try {
-      const success = await (direction === "push" ? onPush() : onPull());
+      const success = await (
+        direction === "push"
+          ? onPush()
+          : direction === "pull"
+            ? onPull()
+            : onMirror()
+      );
       setMessage(
         success
           ? `${
-              direction === "push" ? "已上传到 MySQL" : "已从 MySQL 下载"
+              direction === "push"
+                ? "已上传到 MySQL"
+                : direction === "pull"
+                  ? "已合并 MySQL 书库"
+                  : "已镜像 MySQL 书库"
             } · ${new Date().toLocaleTimeString()}`
           : "同步失败，本地数据已保留，请重试"
       );
@@ -83,7 +95,19 @@ export function LibrarySyncButton({
             <span>
               <span className="block">MySQL → 浏览器</span>
               <span className="block text-[11px] text-muted-foreground">
-                从 MySQL 下载书籍、原文件与阅读状态到此设备
+                合并 MySQL 书籍到此设备；保留本地独有书籍
+              </span>
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => void sync("mirror")}
+            className="flex items-start gap-2 py-2"
+          >
+            <CloudDownload size={15} className="mt-0.5 shrink-0" />
+            <span>
+              <span className="block">MySQL → 浏览器（镜像）</span>
+              <span className="block text-[11px] text-muted-foreground">
+                让此设备与 MySQL 完全一致；本地独有书籍和文件夹将被删除
               </span>
             </span>
           </DropdownMenuItem>

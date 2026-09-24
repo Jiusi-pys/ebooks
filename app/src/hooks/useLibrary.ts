@@ -60,6 +60,7 @@ import {
   flushReaderStates,
   persistImportedBook,
   syncBrowserToMySql,
+  syncMySqlMirrorToBrowser,
   syncMySqlToBrowser,
   synchronizeLibrary,
 } from "@/lib/librarySync";
@@ -251,6 +252,20 @@ export function useLibrary() {
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : "从 MySQL 下载书籍失败"
+      );
+      return false;
+    }
+  }, [reload]);
+
+  const mirrorLibraryFromMySql = useCallback(async () => {
+    try {
+      await syncMySqlMirrorToBrowser();
+      await reload();
+      setSyncError(null);
+      return true;
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : "镜像 MySQL 书库失败"
       );
       return false;
     }
@@ -940,9 +955,11 @@ export function useLibrary() {
   );
 
   const removeAssociation = useCallback(async (id: string) => {
+    // Keep the local row until MySQL confirms the delete, so a failed mirror
+    // write can be retried without losing the only copy of the association.
+    await emitEvent("association.deleted", { extId: id });
     await dbDeleteAssociation(id);
     setAssociations(current => current.filter(item => item.id !== id));
-    emitEvent("association.deleted", { extId: id });
   }, []);
 
   const deleteHighlightEverywhere = useCallback(
@@ -1047,6 +1064,7 @@ export function useLibrary() {
   }, []);
 
   const removeMindMap = useCallback(async (id: string) => {
+    await emitEvent("mindmap.deleted", { extId: id });
     await dbDeleteMindMap(id);
     setMindMaps(s => s.filter(m => m.id !== id));
   }, []);
@@ -1060,6 +1078,7 @@ export function useLibrary() {
     syncLibrary,
     pushLibraryToMySql,
     pullLibraryFromMySql,
+    mirrorLibraryFromMySql,
     books,
     notes,
     highlights,

@@ -603,6 +603,7 @@ export function LibraryView({ lib }: { lib: Library }) {
             <LibrarySyncButton
               onPush={lib.pushLibraryToMySql}
               onPull={lib.pullLibraryFromMySql}
+              onMirror={lib.mirrorLibraryFromMySql}
               disabled={lib.imports.some(task => task.status === "working")}
             />
             {/* 多选开关 */}

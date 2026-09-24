@@ -17,6 +17,7 @@ import {
   flushReaderStates,
   syncBrowserToMySql,
   syncMySqlToBrowser,
+  syncMySqlMirrorToBrowser,
 } from "./librarySync";
 import { syncBookMirror } from "./mirrorSync";
 
@@ -38,6 +39,7 @@ const book: Book = {
 };
 afterEach(async () => {
   await deleteBook(book.id);
+  await deleteBook("mysql-only");
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
@@ -82,6 +84,48 @@ describe("server-backed library", () => {
 
     expect(await getAllBooks()).toContainEqual(book);
     expect(syncBookMirror).not.toHaveBeenCalled();
+  });
+
+  it("removes browser-only books when mirroring the MySQL catalog", async () => {
+    const remoteBook = { ...book, id: "mysql-only", title: "MySQL book" };
+    await putBook(book);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (path: string) => {
+        if (path.endsWith("/books/mysql-only"))
+          return Response.json({ book: remoteBook, source: null });
+        return Response.json({
+          books: [{ id: remoteBook.id, hasReaderData: true, source: null }],
+          deletedBookIds: [book.id],
+          folders: [],
+        });
+      })
+    );
+
+    await syncMySqlMirrorToBrowser();
+
+    expect(await getAllBooks()).toEqual([remoteBook]);
+  });
+
+  it("retains browser-only books when merging the MySQL catalog", async () => {
+    const remoteBook = { ...book, id: "mysql-only", title: "MySQL book" };
+    await putBook(book);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (path: string) => {
+        if (path.endsWith("/books/mysql-only"))
+          return Response.json({ book: remoteBook, source: null });
+        return Response.json({
+          books: [{ id: remoteBook.id, hasReaderData: true, source: null }],
+          deletedBookIds: [],
+          folders: [],
+        });
+      })
+    );
+
+    await syncMySqlToBrowser();
+
+    expect(await getAllBooks()).toHaveLength(2);
   });
 
   it("migrates a local-only book and uploads its complete source in bounded chunks", async () => {

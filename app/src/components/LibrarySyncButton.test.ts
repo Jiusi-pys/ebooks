@@ -18,8 +18,9 @@ it("offers explicit browser-to-MySQL and MySQL-to-browser actions", async () => 
       })
   );
   const onPull = vi.fn(async () => true);
+  const onMirror = vi.fn(async () => true);
   await act(async () =>
-    root.render(createElement(LibrarySyncButton, { onPush, onPull }))
+    root.render(createElement(LibrarySyncButton, { onPush, onPull, onMirror }))
   );
   const [menuButton] = host.querySelectorAll("button");
   expect(menuButton.textContent).toContain("同步书籍");
@@ -30,6 +31,7 @@ it("offers explicit browser-to-MySQL and MySQL-to-browser actions", async () => 
   );
   expect(document.body.textContent).toContain("浏览器 → MySQL");
   expect(document.body.textContent).toContain("MySQL → 浏览器");
+  expect(document.body.textContent).toContain("MySQL → 浏览器（镜像）");
   const pushItem = Array.from(
     document.querySelectorAll('[role="menuitem"]')
   ).find(item => item.textContent?.includes("浏览器 → MySQL"))!;

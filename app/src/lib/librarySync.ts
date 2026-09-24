@@ -8,6 +8,7 @@ import {
   pendingReaderStates,
   cacheServerBook,
   putFolder,
+  deleteFolder,
   type StoredFile,
 } from "./db";
 import { syncBookMirror } from "./mirrorSync";
@@ -69,13 +70,29 @@ export async function syncBrowserToMySql() {
   await flushPendingReaderStates();
 }
 
-/**
- * Download only: MySQL is the source of incoming book data. Local-only books
- * are deliberately retained; this is a safe restore operation rather than a
- * destructive browser reset.
- */
+/** Merge server books into this browser while retaining browser-only books. */
 export async function syncMySqlToBrowser() {
   const catalog = (await (await libraryRequest("/books")).json()) as Catalog;
+  await downloadCatalog(catalog);
+}
+
+/** Mirror MySQL into this browser, removing books that are absent remotely. */
+export async function syncMySqlMirrorToBrowser() {
+  const catalog = (await (await libraryRequest("/books")).json()) as Catalog;
+  const remoteBookIds = new Set(catalog.books.map(book => book.id));
+  // A mirror pull makes the server catalog authoritative. deleteBook performs
+  // the full IndexedDB cascade (file, highlights, reader state, etc.).
+  for (const book of await getAllBooks()) {
+    if (!remoteBookIds.has(book.id)) await deleteBook(book.id);
+  }
+  const remoteFolderIds = new Set(catalog.folders.map(folder => folder.id));
+  for (const folder of await getAllFolders()) {
+    if (!remoteFolderIds.has(folder.id)) await deleteFolder(folder.id);
+  }
+  await downloadCatalog(catalog);
+}
+
+async function downloadCatalog(catalog: Catalog) {
   for (const folder of catalog.folders) await putFolder(folder);
   const localFolders = await getAllFolders();
   for (const summary of catalog.books) {
