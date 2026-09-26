@@ -354,6 +354,22 @@ npm run start
 
 `npm run start` 通过 `cross-env` 跨平台设置 `NODE_ENV=production`。生产模式缺少 `DATABASE_URL` 时会直接拒绝启动；用户表为空时还必须配置 `APP_ID` 与 `APP_SECRET` 才能完成首次登录。
 
+### 每日自动更新（本机 Git 检出部署）
+
+自动更新默认关闭。启用前，先用 systemd、PM2、Windows 服务包装器等进程管理器运行 `npm run start`，并配置非零退出后自动重启（systemd `Restart=on-failure`、PM2 `autorestart`）。自动更新会在每天的服务器本机时区指定时刻，从 GitHub 克隆配置分支，在同一卷的临时目录运行 `npm ci` 和生产构建；构建成功后停止接收新连接、等待当前请求结束、切换 `app` 目录，再以退出码 75 退出，由进程管理器启动新版本。首次执行也会部署所配置仓库分支的当前版本。未变更的提交不会重启服务。
+
+在 `app/.env` 中配置：
+
+```dotenv
+AUTO_UPDATE_ENABLED=true
+AUTO_UPDATE_GITHUB_URL=https://github.com/owner/repository.git
+AUTO_UPDATE_BRANCH=main
+AUTO_UPDATE_TIME=03:00
+AUTO_UPDATE_RESTART_SUPERVISED=true
+```
+
+`AUTO_UPDATE_TIME` 使用 `HH:mm` 24 小时格式，按服务器本机时区计算。启动时会检查当前 checkout 的 `origin` 与配置 URL 是否一致；Git 必须可无交互访问该仓库，私有仓库请预先配置只读凭据。更新保留 `app/.env` 与 `app/.runtime`，MySQL 数据不受代码替换影响。构建失败或目录切换失败时保留旧版；新版本启动失败时，应由进程管理器重启并由管理员回滚代码。数据库迁移由正常启动命令执行，自动更新不会备份或回滚数据库迁移。Docker 部署请继续通过重建镜像更新。
+
 ### 可选容器构建
 
 镜像不会包含 `.env` 或 Codex 凭据：

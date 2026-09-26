@@ -8,6 +8,7 @@ import { env } from "./lib/env";
 import { v1 } from "./v1";
 import { auth } from "./auth";
 import { library } from "./library";
+import { startAutoUpdate } from "./lib/auto-update";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -41,7 +42,8 @@ if (env.isProduction) {
 
   const port = parseInt(process.env.PORT || "3000");
   const hostname = process.env.HOST?.trim() || "127.0.0.1";
-  serve({ fetch: app.fetch, port, hostname }, () => {
+  const server = serve({ fetch: app.fetch, port, hostname }, () => {
     console.log(`Server running on http://${hostname}:${port}/`);
   });
+  startAutoUpdate(code => server.close(() => process.exit(code)));
 }
