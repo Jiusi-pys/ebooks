@@ -20,6 +20,7 @@ import {
 } from "@/lib/pdfAnnotations";
 import { swatch } from "@/lib/reading";
 import { pdfViewerFailureMessage } from "@/lib/pdfViewerErrors";
+import { isReaderHighlightInteractive } from "@/lib/highlightVisibility";
 import type { Highlight, PdfAnchorRect, PdfHighlightAnchor } from "@/types";
 import "pdfjs-dist/web/pdf_viewer.css";
 
@@ -424,10 +425,8 @@ export function PdfCanvasViewer({
       const rect = event.currentTarget.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
       const hit = findPdfAnnotationAtPoint(
-        pageAnnotations.filter(
-          annotation =>
-            (annotation.highlight.style?.kind ?? "underline") !== "none" ||
-            !!annotation.highlight.note
+        pageAnnotations.filter(annotation =>
+          isReaderHighlightInteractive(annotation.highlight)
         ),
         (event.clientX - rect.left) / rect.width,
         (event.clientY - rect.top) / rect.height

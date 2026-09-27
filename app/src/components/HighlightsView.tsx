@@ -19,6 +19,7 @@ import { emitEvent } from "@/lib/events";
 import { BatchAction, BatchBar, SelectDot } from "./BatchBar";
 import { useSelection } from "@/hooks/useSelection";
 import { citationLevelOf } from "@/lib/citations";
+import { isReaderHighlightInteractive } from "@/lib/highlightVisibility";
 
 type CardType = "all" | "mark" | "note" | "qa";
 
@@ -30,9 +31,13 @@ export function HighlightsView({ lib }: { lib: Library }) {
   const [colorFilter, setColorFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState<CardType>("all");
   const [reviewFilter, setReviewFilter] = useState<"all" | "in" | "out">("all");
+  const [deleteError, setDeleteError] = useState("");
   const sel = useSelection();
   const cardHighlights = useMemo(
-    () => lib.highlights.filter(h => citationLevelOf(h) === "content"),
+    () =>
+      lib.highlights.filter(
+        h => citationLevelOf(h) === "content" && isReaderHighlightInteractive(h)
+      ),
     [lib.highlights]
   );
 
@@ -129,20 +134,34 @@ export function HighlightsView({ lib }: { lib: Library }) {
     sel.exit();
   };
 
-  const batchDelete = () => {
+  const batchDelete = async () => {
     const n = sel.selected.size;
     if (n === 0) return;
     if (confirm(`确定删除选中的 ${n} 张卡片？`)) {
-      for (const h of selectedCards) {
-        void lib.removeHighlight(h.id);
+      setDeleteError("");
+      try {
+        for (const h of selectedCards) await lib.removeHighlight(h.id);
+        sel.exit();
+      } catch {
+        sel.exit();
+        setDeleteError(
+          "部分卡片删除失败，剩余记录仍保留，请检查同步连接后重试"
+        );
       }
-      sel.exit();
     }
   };
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl px-10 pb-24 pt-12">
+        {deleteError && (
+          <p
+            role="alert"
+            className="fixed bottom-6 left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-destructive px-4 py-2 text-sm text-destructive-foreground shadow-lg"
+          >
+            {deleteError}
+          </p>
+        )}
         <header className="mb-6 border-b border-foreground/15 pb-6">
           <div className="font-meta text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
             卡片盒 · {filtered.length} / {cardHighlights.length} 条
@@ -388,7 +407,16 @@ export function HighlightsView({ lib }: { lib: Library }) {
                         )}
                         <button
                           className="hover:text-destructive"
-                          onClick={() => lib.removeHighlight(h.id)}
+                          onClick={() => {
+                            setDeleteError("");
+                            void lib
+                              .removeHighlight(h.id)
+                              .catch(() =>
+                                setDeleteError(
+                                  "删除失败，原文记录仍保留，请检查同步连接后重试"
+                                )
+                              );
+                          }}
                         >
                           删除
                         </button>
@@ -428,7 +456,7 @@ export function HighlightsView({ lib }: { lib: Library }) {
           <BatchAction
             disabled={sel.selected.size === 0}
             danger
-            onClick={batchDelete}
+            onClick={() => void batchDelete()}
           >
             <Trash2 size={13} /> 删除
           </BatchAction>

@@ -38,3 +38,19 @@ export function deleteHighlightWithMirror<T>(
 ): Promise<T> {
   return deleteHighlightsWithMirror([{ id, bookTitle }], dependencies);
 }
+
+/** Keep the deletion UI open until both mirror and local state have committed. */
+export async function removeHighlightWithFeedback(
+  remove: () => Promise<void>,
+  close: () => void,
+  reportError: (error: unknown) => void
+): Promise<boolean> {
+  try {
+    await remove();
+    close();
+    return true;
+  } catch (error) {
+    reportError(error);
+    return false;
+  }
+}

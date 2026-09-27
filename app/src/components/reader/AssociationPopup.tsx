@@ -69,8 +69,9 @@ export function AssociationPopup({
     <section
       role="dialog"
       aria-label="管理文段关联"
-      className={`float-pop ${position} z-[70] w-[340px] -translate-x-1/2 rounded-lg border border-border bg-popover p-3 shadow-xl`}
+      className={`float-pop ${position} z-[70] max-h-[calc(100dvh-24px)] w-[340px] overflow-y-auto overscroll-contain -translate-x-1/2 rounded-lg border border-border bg-popover p-3 shadow-xl`}
       style={{ top, left }}
+      onWheel={event => event.stopPropagation()}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -91,7 +92,7 @@ export function AssociationPopup({
         </button>
       </div>
 
-      <div className="mt-2 max-h-64 space-y-1.5 overflow-y-auto pr-0.5">
+      <div className="mt-2 max-h-64 space-y-1.5 overflow-y-auto overscroll-contain pr-0.5">
         {related.length === 0 ? (
           <p className="rounded-md bg-secondary/50 px-2.5 py-3 text-center text-[11.5px] text-muted-foreground">
             这段内容还没有关联

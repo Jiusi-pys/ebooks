@@ -134,8 +134,9 @@ export function CiteBrowser({
 
   return (
     <div
-      className="float-pop absolute z-40 -translate-x-1/2 rounded-lg border border-border bg-popover"
+      className="float-pop absolute z-40 max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain -translate-x-1/2 rounded-lg border border-border bg-popover"
       onMouseDown={e => e.stopPropagation()}
+      onWheel={event => event.stopPropagation()}
     >
       <div className="w-[340px] p-3">
         {/* 头部：返回 + 面包屑 */}
@@ -197,7 +198,7 @@ export function CiteBrowser({
         </div>
 
         {/* 列表 */}
-        <div className="max-h-56 overflow-y-auto">
+        <div className="max-h-56 overflow-y-auto overscroll-contain">
           {level.depth === 1 &&
             (bookList.length ? (
               bookList.map(b => (

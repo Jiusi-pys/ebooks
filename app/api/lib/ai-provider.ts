@@ -52,6 +52,7 @@ export async function askOpenAiCompatible(
 ): Promise<string> {
   if (config.provider === "codex")
     throw new Error("Codex 不是 OpenAI-compatible API Provider");
+  if (!config.model.trim()) throw new Error("请先在 AI 设置中选择或填写模型");
   const provider = PROVIDERS[config.provider];
   const apiKey = config.apiKey?.trim() || process.env[provider.envKey]?.trim();
   if (!apiKey) throw new Error(`${config.provider} API Key 未配置`);
@@ -135,9 +136,7 @@ export async function fetchProviderModels(
     error?: { message?: string };
   };
   if (!response.ok) {
-    throw new Error(
-      data.error?.message || `${provider} 模型列表获取失败 (${response.status})`
-    );
+    throw new Error(`${provider} 模型列表获取失败 (${response.status})`);
   }
   return [
     ...new Set(

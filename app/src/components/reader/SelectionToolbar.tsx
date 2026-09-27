@@ -96,8 +96,9 @@ export function SelectionToolbar({
   return (
     <div
       ref={ref}
-      className="float-pop absolute z-40 -translate-x-1/2 rounded-lg border border-border bg-popover"
+      className="float-pop absolute z-40 max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain -translate-x-1/2 rounded-lg border border-border bg-popover"
       style={{ top, left }}
+      onWheel={event => event.stopPropagation()}
     >
       {mode === "menu" && (
         <div className="w-[304px] p-2">

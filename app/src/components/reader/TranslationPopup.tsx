@@ -85,7 +85,7 @@ export function TranslationPopup({
   return (
     <div
       ref={boxRef}
-      className="float-pop absolute z-40 w-[360px] -translate-x-1/2 rounded-lg border"
+      className="float-pop absolute z-40 max-h-[calc(100dvh-24px)] w-[360px] overflow-y-auto overscroll-contain -translate-x-1/2 rounded-lg border"
       style={{
         top,
         left,
@@ -94,6 +94,7 @@ export function TranslationPopup({
         color: theme.text,
       }}
       onMouseDown={e => e.stopPropagation()}
+      onWheel={event => event.stopPropagation()}
     >
       <div
         className="flex h-10 items-center gap-2 border-b px-3"
@@ -125,7 +126,7 @@ export function TranslationPopup({
         </div>
       </div>
 
-      <div className="max-h-[320px] overflow-y-auto p-3">
+      <div className="max-h-[320px] overflow-y-auto overscroll-contain p-3">
         <div className="rounded-md border-l-[3px] border-primary/70 py-1 pl-2.5">
           <div className="font-reading text-[12.5px] leading-6 opacity-75">
             {sourceText.length > 160

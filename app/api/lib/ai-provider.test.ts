@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { askDeepSeek, fetchProviderModels } from "./ai-provider";
+import {
+  askDeepSeek,
+  askOpenAiCompatible,
+  fetchProviderModels,
+} from "./ai-provider";
 
 describe("DeepSeek provider", () => {
   it("loads available models from the provider endpoint without a static catalog", async () => {
@@ -84,5 +88,34 @@ describe("DeepSeek provider", () => {
       },
       fetchMock as typeof fetch
     );
+  });
+});
+
+describe("provider validation", () => {
+  it("rejects an empty model before calling an external service", async () => {
+    const fetchMock = vi.fn();
+    await expect(
+      askOpenAiCompatible(
+        [{ role: "user", content: "问题" }],
+        { provider: "kimi", model: "", effort: "none", apiKey: "test" },
+        fetchMock as typeof fetch
+      )
+    ).rejects.toThrow(/模型/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not expose provider error bodies from model discovery", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ error: { message: "sk-secret-value" } }),
+          {
+            status: 401,
+          }
+        )
+    );
+    await expect(
+      fetchProviderModels("deepseek", "test", fetchMock as typeof fetch)
+    ).rejects.toThrow("deepseek 模型列表获取失败 (401)");
   });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   deleteHighlightWithMirror,
   deleteHighlightsWithMirror,
+  removeHighlightWithFeedback,
 } from "./highlightDeletion";
 
 function deferred<T>() {
@@ -124,5 +125,35 @@ describe("deleteHighlightWithMirror", () => {
     expect(emitMirror).toHaveBeenCalledTimes(2);
     expect(beforeLocalCommit).not.toHaveBeenCalled();
     expect(commitLocal).not.toHaveBeenCalled();
+  });
+});
+
+describe("removeHighlightWithFeedback", () => {
+  it("closes the popup only after deletion succeeds", async () => {
+    const pending = deferred<void>();
+    const close = vi.fn();
+    const reportError = vi.fn();
+    const removal = removeHighlightWithFeedback(
+      () => pending.promise,
+      close,
+      reportError
+    );
+    expect(close).not.toHaveBeenCalled();
+    pending.resolve();
+    await removal;
+    expect(close).toHaveBeenCalledOnce();
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it("keeps the popup open and reports a failed deletion", async () => {
+    const close = vi.fn();
+    const reportError = vi.fn();
+    await removeHighlightWithFeedback(
+      () => Promise.reject(new Error("mirror unavailable")),
+      close,
+      reportError
+    );
+    expect(close).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledOnce();
   });
 });

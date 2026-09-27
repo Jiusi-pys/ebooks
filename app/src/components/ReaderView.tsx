@@ -67,6 +67,8 @@ import {
 } from "@/lib/reading";
 import { formatDate } from "@/lib/covers";
 import { emitEvent } from "@/lib/events";
+import { isReaderHighlightInteractive } from "@/lib/highlightVisibility";
+import { removeHighlightWithFeedback } from "@/lib/highlightDeletion";
 import { useAiConfig } from "@/lib/aiConfig";
 import { searchUrl, useSearchEngine } from "@/lib/searchEngine";
 import { TypePanel } from "./reader/TypePanel";
@@ -372,6 +374,7 @@ export function ReaderView({
     >();
     if (!chapter) return map;
     for (const h of lib.highlights) {
+      if (!isReaderHighlightInteractive(h)) continue;
       if (citationLevelOf(h) !== "content") continue;
       if (h.bookId !== book.id) continue;
       if (h.chapterId !== chapter.id) continue;
@@ -2345,7 +2348,8 @@ export function ReaderView({
                         pane ? (readerShellRef.current ?? undefined) : undefined
                       }
                       aria-label="AI 设置"
-                      className="relative z-[100] h-[min(80vh,640px)] max-h-[calc(100vh-24px)] w-[360px] overflow-hidden rounded-lg border shadow-lg"
+                      className="relative z-[100] h-[min(80vh,640px)] max-h-[calc(100vh-24px)] w-[360px] overflow-hidden overscroll-contain rounded-lg border shadow-lg"
+                      onWheel={event => event.stopPropagation()}
                     >
                       <AiSettingsPanel
                         value={aiConfig}
@@ -2387,7 +2391,8 @@ export function ReaderView({
                             : undefined
                         }
                         aria-label="排版设置"
-                        className="z-[100] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
+                        className="z-[100] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overscroll-contain rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
+                        onWheel={event => event.stopPropagation()}
                       >
                         <TypePanel
                           generalValue={generalType}
@@ -2533,7 +2538,8 @@ export function ReaderView({
                     <div
                       role="dialog"
                       aria-label="管理 PDF 引用"
-                      className="fixed z-[60] w-[280px] -translate-x-1/2 rounded-lg border border-border bg-popover p-3 shadow-xl"
+                      className="fixed z-[60] max-h-[calc(100dvh-24px)] w-[280px] overflow-y-auto overscroll-contain -translate-x-1/2 rounded-lg border border-border bg-popover p-3 shadow-xl"
+                      onWheel={event => event.stopPropagation()}
                       style={{
                         left: Math.max(
                           150,
@@ -2885,10 +2891,16 @@ export function ReaderView({
                           setHlPopup(null);
                         }}
                         onAskAi={() => askAiOn(popupHl)}
-                        onDelete={() => {
-                          void lib.removeHighlight(popupHl.id);
-                          setHlPopup(null);
-                        }}
+                        onDelete={() =>
+                          void removeHighlightWithFeedback(
+                            () => lib.removeHighlight(popupHl.id),
+                            () => setHlPopup(null),
+                            () =>
+                              showToast(
+                                "删除失败，原文记录仍保留，请检查同步连接后重试"
+                              )
+                          )
+                        }
                         onClose={() => setHlPopup(null)}
                         notes={lib.notes}
                       />
@@ -3530,7 +3542,7 @@ export function HighlightPopup({
       role="dialog"
       aria-label="文段操作"
       onWheel={event => event.stopPropagation()}
-      className={`float-pop fixed z-50 ${viewingQa ? "w-[380px]" : "w-[300px]"} max-h-[calc(100dvh-24px)] max-w-[calc(100vw-24px)] overflow-y-auto -translate-x-1/2 rounded-lg border border-border bg-popover p-3`}
+      className={`float-pop fixed z-50 ${viewingQa ? "w-[380px]" : "w-[300px]"} max-h-[calc(100dvh-24px)] max-w-[calc(100vw-24px)] overflow-y-auto overscroll-contain -translate-x-1/2 rounded-lg border border-border bg-popover p-3`}
       style={position}
     >
       {viewingQa ? (

@@ -17,6 +17,7 @@ import {
 } from "@/lib/aiConfig";
 import { readCodexAuthJson } from "@/lib/codexAuthResponse";
 import { createLatestRequestGate } from "@/lib/latestRequest";
+import { friendlyAiError } from "@/lib/aiError";
 import { trpc } from "@/lib/trpc-client";
 
 interface CodexAuthStatus {
@@ -80,10 +81,7 @@ export function AiSettingsPanel({
             setModels(result.models);
             setModelsFor(modelRequestKey);
             setModelsError("");
-            if (
-              result.models.length > 0 &&
-              !result.models.includes(value.model)
-            ) {
+            if (result.models.length > 0 && !value.model.trim()) {
               onChange({ ...value, model: result.models[0] });
             }
           }
@@ -91,7 +89,7 @@ export function AiSettingsPanel({
         .catch(error => {
           if (active)
             setModelsError(
-              error instanceof Error ? error.message : String(error)
+              friendlyAiError(error, "获取模型列表失败，请检查密钥和网络。")
             );
         });
     }, 350);
@@ -106,11 +104,8 @@ export function AiSettingsPanel({
     provider,
     value.apiKey,
     value.model,
+    value,
   ]);
-
-  useEffect(() => {
-    if (!value.model && models.length) onChange({ ...value, model: models[0] });
-  }, [models, onChange, value]);
 
   const refreshCodexStatus = useCallback(async (showBusy = true) => {
     const requests = codexRequests.current!;
@@ -218,14 +213,13 @@ export function AiSettingsPanel({
       setTestMessage("连接成功，模型已返回响应");
     } catch (error) {
       setTestResult("error");
-      const message = error instanceof Error ? error.message : String(error);
-      setTestMessage(message.split("\n")[0].slice(0, 160));
+      setTestMessage(friendlyAiError(error, "连接失败，请检查模型与网络。"));
     }
   };
 
   return (
     <div
-      className={`absolute inset-x-0 ${inDrawer ? "top-11 bottom-0" : "inset-y-0"} z-20 overflow-y-auto p-4`}
+      className={`absolute inset-x-0 ${inDrawer ? "top-11 bottom-0" : "inset-y-0"} z-20 overflow-y-auto overscroll-contain p-4`}
       style={{ background: theme.panel }}
     >
       <div className="mb-4">
@@ -339,19 +333,20 @@ export function AiSettingsPanel({
       )}
 
       <Field label="Model">
-        <select
+        <input
+          type="text"
           value={value.model}
           onChange={event => onChange({ ...value, model: event.target.value })}
+          list="ai-provider-models"
+          placeholder="输入模型 ID，或从列表选择"
           className="h-9 w-full rounded-md border bg-transparent px-2 text-[12px] outline-none"
           style={{ borderColor: theme.border }}
-        >
-          {value.model && !availableModels.includes(value.model) && (
-            <option>{value.model}</option>
-          )}
+        />
+        <datalist id="ai-provider-models">
           {availableModels.map(model => (
-            <option key={model}>{model}</option>
+            <option key={model} value={model} />
           ))}
-        </select>
+        </datalist>
         <button
           type="button"
           className="mt-1 text-[10px] text-primary"
@@ -365,7 +360,7 @@ export function AiSettingsPanel({
               })
               .catch(error =>
                 setModelsError(
-                  error instanceof Error ? error.message : String(error)
+                  friendlyAiError(error, "获取模型列表失败，请检查密钥和网络。")
                 )
               )
           }

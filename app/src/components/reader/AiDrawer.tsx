@@ -22,6 +22,7 @@ import { contentHashOfBook, scanBookStructure } from "@/lib/reading";
 import { AI_PROVIDERS, useAiConfig } from "@/lib/aiConfig";
 import { AiSettingsPanel } from "./AiSettingsPanel";
 import { conversationHistory } from "@/lib/aiConversation";
+import { friendlyAiError } from "@/lib/aiError";
 
 interface Props {
   book: Book;
@@ -76,19 +77,6 @@ export function AiDrawer({
   const [aiConfig, setAiConfig] = useAiConfig();
   const utils = trpc.useUtils();
 
-  /* 把后端原始错误转成读者可读的提示 */
-  const friendlyError = (e: unknown) => {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("DeepSeek API Key 未配置"))
-      return "请在 AI 后台设置中填写 DeepSeek API Key。";
-    if (msg.includes("api_key_path_forbidden") || msg.includes("(403)"))
-      return "Codex CLI 尚未使用 ChatGPT 登录，请先在本机运行 codex login。";
-    if (msg.includes("(401)"))
-      return "模型服务凭证失效，请重新保存版本后再试。";
-    if (msg.toLowerCase().includes("fetch") || msg.includes("(500)"))
-      return "网络波动，模型服务暂时不可用，请稍后再试。";
-    return "提问失败，请重试";
-  };
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const focusedTargetRef = useRef<string | null>(null);
@@ -122,7 +110,9 @@ export function AiDrawer({
         }
         setDigestLine("首次提问：正在通读全书，提炼结构…");
         const structure = JSON.stringify(scanBookStructure(book), null, 1);
-        setDigestLine(`正在请 ${AI_PROVIDERS.deepseek.label} 为全书写导读…`);
+        setDigestLine(
+          `正在请 ${aiConfig.provider === "codex" ? "Codex" : AI_PROVIDERS[aiConfig.provider].label} 为全书写导读…`
+        );
         let overview = "";
         try {
           const resp = await utils.client.ai.chat.mutate({
@@ -198,7 +188,8 @@ export function AiDrawer({
       });
       onSaveQa({ q, a: content, ts: Date.now() });
     } catch (e) {
-      setError(friendlyError(e));
+      setInput(current => (current.trim() ? current : q));
+      setError(friendlyAiError(e, "提问失败，请稍后重试。"));
     } finally {
       setPhase("ready");
     }
@@ -229,7 +220,7 @@ export function AiDrawer({
       });
       await onApplyStudyCard(card);
     } catch (e) {
-      setError(friendlyError(e));
+      setError(friendlyAiError(e, "制卡失败，请稍后重试。"));
     } finally {
       setPhase("ready");
     }
@@ -317,7 +308,10 @@ export function AiDrawer({
       </div>
 
       {/* 对话区 */}
-      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3">
+      <div
+        ref={listRef}
+        className="flex-1 overflow-y-auto overscroll-contain px-4 py-3"
+      >
         {phase === "digest" && (
           <div
             className="flex items-center gap-2 rounded-md p-3 text-[12.5px]"
@@ -407,7 +401,7 @@ export function AiDrawer({
             placeholder={
               phase === "digest" ? "等待全书扫描完成…" : "就这段文字向 AI 提问…"
             }
-            disabled={phase === "digest"}
+            disabled={phase !== "ready"}
             rows={2}
             className="flex-1 resize-none rounded-md border p-2 text-[13px] leading-6 outline-none focus:border-primary/60 disabled:opacity-50"
             style={{

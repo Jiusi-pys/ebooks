@@ -61,7 +61,7 @@ export function EpubText({
             aria-label="书内注释"
             sideOffset={8}
             collisionPadding={12}
-            className="z-[100] max-h-[50vh] w-80 max-w-[calc(100vw-24px)] overflow-auto rounded-lg border bg-popover p-4 text-popover-foreground shadow-lg"
+            className="z-[100] max-h-[50vh] w-80 max-w-[calc(100vw-24px)] overflow-auto overscroll-contain rounded-lg border bg-popover p-4 text-popover-foreground shadow-lg"
             onClick={event => event.stopPropagation()}
             onWheel={event => event.stopPropagation()}
           >

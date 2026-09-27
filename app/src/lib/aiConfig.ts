@@ -35,7 +35,7 @@ export function readProviderApiKey(provider: Exclude<AiProviderId, "codex">) {
 
 export const DEFAULT_AI_CONFIG: AiConfig = {
   provider: "deepseek",
-  model: "",
+  model: "deepseek-flash",
   effort: "none",
 };
 
@@ -45,7 +45,7 @@ export function defaultAiConfigFor(
   const options = AI_PROVIDERS[provider];
   return {
     provider,
-    model: "",
+    model: provider === "deepseek" ? "deepseek-flash" : "",
     effort: options.efforts[0],
   };
 }
@@ -64,7 +64,7 @@ export function loadAiConfig(): AiConfig {
     const defaults = defaultAiConfigFor(provider);
     return {
       provider,
-      model: saved.model ?? defaults.model,
+      model: saved.model?.trim() || defaults.model,
       effort:
         saved.effort && options.efforts.includes(saved.effort)
           ? saved.effort

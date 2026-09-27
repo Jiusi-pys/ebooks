@@ -102,7 +102,8 @@ export function PdfSelectionToolbar({
       ref={ref}
       role="dialog"
       aria-label="PDF 划选工具"
-      className="float-pop fixed z-50 -translate-x-1/2 rounded-lg border border-border bg-popover shadow-xl"
+      className="float-pop fixed z-50 max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain -translate-x-1/2 rounded-lg border border-border bg-popover shadow-xl"
+      onWheel={event => event.stopPropagation()}
       style={{
         left:
           typeof window === "undefined"

@@ -147,9 +147,10 @@ export function AssociationPicker({
     <div
       role="dialog"
       aria-label="选择关联目标"
-      className="float-pop relative z-50 max-h-[min(640px,calc(100vh-32px))] overflow-hidden rounded-xl border border-border bg-popover shadow-xl"
+      className="float-pop relative z-50 max-h-[min(640px,calc(100vh-32px))] overflow-y-auto overscroll-contain rounded-xl border border-border bg-popover shadow-xl"
       style={{ width: "min(680px, calc(100vw - 32px))" }}
       onMouseDown={event => event.stopPropagation()}
+      onWheel={event => event.stopPropagation()}
     >
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <Link2 size={15} className="shrink-0 text-primary" />
@@ -291,7 +292,7 @@ export function AssociationPicker({
             />
           </div>
 
-          <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-border p-1">
+          <div className="mt-2 max-h-72 overflow-y-auto overscroll-contain rounded-lg border border-border p-1">
             {!selectedBook ? (
               <Empty text="书架中还没有可关联的书籍" />
             ) : !selectedChapter ? (
