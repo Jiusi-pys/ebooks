@@ -47,6 +47,24 @@ npm run dev
 
 `npm run start` 已使用 `cross-env`，在 Windows、Linux 和 macOS 均可启动构建后的生产服务。用户表为空时，用 `.env` 中的初始凭据登录并立即设置自定义用户名和新密码；此后每次登录只从 MySQL 读取并核验账户。用户名由独立的 `APP_DATA_SECRET` 加密，密码仅保存带随机盐的 scrypt 强哈希，会话由 `APP_SESSION_SECRET` 签名。任一独立密钥留空时，本地应用会在 `.runtime/` 生成对应密钥；生产或容器部署必须显式配置它们，或持久化整个 `.runtime` 目录。旧安装应保留原 `APP_SECRET`，配置数据密钥后重新登录一次完成自动重加密，再退役初始密码。会话保存在带 `HttpOnly`、`SameSite=Strict` 属性的签名 Cookie 中，修改请求还会校验同源信息。
 
+### Windows / Linux 登录时自动启动
+
+先完成 `npm ci`、`.env` 配置与 `npm run build`，再从 `app/` 目录安装当前系统用户的自动启动项。安装脚本会询问是否启用；也可用 `-AutoStart` / `-NoAutoStart`（PowerShell）或 `--enable` / `--disable`（Linux）跳过交互。Windows 要求 Node.js 22.13+ 可从当前用户的 `PATH` 访问：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-autostart.ps1
+```
+
+```bash
+sh scripts/install-autostart.sh
+```
+
+Windows 使用任务计划程序的“用户登录时”触发器；Linux 使用 systemd 用户服务，用户登录后启动。首次安装后，应用设置中的“登录时自动启动”可以切换已安装任务的启用状态。切换只影响后续登录，不会停止当前运行的服务。该功能只管理当前应用运行账户自己的任务，不需要管理员权限；Linux 系统需提供 systemd user manager。更换应用目录或环境文件后需重新运行对应安装脚本。容器部署设置 `AUTO_START_MANAGED=false`，继续由 Docker 的 restart policy 管理，不使用这里的本机登录启动项。
+
+状态由登录保护的 `GET /api/autostart/status` 读取；修改使用受同源保护的 `POST` 请求。Windows 检查命令为 `Get-ScheduledTask -TaskName ShufangBookManager`，Linux 可运行 `systemctl --user status shufang-book-manager.service`。如果界面显示“尚未安装启动项”，请确认脚本在运行服务的同一 OS 用户下执行，并重新打开应用设置。若要卸载，Windows 执行 `Unregister-ScheduledTask -TaskName ShufangBookManager`；Linux 执行 `systemctl --user disable --now shufang-book-manager.service`，再删除 `~/.config/systemd/user/shufang-book-manager.service` 并运行 `systemctl --user daemon-reload`。
+
+AI Provider API Key 由用户在 AI 设置中输入时保存在该浏览器的 `localStorage`，不会上传到应用服务器或在设备间同步；清除网站数据会一并删除。版本号从 `app/package.json` 读取，可在页面左下角的用户信息/账户设置中查看。
+
 开放机器 API 必须单独配置 `OPEN_API_KEY`；留空时受保护的 `/api/v1/*` 资源接口返回 503，不会回退使用登录密码。
 
 若 HTTPS 在反向代理处终止，请把浏览器实际访问的完整源配置为 `PUBLIC_ORIGIN`，例如 `PUBLIC_ORIGIN=https://books.example.com`（只包含协议、主机和可选端口）。应用不会信任客户端可伪造的 `X-Forwarded-*` 请求头；未配置时，同源校验仍以直连请求 URL 为准。HTTPS `PUBLIC_ORIGIN` 也会让会话 Cookie 自动带上 `Secure`。

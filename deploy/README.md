@@ -4,6 +4,12 @@
 固定 GitHub 仓库拉取 `main` → 核对触发提交 SHA → 构建镜像 → 迁移 → 切换
 容器 → 检查数据库就绪和容器稳定运行 → Actions 显示成功或失败。
 
+本机 Windows/Linux 的 per-user 登录启动脚本只适用于直接运行 Node 服务的机器；
+us 服务器由此部署工作流更新，容器重启由 Docker 管理。应用版本号来自
+`app/package.json`，在左下角用户信息的账户设置中显示。当前发布方式以 `main`
+分支自动部署为主，不产出供用户下载的独立二进制包，因此不额外创建 GitHub
+Release/tag；部署的提交 SHA 与迁移链记录在验收和部署任务中。
+
 ## API
 
 所有请求使用独立的 `Authorization: Bearer <DEPLOY_TOKEN>`；不能使用登录

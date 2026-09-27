@@ -21,7 +21,8 @@
 - 浏览器 IndexedDB 与 MySQL 镜像对书籍、笔记、书摘、引用、关联和摘要删除保持一致；事件回执、墓碑、事务化引用清理和前向迁移让迟到事件可以安全重试。
 - 支持可编辑脑图、复习卡片、回忆模式和间隔复习队列。
 - 默认通过本机 ChatGPT 登录调用 Codex，也可在 AI 后台选择 DeepSeek API。
-- 左右阅读侧栏均可在固定显示与自动隐藏间切换；右侧可把书摘、批注和 AI 问答合并为按时间排列、颜色区分的列表；沉浸模式会隐藏两侧栏和工具栏；账户面板可修改 MySQL 用户名和密码。
+- AI 问答对应的整段原文会以浅色底纹和点线下划线标记；第三方 Provider 的 API Key 可长期保存在当前浏览器。
+- 左右阅读侧栏均可在固定显示与自动隐藏间切换；右侧可把书摘、批注和 AI 问答合并为按时间排列、颜色区分的列表；沉浸模式会隐藏两侧栏和工具栏；左下角用户信息可打开账户面板修改 MySQL 用户名和密码、查看应用版本。
 
 ## 全局搜索
 
@@ -327,7 +328,7 @@ codex login status
 
 ## 可选 DeepSeek Provider
 
-DeepSeek 与“不使用 API Key”的 Codex 路径相互独立，会产生 DeepSeek API 计费。可以在服务端设置 `DEEPSEEK_API_KEY`，也可以在 AI 后台临时填写；界面填写的密钥仅保存在浏览器 `sessionStorage`。当前版本提供：
+DeepSeek 与“不使用 API Key”的 Codex 路径相互独立，会产生 DeepSeek API 计费。可以在服务端设置 `DEEPSEEK_API_KEY`，也可以在 AI 后台填写。界面填写的 Provider API Key 会保存在当前浏览器的 `localStorage`，重启浏览器或重新登录后仍可使用；旧版 `sessionStorage` 中的密钥会在读取时迁移。密钥不会同步到服务器或其他浏览器，清除网站数据会删除密钥。当前版本提供：
 
 - 模型：`deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-v4-flash-vision-exp`
 - 思考强度：`none`、`low`、`high`、`max`
@@ -335,6 +336,22 @@ DeepSeek 与“不使用 API Key”的 Codex 路径相互独立，会产生 Deep
 当前适配器只发送文本消息，即使所选模型名称中包含 `vision` 也不会发送图片。
 
 建议先在 AI 后台点击“测试连接”，再执行翻译、对话、脑图生成或 AI 制卡。
+
+### Windows / Linux 登录时自动启动
+
+本机部署可为运行书房的当前系统用户安装登录启动项。先完成 `.env` 配置和生产构建，再从 `app/` 目录运行安装脚本；交互模式会询问是否启用，也可直接传入启用/禁用选项：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-autostart.ps1
+# 或直接启用：在上面的命令末尾添加 -AutoStart
+```
+
+```bash
+sh scripts/install-autostart.sh --enable
+# 安装但保持关闭：使用 --disable
+```
+
+Windows 使用任务计划程序的用户登录触发器，Linux 使用 systemd 用户服务。应用设置里的“登录时自动启动”开关会管理该启动项的启用状态，不会停止正在运行的服务。查看版本可点击页面左下角用户信息。若改动了应用目录或 `.env` 文件位置，需重新安装启动项。该功能用于本机 Node 部署；Docker、GitHub Actions 及 us 服务器的自动更新仍由容器重启策略和部署工作流负责。
 
 ## 生产模式启动
 

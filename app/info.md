@@ -8,6 +8,9 @@ The maintained setup and deployment guides are [app README](README.md),
 - Backend: Hono, tRPC, Drizzle ORM, and MySQL. Browser library requests use authenticated sessions.
 - Book metadata, chapters, originals, covers, outlines, and reading state persist in MySQL; IndexedDB caches them locally.
 - The library offers a manual “同步到 MySQL” action with confirmed success or retry feedback.
+- Third-party AI provider keys entered in settings persist in the current browser's local storage; they are not synchronized to the server.
+- Saved AI Q&A marks its full source passage in the reader, and account settings display the package version.
+- Local Windows/Linux installs can register a per-user login startup task; Docker and the US deployment use their existing supervisors.
 
 ## Source layout
 

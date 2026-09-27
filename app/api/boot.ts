@@ -11,9 +11,11 @@ import { library } from "./library";
 import { startAutoUpdate } from "./lib/auto-update";
 import { configureSync } from "./sync/api";
 import { legacyBridge } from "./sync/legacy";
+import { autoStart } from "./auto-start";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
-const sync = process.env.SYNC_ENABLED === "true" ? await configureSync() : undefined;
+const sync =
+  process.env.SYNC_ENABLED === "true" ? await configureSync() : undefined;
 
 const limitRequestBody = bodyLimit({ maxSize: 50 * 1024 * 1024 });
 app.use(async (c, next) => {
@@ -24,6 +26,7 @@ app.use(async (c, next) => {
   return limitRequestBody(c, next);
 });
 app.route("/api/auth", auth);
+app.route("/api/autostart", autoStart);
 if (sync) {
   app.route("/api/library", legacyBridge(sync.store, sync.blobs, true));
   app.route("/api/v1", legacyBridge(sync.store, sync.blobs));

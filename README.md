@@ -37,10 +37,14 @@ extensions are outside the current web scope.
 - Create editable mind maps, review cards, and spaced-repetition queues.
 - Use Codex through a local ChatGPT login, or select the optional DeepSeek API
   provider from the AI settings panel.
+- Mark the full source passage associated with saved AI Q&A using a subtle
+  background and dotted underline. Third-party provider API keys can persist in
+  the current browser.
 - Pin or auto-hide both reading sidebars; immersive mode hides both sidebars
   and the reader toolbar. The right panel can combine excerpts, annotations,
   and AI Q&A into one colour-coded chronological feed. Manage the MySQL-backed
-  local username and password from the account panel.
+  local username and password from the bottom-left account panel, which also
+  shows the application version.
 
 ## Global Search
 
@@ -670,8 +674,11 @@ can select the other model/effort values supported by this build.
 
 DeepSeek is separate from the no-API-key Codex path and uses DeepSeek API
 billing. Either set `DEEPSEEK_API_KEY` on the server or enter a key in AI
-settings; a UI-entered key is kept only in browser `sessionStorage`. The current
-build exposes:
+settings. A UI-entered provider key is saved in this browser's `localStorage`
+and remains available after browser restarts and sign-in changes. Legacy keys in
+`sessionStorage` migrate when read. Keys are not sent to the server for storage
+or synchronized to other browsers, and clearing site data removes them. The
+current build exposes:
 
 - Models: `deepseek-v4-flash`, `deepseek-v4-pro`,
   `deepseek-v4-flash-vision-exp`
@@ -705,6 +712,30 @@ npm run start
 `npm run start` sets `NODE_ENV=production` cross-platform. Production startup
 fails fast when `DATABASE_URL` is missing. `APP_ID` and `APP_SECRET` are also
 needed only for the first login while the user table is empty.
+
+### Windows / Linux Login Startup
+
+For a local Node deployment, install a per-user login startup entry after
+configuring `.env` and building the app. The installer prompts whether to enable
+the entry, or accepts an explicit choice:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-autostart.ps1
+# Append -AutoStart to enable without prompting, or -NoAutoStart to install disabled.
+```
+
+```bash
+sh scripts/install-autostart.sh --enable
+# Use --disable to install the unit without enabling it.
+```
+
+Windows uses Task Scheduler's user-logon trigger; Linux uses a systemd user
+service. The **Login Startup** switch in App Settings enables or disables the
+installed entry and does not stop the currently running server. Re-run the
+installer if the app directory or `.env` path changes. Click the bottom-left
+account panel to see the app version. This local startup option is separate from
+Docker restart policies and the GitHub Actions deployment/update workflow used
+for the US server.
 
 ### Server administrator installation and updates
 
