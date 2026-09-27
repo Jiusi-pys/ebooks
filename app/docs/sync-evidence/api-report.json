@@ -1,0 +1,102 @@
+{
+  "startedAt": "2026-09-27T01:33:02.640Z",
+  "checks": [
+    {
+      "name": "both directions/all entity kinds",
+      "passed": true,
+      "details": {
+        "convergenceMs": 5257
+      }
+    },
+    {
+      "name": "create update delete every mutable kind from both nodes",
+      "passed": true,
+      "details": {
+        "entities": 20,
+        "histories": 20
+      }
+    },
+    {
+      "name": "independent mind map nodes, memberships and immutable review events",
+      "passed": true
+    },
+    {
+      "name": "concurrent field merge and deterministic winner",
+      "passed": true
+    },
+    {
+      "name": "lost acknowledgement retry and duplicate payload rejection",
+      "passed": true
+    },
+    {
+      "name": "delete wins over delayed update",
+      "passed": true
+    },
+    {
+      "name": "snapshot watermark preserves concurrent mutations",
+      "passed": true
+    },
+    {
+      "name": "authentication, workspace scope and revocation",
+      "passed": true
+    },
+    {
+      "name": "resumable file upload, corrupt chunk rejection and remote checksum",
+      "passed": true,
+      "details": {
+        "sha256": "9e8c59d749539ef7855f9308568cd2fe3a2d511806eba3b9dfdaa5ace1d8dc4d",
+        "size": 666036
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "version": 2,
+      "workspaceId": "windows-linux-lab",
+      "nodeId": "windows-lab",
+      "epoch": "dfda6109-764c-40bd-ad3a-4b2f30d2afdd",
+      "kinds": [
+        "books",
+        "folders",
+        "notes",
+        "highlights",
+        "associations",
+        "translations",
+        "mindMaps",
+        "studySets",
+        "reviews",
+        "preferences",
+        "sources"
+      ],
+      "maxBatch": 100,
+      "maxBytes": 1048576,
+      "chunkSize": 262144
+    },
+    {
+      "version": 2,
+      "workspaceId": "windows-linux-lab",
+      "nodeId": "linux-lab",
+      "epoch": "f22f2cb0-e2e9-45c4-8896-76b63c545e10",
+      "kinds": [
+        "books",
+        "folders",
+        "notes",
+        "highlights",
+        "associations",
+        "translations",
+        "mindMaps",
+        "studySets",
+        "reviews",
+        "preferences",
+        "sources"
+      ],
+      "maxBatch": 100,
+      "maxBytes": 1048576,
+      "chunkSize": 262144
+    }
+  ],
+  "artifacts": {
+    "boot": "f08330006f57c9ab747cd17732e14bc4cfff6e986df326585ddb1f08e8d245e1"
+  },
+  "finishedAt": "2026-09-27T01:33:53.914Z"
+}

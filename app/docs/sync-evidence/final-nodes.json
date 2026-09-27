@@ -1,0 +1,74 @@
+[
+  {
+    "port": 3101,
+    "capabilities": {
+      "version": 2,
+      "workspaceId": "windows-linux-lab",
+      "nodeId": "windows-lab",
+      "epoch": "dfda6109-764c-40bd-ad3a-4b2f30d2afdd",
+      "kinds": [
+        "books",
+        "folders",
+        "notes",
+        "highlights",
+        "associations",
+        "translations",
+        "mindMaps",
+        "studySets",
+        "reviews",
+        "preferences",
+        "sources"
+      ],
+      "maxBatch": 100,
+      "maxBytes": 1048576,
+      "chunkSize": 262144
+    },
+    "status": {
+      "nodeId": "windows-lab",
+      "workspaceId": "windows-linux-lab",
+      "sequence": "316",
+      "peers": {
+        "linux-lab": {
+          "lastSuccess": "2026-09-27T01:35:51.084Z",
+          "failures": 0
+        }
+      }
+    }
+  },
+  {
+    "port": 3102,
+    "capabilities": {
+      "version": 2,
+      "workspaceId": "windows-linux-lab",
+      "nodeId": "linux-lab",
+      "epoch": "f22f2cb0-e2e9-45c4-8896-76b63c545e10",
+      "kinds": [
+        "books",
+        "folders",
+        "notes",
+        "highlights",
+        "associations",
+        "translations",
+        "mindMaps",
+        "studySets",
+        "reviews",
+        "preferences",
+        "sources"
+      ],
+      "maxBatch": 100,
+      "maxBytes": 1048576,
+      "chunkSize": 262144
+    },
+    "status": {
+      "nodeId": "linux-lab",
+      "workspaceId": "windows-linux-lab",
+      "sequence": "316",
+      "peers": {
+        "windows-lab": {
+          "lastSuccess": "2026-09-27T01:35:54.144Z",
+          "failures": 0
+        }
+      }
+    }
+  }
+]

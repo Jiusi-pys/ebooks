@@ -1,0 +1,65 @@
+{
+  "verifiedAt": "2026-09-27T00:56:06.737Z",
+  "nodes": [
+    {
+      "port": 3101,
+      "state": {
+        "id": "partition-20260927",
+        "kind": "notes",
+        "deleted": false,
+        "fields": {
+          "title": {
+            "version": "0001790470461698:0000000000:windows-partition:81aa4744-73cb-4098-9e8f-3b6103bdffde",
+            "value": "Windows partition title"
+          },
+          "createdAt": {
+            "version": "0001790470461698:0000000000:windows-partition:81aa4744-73cb-4098-9e8f-3b6103bdffde",
+            "value": 1790470461698
+          },
+          "updatedAt": {
+            "version": "0001790470461698:0000000000:windows-partition:81aa4744-73cb-4098-9e8f-3b6103bdffde",
+            "value": 1790470461698
+          },
+          "color": {
+            "version": "0001790470461735:0000000000:linux-partition:c92ea1f1-d52d-43ff-a7ea-92c679b7b48f",
+            "value": "blue"
+          },
+          "content": {
+            "version": "0001790470461735:0000000000:linux-partition:c92ea1f1-d52d-43ff-a7ea-92c679b7b48f",
+            "value": "Linux partition content"
+          }
+        }
+      }
+    },
+    {
+      "port": 3102,
+      "state": {
+        "id": "partition-20260927",
+        "kind": "notes",
+        "deleted": false,
+        "fields": {
+          "content": {
+            "version": "0001790470461735:0000000000:linux-partition:c92ea1f1-d52d-43ff-a7ea-92c679b7b48f",
+            "value": "Linux partition content"
+          },
+          "color": {
+            "version": "0001790470461735:0000000000:linux-partition:c92ea1f1-d52d-43ff-a7ea-92c679b7b48f",
+            "value": "blue"
+          },
+          "createdAt": {
+            "version": "0001790470461698:0000000000:windows-partition:81aa4744-73cb-4098-9e8f-3b6103bdffde",
+            "value": 1790470461698
+          },
+          "title": {
+            "version": "0001790470461698:0000000000:windows-partition:81aa4744-73cb-4098-9e8f-3b6103bdffde",
+            "value": "Windows partition title"
+          },
+          "updatedAt": {
+            "version": "0001790470461698:0000000000:windows-partition:81aa4744-73cb-4098-9e8f-3b6103bdffde",
+            "value": 1790470461698
+          }
+        }
+      }
+    }
+  ]
+}

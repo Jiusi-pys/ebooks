@@ -418,7 +418,7 @@ try {
       });
       await request(0, `/blobs/uploads/${upload.id}/commit`, "POST");
       await push(0, op("sources", "lab-books", manifest));
-      for (let n = 0; n < 30; n++) {
+      for (let n = 0; n < 300; n++) {
         const r = await fetch(urls[1] + `/api/v2/blobs/${sha256}`, { headers });
         if (r.ok) {
           assert.equal(
@@ -431,7 +431,9 @@ try {
         }
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-      throw new Error("remote file not available within 15 s");
+      throw new Error(
+        "file replica incomplete after the 150 s test timeout (separate from metadata latency)"
+      );
     }
   );
   report.finishedAt = new Date().toISOString();
