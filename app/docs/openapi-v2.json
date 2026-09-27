@@ -1012,7 +1012,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "pattern": "^[\\w.:-]+$"
+            "pattern": "^[\\p{L}\\p{M}\\p{N}_.:-]+$"
           },
           "clock": {
             "type": "string",

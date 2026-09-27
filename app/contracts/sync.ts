@@ -24,7 +24,11 @@ export const operationSchema = z
     operationId: identifier,
     replicaId: identifier,
     kind: z.enum(entityKinds),
-    entityId: identifier,
+    entityId: z
+      .string()
+      .min(1)
+      .max(128)
+      .regex(/^[\p{L}\p{M}\p{N}_.:-]+$/u),
     clock: z.string().regex(/^\d{1,16}:\d{1,10}$/),
     patch: z.record(z.string().min(1).max(256), z.json()),
     unset: z.array(z.string().min(1).max(256)).max(256).default([]),

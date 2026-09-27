@@ -9,6 +9,12 @@ import {
 } from "./sync";
 
 describe("replica convergence", () => {
+  it("preserves legacy translation IDs containing a language name", () => {
+    const id = "book:chapter:中文";
+    const op = makeOperation("w", "a", "translations", id, { text: "译文" });
+    expect(materialize(applyOperation(undefined, op))?.id).toBe(id);
+    expect(() => makeOperation("w", "a", "notes", "bad/id", {})).toThrow();
+  });
   it("merges a fixed snapshot without replacing unacknowledged local fields", () => {
     const local = applyOperation(
       undefined,

@@ -21,7 +21,7 @@ import {
 } from "./citations";
 
 export const SHUFANG_DB_NAME = "shufang";
-export const SHUFANG_DB_VERSION = 9;
+export const SHUFANG_DB_VERSION = 10;
 
 const SEED_MARKER_KEY = "example-library-v1";
 
@@ -75,33 +75,45 @@ function db() {
   if (!dbp) {
     const pending = openDB(SHUFANG_DB_NAME, SHUFANG_DB_VERSION, {
       upgrade(d, oldVersion, _newVersion, tx) {
-        if (oldVersion >= 6 && oldVersion < 9) {
+        if (d.objectStoreNames.contains("associations")) {
           const associations = tx.objectStore("associations");
-          associations.deleteIndex("by-pair");
-          associations.createIndex("by-pair", "pairKey");
+          if (
+            associations.indexNames.contains("by-pair") &&
+            associations.index("by-pair").unique
+          )
+            associations.deleteIndex("by-pair");
+          if (!associations.indexNames.contains("by-pair"))
+            associations.createIndex("by-pair", "pairKey");
         }
-        if (oldVersion < 8) upgradeSyncDatabase(d);
-        if (oldVersion < 1) {
+        // Repair incomplete historical schemas by presence, preserving all records.
+        upgradeSyncDatabase(d);
+        if (!d.objectStoreNames.contains("books")) {
           d.createObjectStore("books", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("notes")) {
           d.createObjectStore("notes", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("highlights")) {
           const hl = d.createObjectStore("highlights", { keyPath: "id" });
           hl.createIndex("by-book", "bookId");
         }
-        if (oldVersion < 2) {
+        if (!d.objectStoreNames.contains("folders")) {
           d.createObjectStore("folders", { keyPath: "id" });
         }
-        if (oldVersion < 3) {
+        if (!d.objectStoreNames.contains("translations")) {
           d.createObjectStore("translations", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("mindMaps")) {
           d.createObjectStore("mindMaps", { keyPath: "id" });
         }
-        if (oldVersion < 4) {
+        if (!d.objectStoreNames.contains("files")) {
           // 原始 PDF 文件（ArrayBuffer 或 Blob），原版阅读模式按需加载渲染
           d.createObjectStore("files", { keyPath: "id" });
         }
-        if (oldVersion < 5) {
+        if (!d.objectStoreNames.contains("studySets")) {
           d.createObjectStore("studySets", { keyPath: "id" });
         }
-        if (oldVersion < 6) {
+        if (!d.objectStoreNames.contains("associations")) {
           const associations = d.createObjectStore("associations", {
             keyPath: "id",
           });
@@ -109,7 +121,7 @@ function db() {
           associations.createIndex("by-target-book", "target.bookId");
           associations.createIndex("by-pair", "pairKey");
         }
-        if (oldVersion < 7) {
+        if (!d.objectStoreNames.contains("metadata")) {
           const metadata = d.createObjectStore("metadata", {
             keyPath: "key",
           });
