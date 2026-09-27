@@ -1,0 +1,57 @@
+{
+  "startedAt": "2026-09-27T09:17:15.448Z",
+  "transport": "HTTPS REST, production SSH tunnel stopped",
+  "checks": [
+    {
+      "name": "Windows to cloud metadata",
+      "passed": true,
+      "convergenceMs": 4955
+    },
+    {
+      "name": "https-0.txt",
+      "passed": true,
+      "sha256": "493bd8cac206705d486771ee5a1362fb525182675d911650f94f81ffe24da149",
+      "size": 312000,
+      "type": "text/plain",
+      "direction": "Windows to cloud file"
+    },
+    {
+      "name": "cloud to Windows metadata",
+      "passed": true,
+      "convergenceMs": 3771
+    },
+    {
+      "name": "https-1.txt",
+      "passed": true,
+      "sha256": "c3d5109874bbb65559b680b4947332c8c552c1159716934f12b2bee886db5f4d",
+      "size": 312000,
+      "type": "text/plain",
+      "direction": "cloud to Windows file"
+    },
+    {
+      "name": "bidirectional tombstones and temporary record cleanup",
+      "passed": true
+    }
+  ],
+  "status": [
+    {
+      "nodeId": "windows-personal",
+      "workspaceId": "personal-workspace",
+      "sequence": "92",
+      "peers": {
+        "linux-personal": {
+          "lastSuccess": "2026-09-27T09:18:03.580Z",
+          "failures": 0
+        }
+      }
+    },
+    {
+      "nodeId": "linux-personal",
+      "workspaceId": "personal-workspace",
+      "sequence": "92",
+      "peers": {}
+    }
+  ],
+  "finishedAt": "2026-09-27T09:18:04.677Z",
+  "sourceCommit": "60997bd"
+}
