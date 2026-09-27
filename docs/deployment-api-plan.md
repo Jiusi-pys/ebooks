@@ -39,3 +39,12 @@ maintenance procedure. The deployment API never accepts migration commands.
   status without deploying the older GitHub HEAD over local fixes.
 - Commit/push must include the preceding reader/digest fixes before the first
   automatic rollout, otherwise GitHub does not contain the currently live fixes.
+
+## Implementation status
+
+Implemented and first deployed in `cc952ae`. The first push workflow succeeded,
+and a subsequent manual main workflow verified the update API's same-SHA reuse.
+See [deployment acceptance](deployment-acceptance-20260927.md) for dated evidence.
+Database migration design now follows the mandatory append-only, archived-history
+and multi-version upgrade rules in the root AGENTS.md. No schema migration is
+introduced by this documentation/policy update.

@@ -1,0 +1,4 @@
+# Migration hashes must not vary between Windows and Linux checkouts.
+app/db/migrations/** text eol=lf
+app/db/migration-history/*.json text eol=lf
+app/db/migration-history/*.tar.gz binary

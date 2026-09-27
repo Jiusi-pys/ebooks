@@ -84,7 +84,9 @@ DeepSeek 当前提供 `deepseek-v4-flash`、`deepseek-v4-pro` 和 `deepseek-v4-f
 
 PDF、EPUB、MOBI/AZW/AZW3 与 FB2 单文件上限为 128 MB，TXT 上限为 64 MB。超过 600 页的 PDF 仍可完整使用原版阅读，但不会生成可能缺页的重排副本。
 
-空库和已有数据库都使用 `npm run db:migrate`：迁移会建立完整镜像结构、补齐引用层级与文段关联，并把 `mirror_books.chapters` 升级为 `LONGTEXT`。为支持最大 96 MB 的分块正文镜像，MySQL 的 `max_allowed_packet` 应设置为 `256M`。最新迁移 `0013_confused_amphibian` 新增阅读状态、原文件清单及 `library_source_chunks` 分块存储；原文件接口支持 256 MiB，但浏览器导入仍受上方格式限制。升级现有生产库前先备份；`ALTER TABLE` 在大表上可能短暂锁表。
+空库和已有数据库都使用 `npm run db:migrate`：迁移会建立完整镜像结构、补齐引用层级与文段关联，并把 `mirror_books.chapters` 升级为 `LONGTEXT`。为支持最大 96 MB 的分块正文镜像，MySQL 的 `max_allowed_packet` 应设置为 `256M`。迁移 `0013_confused_amphibian` 新增阅读状态、原文件清单及 `library_source_chunks` 分块存储；最新迁移 `0014_workspace_sync` 新增工作区同步表。原文件接口支持 256 MiB，但浏览器导入仍受上方格式限制。升级现有生产库前先备份；`ALTER TABLE` 在大表上可能短暂锁表。
+
+多端异步更新必须保留完整历史迁移链，一次补齐所有尚未应用的版本；禁止删除或改写已发布 SQL/journal，禁止对生产使用 `db:push`。迁移独立归档、校验清单及恢复方式见 [迁移历史备份](db/migration-history/README.md)，强制规则见 [AGENTS.md](../AGENTS.md)。us 服务器通过 [GitHub Actions 与更新 API](../deploy/README.md) 自动部署；应用容器回滚不会撤销数据库迁移。
 
 完整的部署、备份和故障排查说明见根目录 [中文 README](../README_zh.md) 与 [English README](../README.md)。跨网络访问必须部署 Node 服务并连接同一持久化数据库，不能只部署静态前端。
 

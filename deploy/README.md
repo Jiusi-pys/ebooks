@@ -49,7 +49,21 @@
 - Secret 轮换：同步更新 deploy.env 与 GitHub Secret，确认无任务后重启服务。
 - 自动更新只接受固定仓库 main 最新 SHA；该分支的写权限即生产发布权限。
 
-## 验证
+## 多端数据库迁移与历史备份
+
+数据库改动必须遵守根目录 [AGENTS.md](../AGENTS.md) 的强制迁移规则。
+当前 MySQL 迁移链为 `0000–0014_workspace_sync`；镜像携带完整 SQL/journal，
+更新时先执行 `node dist/migrate.js`，一次补齐本节点尚未应用的中间版本。
+不能用 `db:push` 或仅执行最新 SQL 替代该过程。
+
+独立历史归档及 SHA-256 清单保存在
+[`app/db/migration-history/`](../app/db/migration-history/README.md)，后续迁移
+须追加新的完整归档，保留旧归档。发布前另行备份数据库与原文件；此更新 API
+不会自动生成数据库数据备份，也不会回滚已经执行的数据库迁移。
+
+最新实测结果见 [2026-09-27 验收记录](../docs/deployment-acceptance-20260927.md)。
+
+## 验证命令
 
 仓库根目录运行 `python -m unittest discover -s deploy -p 'test_*.py'`。
 `app/` 下运行 `npm run check`、`npm run lint`、`npm test`、`npm run build`。

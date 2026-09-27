@@ -194,7 +194,7 @@ See [migration, deployment, and backup/recovery](app/docs/workspace-sync.md).
 - Shared workspace: `personal-workspace`; separate databases and file replicas.
 - Transport: outbound HTTPS REST push/pull from Windows; cloud
   `SYNC_PEERS_JSON=[]`. SSH is only a test/deployment-management tool.
-- Runtime synchronization release: `60997bd`. At the 18:11 Asia/Shanghai check,
+- Historical synchronization acceptance release: `60997bd`. At the 18:11 Asia/Shanghai check,
   both nodes reported sequence `137`; Windows reported zero replication failures.
   These counters are a dated observation and increase with subsequent edits.
 - Real HTTPS acceptance: 4,955 ms Windows → cloud and 3,771 ms cloud → Windows
@@ -205,6 +205,13 @@ See [migration, deployment, and backup/recovery](app/docs/workspace-sync.md).
 - Tests at that release: 479 passed, 15 optional integration tests skipped.
   Windows process auto-start/supervision and native iOS/Xcode verification remain
   pending. Windows Node and Docker/MySQL must stay running; no webhook is required.
+
+Cloud application updates now use GitHub Actions and the authenticated deployment
+REST API. Release `cc952ae` was deployed successfully from GitHub, with 490 tests
+passing and 15 skipped, plus 10 deployment supervisor tests. The current live
+revision is the container label `org.opencontainers.image.revision`; do not infer
+it from the earlier synchronization acceptance release. See the
+[deployment instructions](deploy/README.md) and [latest acceptance record](docs/deployment-acceptance-20260927.md).
 
 ## Requirements
 
@@ -376,10 +383,14 @@ on the installation method.
 
 Before updating an existing installation, back up the database and always run
 `npm run db:migrate` rather than `db:push`. The committed migration sequence is
-forward-only through `0013_confused_amphibian`. Migration 0013 adds
+forward-only through `0014_workspace_sync`. Migration 0013 adds
 `mirror_books.reader_data`, `mirror_books.source_manifest`, and
 `library_source_chunks` for reading state and original files. The migration
-runner skips migrations already recorded as applied.
+runner skips migrations already recorded as applied. Migration 0014 adds the
+workspace replication tables. All intermediate SQL files and journal entries
+must remain available so a lagging node can apply every pending migration in one
+update. Published migrations are append-only; see the mandatory rules in
+[AGENTS.md](AGENTS.md) and [immutable migration backups](app/db/migration-history/README.md).
 
 ## Environment Configuration
 
@@ -696,6 +707,14 @@ fails fast when `DATABASE_URL` is missing. `APP_ID` and `APP_SECRET` are also
 needed only for the first login while the user table is empty.
 
 ### Server administrator installation and updates
+
+For `us.jiusi.org`, push to `main`: [the GitHub workflow](.github/workflows/deploy.yml)
+runs checks and calls `POST /api/deploy`. The separate supervisor fetches the exact
+commit, builds an image, applies pending migrations, switches containers and checks
+readiness. Failed candidate startup restores the previous container; database
+migrations are not undone. Credentials and runtime data remain server-local.
+See [API, status and recovery instructions](deploy/README.md). The manual procedure
+below remains available for other independently deployed nodes.
 
 Administrators do not need Codex or Claude Code. Install Git, Node.js 22.13+
 and MySQL on the server, then clone this repository and configure `app/.env`.
