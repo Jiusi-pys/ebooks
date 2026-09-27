@@ -33,7 +33,6 @@ import { LoginView } from "@/components/LoginView";
 import { FirstRunSetupView } from "@/components/FirstRunSetupView";
 import type { AccountUpdateInput } from "@/components/AccountSettingsDialog";
 import { useAppSession } from "@/lib/appAuth";
-import { SyncStatus } from "@/components/SyncStatus";
 
 export default function App() {
   const auth = useAppSession();
@@ -348,7 +347,6 @@ function WorkspaceApp({
         </div>
       </main>
       <ImportTray lib={lib} />
-      <SyncStatus />
     </div>
   );
 }

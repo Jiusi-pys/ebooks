@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useSearchEngine } from "@/lib/searchEngine";
+import { SyncStatus } from "./SyncStatus";
 
 /** Local, application-wide preferences that are independent of an account. */
 export function AppSettingsDialog({
@@ -19,7 +20,7 @@ export function AppSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm rounded-[22px] bg-card">
+      <DialogContent className="max-h-[85vh] max-w-sm overflow-y-auto rounded-[22px] bg-card">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-[16px]">
             <Search size={18} className="text-primary" /> 应用设置
@@ -47,6 +48,7 @@ export function AppSettingsDialog({
             ))}
           </div>
         </section>
+        {open && <SyncStatus />}
         <section className="border-t border-border pt-4">
           <h3 className="flex items-center gap-1.5 text-[13px] font-medium">
             <Keyboard size={14} className="text-primary" /> 快捷键说明

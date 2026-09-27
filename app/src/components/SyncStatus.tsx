@@ -46,8 +46,9 @@ export function SyncStatus() {
   }, []);
   if (!text) return null;
   return (
-    <details className="fixed bottom-3 right-3 z-50 max-w-sm rounded border bg-background p-2 text-xs shadow">
-      <summary className="cursor-pointer">同步：{text}</summary>
+    <details className="border-t border-border pt-4 text-xs">
+      <summary className="cursor-pointer text-[13px] font-medium">同步与离线书籍</summary>
+      <p className="mt-2 text-muted-foreground">{text}</p>
       <pre className="my-2 whitespace-pre-wrap">{detail}</pre>
       <button
         className="underline"
