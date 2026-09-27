@@ -42,6 +42,43 @@ describe("AppSettingsDialog automatic startup", () => {
     host.remove();
   });
 
+  it("explains that Docker manages startup for container deployments", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              supported: false,
+              installed: false,
+              enabled: false,
+              platform: "linux",
+              reason: "managed_externally",
+            })
+          )
+      )
+    );
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(
+        createElement(AppSettingsDialog, {
+          open: true,
+          onOpenChange: vi.fn(),
+        })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.body.textContent).toContain("由 Docker 管理");
+    expect(document.body.textContent).toContain("自动重启策略");
+
+    await act(async () => root.unmount());
+    host.remove();
+  });
+
   it("lets the user switch an installed startup task on or off", async () => {
     let enabled = false;
     const fetchMock = vi.fn(

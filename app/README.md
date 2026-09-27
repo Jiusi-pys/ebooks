@@ -59,7 +59,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-autostart.ps1
 sh scripts/install-autostart.sh
 ```
 
-Windows 使用任务计划程序的“用户登录时”触发器；Linux 使用 systemd 用户服务，用户登录后启动。首次安装后，应用设置中的“登录时自动启动”可以切换已安装任务的启用状态。切换只影响后续登录，不会停止当前运行的服务。该功能只管理当前应用运行账户自己的任务，不需要管理员权限；Linux 系统需提供 systemd user manager。更换应用目录或环境文件后需重新运行对应安装脚本。容器部署设置 `AUTO_START_MANAGED=false`，继续由 Docker 的 restart policy 管理，不使用这里的本机登录启动项。
+Windows 使用任务计划程序的“用户登录时”触发器；Linux 使用 systemd 用户服务，用户登录后启动。首次安装后，应用设置中的“登录时自动启动”可以切换已安装任务的启用状态。切换只影响后续登录，不会停止当前运行的服务。该功能只管理当前应用运行账户自己的任务，不需要管理员权限；Linux 系统需提供 systemd user manager。更换应用目录或环境文件后需重新运行对应安装脚本。容器部署设置 `AUTO_START_MANAGED=false`，继续由 Docker 的 restart policy 管理，不使用这里的本机登录启动项；界面会明确显示“由 Docker 管理”，而不是将其报告为不支持的平台。
 
 状态由登录保护的 `GET /api/autostart/status` 读取；修改使用受同源保护的 `POST` 请求。Windows 检查命令为 `Get-ScheduledTask -TaskName ShufangBookManager`，Linux 可运行 `systemctl --user status shufang-book-manager.service`。如果界面显示“尚未安装启动项”，请确认脚本在运行服务的同一 OS 用户下执行，并重新打开应用设置。若要卸载，Windows 执行 `Unregister-ScheduledTask -TaskName ShufangBookManager`；Linux 执行 `systemctl --user disable --now shufang-book-manager.service`，再删除 `~/.config/systemd/user/shufang-book-manager.service` 并运行 `systemctl --user daemon-reload`。
 

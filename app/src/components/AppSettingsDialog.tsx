@@ -14,6 +14,7 @@ interface AutoStartState {
   installed: boolean;
   enabled: boolean;
   platform: "windows" | "linux" | "unsupported";
+  reason?: "managed_externally" | "unsupported_platform";
 }
 
 /** Local, application-wide preferences that are independent of an account. */
@@ -131,6 +132,12 @@ export function AppSettingsDialog({
                 )}
               </span>
             </button>
+          ) : autoStart?.reason === "managed_externally" ? (
+            <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+              <span className="font-medium text-foreground">由 Docker 管理。</span>
+              此实例的容器使用 Docker 自动重启策略恢复服务，应用更新由 GitHub
+              Actions 部署；本页不能更改宿主机的容器策略。
+            </p>
           ) : autoStart?.supported ? (
             <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
               尚未安装启动项。请在项目的 app 目录运行{" "}
@@ -141,9 +148,9 @@ export function AppSettingsDialog({
               </code>
               ，安装时可选择是否启用，然后重新打开此设置。
             </p>
-          ) : autoStart ? (
+          ) : autoStart?.reason === "unsupported_platform" ? (
             <p className="mt-2 text-[11px] text-muted-foreground">
-              当前运行平台或部署方式不支持在应用内切换自动启动；容器部署由宿主机的重启策略管理。
+              当前运行平台不支持在应用内管理自动启动。
             </p>
           ) : null}
           {autoStartError && (

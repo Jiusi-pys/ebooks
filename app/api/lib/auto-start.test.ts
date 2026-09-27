@@ -88,6 +88,7 @@ describe("auto-start manager", () => {
       supported: false,
       installed: false,
       enabled: false,
+      reason: "unsupported_platform",
     });
     expect(run).not.toHaveBeenCalled();
   });
@@ -100,6 +101,7 @@ describe("auto-start manager", () => {
       supported: false,
       installed: false,
       enabled: false,
+      reason: "managed_externally",
     });
     expect(run).not.toHaveBeenCalled();
   });

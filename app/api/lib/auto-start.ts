@@ -9,6 +9,7 @@ export interface AutoStartState {
   installed: boolean;
   enabled: boolean;
   platform: "windows" | "linux" | "unsupported";
+  reason?: "managed_externally" | "unsupported_platform";
 }
 
 type Platform = string;
@@ -38,12 +39,21 @@ export function createAutoStartManager(
   const name = platformName(platform);
 
   async function status(): Promise<AutoStartState> {
-    if (name === "unsupported" || !managed)
+    if (name === "unsupported")
       return {
         supported: false,
         installed: false,
         enabled: false,
         platform: name,
+        reason: "unsupported_platform",
+      };
+    if (!managed)
+      return {
+        supported: false,
+        installed: false,
+        enabled: false,
+        platform: name,
+        reason: "managed_externally",
       };
 
     if (name === "linux") {
