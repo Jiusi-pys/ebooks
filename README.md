@@ -31,10 +31,9 @@ extensions are outside the current web scope.
 - Edit catalogue metadata such as title, contributors, publisher, publication
   date, languages, identifiers, series, subjects, description, edition, and
   rights, and mirror it to MySQL without rewriting the source ebook file.
-- Keep local IndexedDB and the MySQL mirror consistent across book,
-  note, highlight, citation, association, and digest deletion. Event receipts,
-  tombstones, transactional citation cleanup, and forward-only migrations make
-  late browser events safe to retry.
+- Synchronize browser IndexedDB and independent Windows/Linux MySQL workspaces
+  through v2 operations, persistent receipts, field versions, and tombstones.
+  HTTPS REST transfers metadata and complete file replicas in both directions.
 - Create editable mind maps, review cards, and spaced-repetition queues.
 - Use Codex through a local ChatGPT login, or select the optional DeepSeek API
   provider from the AI settings panel.
@@ -144,36 +143,59 @@ app/
 └── verifier/     Historical acceptance criteria and run records
 ```
 
-MySQL stores the book library: metadata, parsed chapters (including footnotes),
-covers, editable outlines, reading progress, reader mode, and original files.
-Browser IndexedDB is a local cache. After login, the browser uploads older local-only
-books and restores the server library, including original PDFs for original-layout
-reading. New imports upload originals for every supported format in 256 KiB chunks
-(up to 256 MiB per file); byte count and SHA-256 are verified before publication.
-An import is complete only after its server writes succeed. Failed uploads keep
-the local copy and show a retry action; queued reading-state edits retry every five
-seconds while the app is open. Reopening the app or reconnecting also reconciles
-the library. Server deletion tombstones prevent stale caches resurrecting books.
+With `SYNC_ENABLED=true`, each server has its **own MySQL database** and
+SHA-256 content-addressed file directory (`SYNC_BLOB_DIR`). MySQL stores entity
+state, field versions, operation history, tombstones, receipts, and replication
+checkpoints. Original files and large derived content live in the file directory;
+back up **both the database and this directory**. Mount the directory persistently
+when using Docker. Accounts, passwords, sessions, and API keys do not replicate.
 
-Use **同步到 MySQL** below the library heading (also available inside folders)
-to manually synchronize books and flush pending reading-state edits. The button
-is disabled during imports and synchronization. A successful server response
-displays **书籍已保存到 MySQL** with a timestamp; failures retain local data and
-allow retry. This action covers the book library, not all workspace tools.
+IndexedDB is an offline replica with a transactional outbox. Books, folders,
+notes, excerpts/citations, associations, translations, mind maps, study sets,
+review events, reading state, and allowlisted preferences synchronize through
+`/api/v2`. The current browser schema is **v10**, which repairs missing stores
+without clearing existing records. Unsent edits survive snapshot merges;
+late operations cannot resurrect deleted entities. Restore creates a new ID.
 
-Older EPUB/MOBI/AZW3/FB2/TXT imports did not retain original files: their existing
-chapters, covers and reading state can migrate, but missing originals require
-reimporting the source. Leave the original browser open until migration succeeds
-before clearing its cache. Notes and other workspace tools retain their existing
-storage behavior; this library restoration does not restore every workspace tool.
+Windows can initiate **both push and pull over HTTPS REST** to a public server;
+no inbound Windows port or SSH tunnel is needed. Operations and file transfers
+retry independently. Files use 256 KiB chunks, resumable sessions, and SHA-256
+validation, with a server limit of 256 MiB per original file. Browser import
+limits are listed below. Browser replicas download originals on demand and can
+pin books for offline use.
 
-For access across browsers or networks, deploy the Node server and frontend under
-one HTTPS origin, configure `PUBLIC_ORIGIN` and secure session cookies, and point
-`DATABASE_URL` at the same persistent MySQL database. Run `npm run db:migrate`
-before starting the updated server. A static-only frontend cannot provide library
-persistence. Back up MySQL, including `mirror_books` and `library_source_chunks`;
-original files are stored in the database, not on the web server's local disk.
-Separate deployments only share a library when they share this database.
+Open **应用设置 → 同步与离线书籍** (App settings → Sync and offline books) for
+pending changes, upload/download state, peer status, manual synchronization, and
+offline pinning. There is no permanent bottom status badge. “当前节点已确认”
+means the current server acknowledged browser edits; verify the other node's
+content and file state before treating it as a second complete replica. Keep
+the original browser open until its pending work finishes.
+
+When `SYNC_ENABLED=false`, the older MySQL mirror/library endpoints remain
+available. Enabling v2 imports their existing data and validates original-file
+chunks before switching references; old records are retained. Old imports that
+never saved originals require reimporting the source file. Do not disable v2 as
+a rollback shortcut: new v2 edits are not copied back into the legacy tables.
+See [migration, deployment, and backup/recovery](app/docs/workspace-sync.md).
+
+### Verified deployment status — 2026-09-27
+
+- Windows: `http://127.0.0.1:3000`, node `windows-personal`.
+- Cloud: `https://us.jiusi.org`, node `linux-personal`.
+- Shared workspace: `personal-workspace`; separate databases and file replicas.
+- Transport: outbound HTTPS REST push/pull from Windows; cloud
+  `SYNC_PEERS_JSON=[]`. SSH is only a test/deployment-management tool.
+- Runtime synchronization release: `60997bd`. At the 18:11 Asia/Shanghai check,
+  both nodes reported sequence `137`; Windows reported zero replication failures.
+  These counters are a dated observation and increase with subsequent edits.
+- Real HTTPS acceptance: 4,955 ms Windows → cloud and 3,771 ms cloud → Windows
+  metadata visibility; cross-chunk file checksums matched in both directions.
+  See [acceptance report](app/docs/sync-https-acceptance.md).
+- Pairing was checked at 18:11: token issuance `201`, authenticated access `200`,
+  revocation `200`, revoked-token access `401`. The temporary credential was revoked.
+- Tests at that release: 479 passed, 15 optional integration tests skipped.
+  Windows process auto-start/supervision and native iOS/Xcode verification remain
+  pending. Windows Node and Docker/MySQL must stay running; no webhook is required.
 
 ## Requirements
 
@@ -404,7 +426,13 @@ openssl rand -hex 32
 | `PUBLIC_ORIGIN`         | Exact external origin behind a trusted TLS proxy, with no path             |
 | `SESSION_TTL_SECONDS`   | Session lifetime, clamped to 300–604800 seconds                            |
 | `SESSION_COOKIE_SECURE` | Force the session cookie's `Secure` flag                                   |
-| `OPEN_API_KEY`          | Key for `/api/v1/*` machine clients; blank disables the machine API        |
+| `OPEN_API_KEY`          | Owner key for machine APIs and v2 credential issuance; distinct from node tokens |
+| `SYNC_ENABLED`          | Enable v2 workspace replication (`false` by default) |
+| `SYNC_WORKSPACE_ID`     | Same workspace ID on paired servers |
+| `SYNC_NODE_ID`          | Stable, unique identity for this database; different on each server |
+| `SYNC_BLOB_DIR`         | Persistent SHA-256 file directory; include in backups |
+| `SYNC_PEERS_JSON`       | Array of target `{id,url,token}` objects; `[]` for passive cloud nodes |
+| `AUTO_UPDATE_*`         | Optional daily Git updater; keep disabled during controlled migrations |
 | `CODEX_*`               | Codex executable, default model/effort, and timeouts                       |
 | `DEEPSEEK_*`            | Optional DeepSeek key and timeout                                          |
 
@@ -425,8 +453,166 @@ Upgrading an existing installation: keep the old `APP_SECRET`, configure and
 persist `APP_DATA_SECRET`, restart, then sign out and sign in once. A successful
 database login automatically re-encrypts the username with the new data key;
 after that migration, the bootstrap secret may be rotated or removed. Keep
-`OPEN_API_KEY` separate from login credentials; when blank, protected machine
-routes return `503` and remain disabled.
+`OPEN_API_KEY` separate from login credentials. When blank, owner-key machine
+access is disabled; already-issued workspace node tokens remain independent.
+
+## HTTPS Workspace Sync: Configure URL, Obtain ID and Token
+
+Windows can push and pull through the cloud's public HTTPS API. It does not need
+a public address or an incoming connection. The cloud may keep
+`SYNC_PEERS_JSON=[]`; an empty cloud peer-status object is expected in this mode.
+SSH tunnels are unnecessary. Webhooks are not currently implemented; periodic
+REST exchange also recovers changes missed while either node was offline.
+
+### 1. Configure the two nodes
+
+Example cloud environment (persist the database and file directory):
+
+```dotenv
+SYNC_ENABLED=true
+SYNC_WORKSPACE_ID=personal-workspace
+SYNC_NODE_ID=linux-personal
+SYNC_BLOB_DIR=/app/.runtime/blobs/personal-workspace
+SYNC_PEERS_JSON=[]
+OPEN_API_KEY=<independent-long-random-owner-key>
+AUTO_UPDATE_ENABLED=false
+```
+
+Example Windows `app/.env`, before pairing:
+
+```dotenv
+SYNC_ENABLED=true
+SYNC_WORKSPACE_ID=personal-workspace
+SYNC_NODE_ID=windows-personal
+SYNC_BLOB_DIR=.runtime/production/blobs
+SYNC_PEERS_JSON=[]
+AUTO_UPDATE_ENABLED=false
+```
+
+Keep the existing database, login, and encryption configuration. Apply migrations
+and restart after changing environment variables. Both servers must use the same
+workspace, with different stable node IDs. Do not rename an existing database's
+node/workspace to turn it into a new replica. The cloud owner configures
+`OPEN_API_KEY` in its protected environment (currently `/opt/shufang/.env.sync`
+on `us.jiusi.org`); it cannot be retrieved through an API. If absent, set it and
+restart the cloud first. It is separate from the account password and `APP_SECRET`.
+
+### 2. Obtain the target ID and issue a token
+
+| Value | Where to obtain it | Where to use it |
+| --- | --- | --- |
+| Target node ID | `GET /api/v2/capabilities` → `nodeId` | `SYNC_PEERS_JSON[].id` |
+| Workspace ID | Same response → `workspaceId` | Matching `SYNC_WORKSPACE_ID` and request header |
+| Credential label | Chosen in `POST /api/v2/peers` → `id` | Later credential revocation; **not** the target node ID |
+| Node token | `POST /api/v2/peers` → `token` | `SYNC_PEERS_JSON[].token` and bearer authentication |
+
+Run the following in PowerShell from `app/`, after configuring the local
+environment above. Enter the **target cloud's owner key** when prompted. This
+creates a fresh credential, checks it, and updates only `SYNC_PEERS_JSON` in
+the local `.env`. It does not print the key or token. Keep the displayed
+credential label for revocation. Pairing replaces the local peer list with this
+single target; preserve additional peers separately if you use more than one.
+
+```powershell
+$ErrorActionPreference = "Stop"
+$remote = "https://us.jiusi.org".TrimEnd('/')
+$envPath = (Resolve-Path -LiteralPath .env).Path
+$secureKey = Read-Host "Target server OPEN_API_KEY" -AsSecureString
+$ownerKey = [Net.NetworkCredential]::new("", $secureKey).Password
+$ownerHeaders = @{ "X-API-Key" = $ownerKey }
+$caps = Invoke-RestMethod "$remote/api/v2/capabilities" `
+  -Headers $ownerHeaders -MaximumRedirection 0 -TimeoutSec 30
+if ($caps.version -ne 2) { throw "Target must support protocol v2" }
+$workspaceLine = @(Get-Content -LiteralPath $envPath -Encoding UTF8 | Where-Object {
+  $_ -match '^\s*SYNC_WORKSPACE_ID\s*='
+})
+if ($workspaceLine.Count -ne 1) { throw "Set one SYNC_WORKSPACE_ID in .env first" }
+$localWorkspace = ($workspaceLine[0] -split '=', 2)[1].Trim().Trim('"').Trim("'")
+if ($localWorkspace -ne $caps.workspaceId) {
+  throw "Workspace mismatch: target is $($caps.workspaceId); inspect configuration first"
+}
+$credentialId = "windows-pair-" + [Guid]::NewGuid().ToString("N")
+$body = @{ id = $credentialId } | ConvertTo-Json -Compress
+$issued = Invoke-RestMethod "$remote/api/v2/peers" -Method Post `
+  -Headers $ownerHeaders -ContentType "application/json" -Body $body `
+  -MaximumRedirection 0 -TimeoutSec 30
+$nodeHeaders = @{
+  Authorization = "Bearer $($issued.token)"
+  "X-Workspace-Id" = $caps.workspaceId
+}
+$verified = Invoke-RestMethod "$remote/api/v2/capabilities" `
+  -Headers $nodeHeaders -MaximumRedirection 0 -TimeoutSec 30
+if ($verified.nodeId -ne $caps.nodeId) { throw "Target identity changed" }
+$peerJson = ConvertTo-Json -InputObject @(@{
+  id = $caps.nodeId; url = $remote; token = $issued.token
+}) -Compress
+$lines = @(Get-Content -LiteralPath $envPath -Encoding UTF8 | Where-Object {
+  $_ -notmatch '^\s*SYNC_PEERS_JSON\s*='
+})
+[IO.File]::WriteAllLines($envPath,
+  [string[]]($lines + "SYNC_PEERS_JSON=$peerJson"),
+  [Text.UTF8Encoding]::new($false))
+Write-Host "Target: $($caps.nodeId); workspace: $($caps.workspaceId)"
+Write-Host "Credential label (save for revocation): $credentialId"
+Remove-Variable secureKey, ownerKey, ownerHeaders, issued, nodeHeaders, peerJson
+```
+
+The resulting setting has this shape (use actual values from the API):
+
+```dotenv
+SYNC_PEERS_JSON=[{"id":"linux-personal","url":"https://us.jiusi.org","token":"<issued-token>"}]
+```
+
+Use the server root URL, without `/api/v2`, a query, or a fragment. Keep `.env`
+private and out of Git. The server stores only a token digest: plaintext is
+returned at issuance, not through a later retrieval endpoint. If lost, issue a
+fresh credential and revoke the old one. Reissuing the **same credential label**
+replaces its token immediately; fresh labels avoid interrupting existing peers.
+
+Restart the local service to load the setting. For the native Windows deployment,
+after stopping its existing Node process and with `dist/` built:
+
+```powershell
+powershell -File scripts/start-sync-windows.ps1 -EnvFile .env
+```
+
+Do not start a second process on port 3000. Keep Node and MySQL running.
+
+### 3. Check synchronization, replace a server, or revoke access
+
+Open **应用设置 → 同步与离线书籍** on both browsers. The Windows peer should show
+recent success without errors. Authenticated `GET /api/v2/status` reports node,
+workspace, sequence, and outgoing peer state. Equal sequence numbers alone do
+not prove data equality: create a small item on each side and confirm it appears
+on the other, then check file availability separately. See the dated
+[HTTPS acceptance report](app/docs/sync-https-acceptance.md) for real two-node
+results, and [the synchronization guide](app/docs/workspace-sync.md) for protocol,
+backup, and recovery details.
+
+To change only the hostname of the same server/database, update the peer `url`
+in `.env` and restart Windows. For a replacement node, configure its persistent
+storage and workspace first, then repeat pairing against its HTTPS URL to obtain
+its actual node ID and a new token. Preserve the previous database and files
+until the new replica has caught up; changing a URL alone does not migrate data.
+
+To revoke a credential, authenticate with the target's owner key and use the
+**credential label saved above**, not `linux-personal`:
+
+```powershell
+$remote = "https://us.jiusi.org"
+$credentialId = Read-Host "Credential label to revoke"
+$secureKey = Read-Host "Target server OPEN_API_KEY" -AsSecureString
+$ownerHeaders = @{ "X-API-Key" = [Net.NetworkCredential]::new("", $secureKey).Password }
+$escapedId = [Uri]::EscapeDataString($credentialId)
+Invoke-RestMethod "$remote/api/v2/peers/$escapedId" -Method Delete `
+  -Headers $ownerHeaders -MaximumRedirection 0 -TimeoutSec 30
+Remove-Variable secureKey, ownerHeaders
+```
+
+Revoked tokens receive `401`; the affected sender needs a fresh token and restart.
+Owner-only pairing rejects node-token credentials. An incorrect workspace header
+also rejects node access. If a pairing command fails after issuance, revoke its
+new credential label before retrying to avoid leaving unused credentials active.
 
 ## Codex with ChatGPT Login (No OpenAI API Key)
 
@@ -558,10 +744,13 @@ docker build -t shufang ./app
 docker run --rm --name shufang \
   -p 127.0.0.1:3000:3000 \
   --env-file app/.env \
+  -v shufang-runtime:/app/.runtime \
   -e HOST=0.0.0.0 \
   shufang
 ```
 
+Keep `SYNC_BLOB_DIR` under `/app/.runtime` to persist files in the named volume.
+Back up that volume together with MySQL; neither alone is a complete workspace.
 `DATABASE_URL` must point to a MySQL address reachable from the container
 (`host.docker.internal` is commonly available with Docker Desktop). The image
 does not install Codex or copy its credential store. Prefer the local Node.js
@@ -570,7 +759,12 @@ credential store at runtime without baking credentials into the image.
 
 ## Open API
 
-`GET /api/v1/` returns the machine-readable endpoint directory. All resource
+`GET /api/v2/openapi.json` exposes the authenticated workspace-sync contract;
+a checked-in copy is [available here](app/docs/openapi-v2.json). See the pairing
+section above for owner versus node credentials. `/api/v1` and `/api/library`
+remain compatibility endpoints and use the unified store when v2 is enabled.
+
+`GET /api/v1/` returns the legacy machine-readable endpoint directory. All resource
 routes require either `X-API-Key: <OPEN_API_KEY>` or
 `Authorization: Bearer <OPEN_API_KEY>`. The API covers books and chapters,
 highlights, review cards, associations, notes, folders, translations, mind maps,
@@ -611,10 +805,14 @@ See [`AGENTS.md`](AGENTS.md) for contributor conventions.
 
 ## Troubleshooting
 
-- **Books are missing in another browser:** confirm both browsers use the same
-  deployed service/database, then click **同步到 MySQL** in the original browser
-  and wait for success before reopening the other browser. Keep old caches until
-  migration completes; source files absent from old caches require reimport.
+- **Changes are missing on the other node:** open **应用设置 → 同步与离线书籍**,
+  finish browser pending work, and check the peer error/last-success time. Confirm
+  the target URL, workspace, node ID, and token; restart the Node process after
+  changing `.env`. Passive cloud `peers={}` is expected. Compare actual records
+  and files on both nodes; matching sequence counts alone are not proof.
+- **IndexedDB object store not found:** refresh to load the v10 repair migration;
+  close older tabs if they block the upgrade. Do not clear browser storage: it may
+  contain the only copy of unsent edits or original files.
 
 - **PowerShell blocks `npm.ps1`:** use `npm.cmd` and `npx.cmd`; no execution-policy
   change is required.
