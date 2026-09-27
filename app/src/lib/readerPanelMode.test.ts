@@ -4,6 +4,7 @@ import {
   loadReaderPanelMode,
   parseReaderPanelMode,
   readerPanelIsVisible,
+  readerPanelModeForPaneLayout,
   readerPanelOccupiesLayout,
   readerPanelReservesLayout,
   READER_PANEL_MODE_STORAGE_KEY,
@@ -55,6 +56,12 @@ describe("reader right panel mode", () => {
     expect(readerPanelOccupiesLayout("pinned", true)).toBe(true);
     expect(readerPanelOccupiesLayout("auto", true)).toBe(false);
     expect(readerPanelOccupiesLayout("pinned", false)).toBe(false);
+  });
+
+  it("keeps split pane panels local without changing the saved global mode", () => {
+    expect(readerPanelModeForPaneLayout("pinned", true)).toBe("auto");
+    expect(readerPanelModeForPaneLayout("auto", true)).toBe("auto");
+    expect(readerPanelModeForPaneLayout("pinned", false)).toBe("pinned");
   });
 
   it("keeps a transient overlay reachable on narrow and auto modes", () => {

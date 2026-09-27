@@ -3,6 +3,8 @@ import {
   MAIN_READER_PANE,
   closeReferencePane,
   countReaderPanes,
+  routeForSplitTarget,
+  splitTargetFromRoute,
   splitReaderPane,
   updateReferencePane,
 } from "./splitLayout";
@@ -25,6 +27,53 @@ describe("reader split layout", () => {
       kind: "split",
       direction: "horizontal",
       second: { kind: "split", direction: "vertical" },
+    });
+  });
+
+  it("keeps each pane's route and jump anchors independent from the main reader", () => {
+    const mainRoute = {
+      view: "reader" as const,
+      bookId: "main-book",
+      chapterId: "main-chapter",
+      highlightId: "main-highlight",
+      outlineParaIndex: 8,
+    };
+    const target = {
+      bookId: "pane-book",
+      chapterId: "pane-chapter",
+      route: { studySetId: "set-1", highlightId: "pane-highlight" },
+    };
+
+    expect(routeForSplitTarget(mainRoute, target)).toMatchObject({
+      view: "reader",
+      bookId: "pane-book",
+      chapterId: "pane-chapter",
+      studySetId: "set-1",
+      highlightId: "pane-highlight",
+      outlineParaIndex: undefined,
+    });
+    expect(
+      splitTargetFromRoute(
+        {
+          view: "reader",
+          bookId: "pane-book",
+          chapterId: "next-chapter",
+          studySetId: "set-1",
+          highlightId: "selected-highlight",
+        },
+        "fallback"
+      )
+    ).toEqual({
+      bookId: "pane-book",
+      chapterId: "next-chapter",
+      route: {
+        studySetId: "set-1",
+        highlightId: "selected-highlight",
+        anchorText: undefined,
+        passageAnchor: undefined,
+        outlineParaIndex: undefined,
+        outlineNavigationKey: undefined,
+      },
     });
   });
 

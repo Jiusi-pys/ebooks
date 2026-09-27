@@ -1,5 +1,13 @@
 import * as Popover from "@radix-ui/react-popover";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { createPortal } from "react-dom";
 import {
   BookOpenText,
   ChevronLeft,
@@ -35,6 +43,7 @@ import type {
   Note,
   OutlineItem,
   PassageAnchor,
+  Route,
   ReaderTheme,
   TextPassageAnchor,
   TypeSettings,
@@ -79,9 +88,12 @@ import {
   closeReferencePane,
   countReaderPanes,
   splitReaderPane,
+  routeForSplitTarget,
+  splitTargetFromRoute,
   updateReferencePane,
   type ReaderPane,
   type SplitDirection,
+  type SplitTarget,
 } from "@/lib/splitLayout";
 import { appendChild, createMindFromBook, newNode } from "@/lib/mind";
 import { getSplitBooks } from "@/lib/splitScope";
@@ -109,6 +121,7 @@ import {
   loadReaderPanelMode,
   parseReaderPanelMode,
   readerPanelIsVisible,
+  readerPanelModeForPaneLayout,
   readerPanelOccupiesLayout,
   readerPanelReservesLayout,
   READER_PANEL_MODE_STORAGE_KEY,
@@ -156,13 +169,61 @@ type ReadingPosture = "read" | "immersive" | "recall";
 
 export function ReaderView({
   lib,
-  book,
+  book: initialBook,
   onImmersiveChange,
+  pane,
 }: {
   lib: Library;
   book: Book;
   onImmersiveChange?: (active: boolean) => void;
+  pane?: {
+    id: string;
+    target: SplitTarget;
+    canSplit: boolean;
+    scopeLabel?: string;
+    onChange: (target: SplitTarget) => void;
+    onSplit: (direction: SplitDirection, target: SplitTarget) => void;
+    onClose: () => void;
+  };
 }) {
+  const [splitLayout, setSplitLayout] = useState<ReaderPane>(MAIN_READER_PANE);
+  const [mainPaneTarget, setMainPaneTarget] = useState<SplitTarget | null>(null);
+  const hasMultiplePanes = countReaderPanes(splitLayout) > 1;
+  const activeTarget = hasMultiplePanes
+    ? (mainPaneTarget ?? pane?.target ?? null)
+    : (pane?.target ?? null);
+  const book = activeTarget
+    ? (lib.books.find(item => item.id === activeTarget.bookId) ?? initialBook)
+    : initialBook;
+  const route: Route = activeTarget
+    ? routeForSplitTarget(lib.route, activeTarget)
+    : lib.route;
+  const navigate = useCallback(
+    (next: Route) => {
+      if (
+        hasMultiplePanes &&
+        next.view === "reader" &&
+        next.bookId
+      ) {
+        const targetBook = lib.books.find(item => item.id === next.bookId);
+        const fallbackChapterId =
+          targetBook?.progress.chapterId ?? targetBook?.chapters[0]?.id ?? "";
+        const target = splitTargetFromRoute(next, fallbackChapterId);
+        if (target) setMainPaneTarget(target);
+        return;
+      }
+      if (pane && next.view === "reader" && next.bookId) {
+        const targetBook = lib.books.find(item => item.id === next.bookId);
+        const fallbackChapterId =
+          targetBook?.progress.chapterId ?? targetBook?.chapters[0]?.id ?? "";
+        const target = splitTargetFromRoute(next, fallbackChapterId);
+        if (target) pane.onChange(target);
+        return;
+      }
+      lib.navigate(next);
+    },
+    [hasMultiplePanes, lib, pane]
+  );
   const [generalType, setGeneralType] =
     useState<TypeSettings>(loadTypeSettings);
   const [bookType, setBookType] = useState<TypeSettings | undefined>(
@@ -170,7 +231,9 @@ export function ReaderView({
   );
   const [aiConfig, setAiConfig] = useAiConfig();
   const [searchEngine] = useSearchEngine();
-  const [showToc, setShowToc] = useState(true);
+  // Keep the main reader's familiar outline open. A secondary pane starts
+  // with more room for reading; its own outline remains available on demand.
+  const [showToc, setShowToc] = useState(!pane);
   const [showType, setShowType] = useState(false);
   const [sel, setSel] = useState<SelInfo | null>(null);
   const [hlPopup, setHlPopup] = useState<HlPopup | null>(null);
@@ -189,7 +252,6 @@ export function ReaderView({
   const [pdfAnchorPage, setPdfAnchorPage] = useState<number | null>(null);
   const [bilingualLanguage, setBilingualLanguage] =
     useState<BilingualLanguage | null>(null);
-  const [splitLayout, setSplitLayout] = useState<ReaderPane>(MAIN_READER_PANE);
   const [posture, setPosture] = useState<ReadingPosture>("read");
   const [associationSource, setAssociationSource] =
     useState<PassageAnchor | null>(null);
@@ -199,11 +261,10 @@ export function ReaderView({
     useState<ReaderPanelMode>(loadReaderPanelMode);
   const [readerPanelTransientOpen, setReaderPanelTransientOpen] =
     useState(false);
-  const [wideReaderPanel, setWideReaderPanel] = useState(() =>
-    typeof window === "undefined"
-      ? true
-      : window.matchMedia("(min-width: 1280px)").matches
-  );
+  const [wideReaderPanel, setWideReaderPanel] = useState(false);
+  const readerShellRef = useRef<HTMLDivElement>(null);
+  const [mainPaneContainer, setMainPaneContainer] =
+    useState<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const activeChapterRef = useRef<string | null>(null);
@@ -229,7 +290,7 @@ export function ReaderView({
   const isOriginal =
     book.format === "pdf" && resolvePdfReaderMode(book) === "original";
   const chapterId =
-    lib.route.chapterId || book.progress.chapterId || book.chapters[0]?.id;
+    route.chapterId || book.progress.chapterId || book.chapters[0]?.id;
   const { chapter, chapterIndex: chapterIdx } = resolveReaderChapter(
     book,
     chapterId
@@ -325,8 +386,8 @@ export function ReaderView({
   const aiTarget = aiTargetId
     ? (lib.highlights.find(h => h.id === aiTargetId) ?? null)
     : null;
-  const activeStudySet = lib.route.studySetId
-    ? lib.studySets.find(set => set.id === lib.route.studySetId)
+  const activeStudySet = route.studySetId
+    ? lib.studySets.find(set => set.id === route.studySetId)
     : undefined;
   const splitBooks = getSplitBooks(lib.books, book, activeStudySet);
 
@@ -360,20 +421,17 @@ export function ReaderView({
       cancelReaderPanelClose();
       setReaderPanelMode(mode);
       saveReaderPanelMode(mode);
-      // Keep an overlay visible across mode changes; narrow pinned panels stay
-      // open until the user explicitly closes them.
+      // Narrow panes use the reader panel as a transient overlay so their
+      // reading area and toolbar remain reachable.
       setReaderPanelTransientOpen(mode === "auto" || !wideReaderPanel);
     },
     [cancelReaderPanelClose, wideReaderPanel]
   );
 
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1280px)");
-    const sync = () => setWideReaderPanel(media.matches);
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
+  const effectiveReaderPanelMode = readerPanelModeForPaneLayout(
+    readerPanelMode,
+    Boolean(pane) || countReaderPanes(splitLayout) > 1
+  );
 
   useEffect(() => {
     const sync = (event: StorageEvent) => {
@@ -389,14 +447,14 @@ export function ReaderView({
     const closeOnEscape = (event: KeyboardEvent) => {
       if (
         event.key === "Escape" &&
-        !readerPanelOccupiesLayout(readerPanelMode, wideReaderPanel)
+        !readerPanelOccupiesLayout(effectiveReaderPanelMode, wideReaderPanel)
       ) {
         closeReaderPanel();
       }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [closeReaderPanel, readerPanelMode, wideReaderPanel]);
+  }, [closeReaderPanel, effectiveReaderPanelMode, wideReaderPanel]);
 
   useEffect(() => {
     if (aiTarget) openReaderPanel();
@@ -473,7 +531,7 @@ export function ReaderView({
       activeChapterRef.current,
       chapter.id,
       book.progress,
-      activeChapterRef.current === null && Boolean(lib.route.chapterId)
+      activeChapterRef.current === null && Boolean(route.chapterId)
     );
     const entryRatio = chapterEntryRatioRef.current ?? plan.ratio;
     chapterEntryRatioRef.current = null;
@@ -538,7 +596,7 @@ export function ReaderView({
 
   // 锚点跳转：滚动到书摘段落并闪烁
   useEffect(() => {
-    const hid = lib.route.highlightId;
+    const hid = route.highlightId;
     if (!hid || !chapter) return;
     const h = lib.highlights.find(x => x.id === hid);
     if (!h || h.chapterId !== chapter.id) return;
@@ -551,11 +609,11 @@ export function ReaderView({
       window.setTimeout(() => el?.classList.remove("anchor-flash"), 2400);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lib.route.highlightId, chapter?.id, lib.route.outlineNavigationKey]);
+  }, [route.highlightId, chapter?.id, route.outlineNavigationKey]);
 
   // 关联跳转：优先使用独立文段锚点，不要求目标先成为书摘。
   useEffect(() => {
-    const anchor = lib.route.passageAnchor;
+    const anchor = route.passageAnchor;
     if (
       !anchor ||
       anchor.kind !== "text" ||
@@ -591,16 +649,11 @@ export function ReaderView({
           target.classList.remove("anchor-flash");
       }, 2400);
     });
-  }, [
-    book.id,
-    chapter?.id,
-    lib.route.passageAnchor,
-    lib.route.outlineNavigationKey,
-  ]);
+  }, [book.id, chapter?.id, route.passageAnchor, route.outlineNavigationKey]);
 
   // 自定义目录：可精确跳到章节内的正文段落。
   useEffect(() => {
-    const paraIndex = lib.route.outlineParaIndex;
+    const paraIndex = route.outlineParaIndex;
     if (paraIndex === undefined || !chapterId) return;
     requestAnimationFrame(() => {
       const el = wrapRef.current?.querySelector(`[data-pi="${paraIndex}"]`);
@@ -608,12 +661,12 @@ export function ReaderView({
       el?.classList.add("anchor-flash");
       window.setTimeout(() => el?.classList.remove("anchor-flash"), 2400);
     });
-  }, [lib.route.outlineParaIndex, lib.route.outlineNavigationKey, chapterId]);
+  }, [route.outlineParaIndex, route.outlineNavigationKey, chapterId]);
 
   // 原版模式：「回到原文」→ 按书摘文字定位 PDF 页
   useEffect(() => {
     if (!isOriginal) return;
-    const associationAnchor = lib.route.passageAnchor;
+    const associationAnchor = route.passageAnchor;
     if (
       associationAnchor?.kind === "pdf" &&
       associationAnchor.bookId === book.id
@@ -622,7 +675,7 @@ export function ReaderView({
       setPdfAnchorPage(associationAnchor.pdfAnchor.page);
       return;
     }
-    const hid = lib.route.highlightId;
+    const hid = route.highlightId;
     if (!hid) return;
     const h = lib.highlights.find(x => x.id === hid);
     if (h) {
@@ -632,10 +685,10 @@ export function ReaderView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     book.id,
-    lib.route.highlightId,
-    lib.route.passageAnchor,
+    route.highlightId,
+    route.passageAnchor,
     isOriginal,
-    lib.route.outlineNavigationKey,
+    route.outlineNavigationKey,
   ]);
 
   const pdfSaveTimer = useRef<number | null>(null);
@@ -724,7 +777,7 @@ export function ReaderView({
       const target = book.chapters[index];
       if (!target) return false;
       if (entryRatio !== undefined) chapterEntryRatioRef.current = entryRatio;
-      lib.navigate({
+      navigate({
         view: "reader",
         bookId: book.id,
         chapterId: target.id,
@@ -732,7 +785,7 @@ export function ReaderView({
       });
       return true;
     },
-    [activeStudySet?.id, book.chapters, book.id, lib]
+    [activeStudySet?.id, book.chapters, book.id, navigate]
   );
 
   const turnHorizontalPage = useCallback(
@@ -960,14 +1013,14 @@ export function ReaderView({
         const switched = await lib.setReaderMode(anchor.bookId, readerMode);
         if (!switched) showToast("未找到 PDF 原始文件，可能无法精确定位");
       }
-      lib.navigate({
+      navigate({
         view: "reader",
         bookId: anchor.bookId,
         chapterId: anchor.chapterId,
         passageAnchor: anchor,
       });
     },
-    [lib, showToast]
+    [lib, navigate, showToast]
   );
 
   const openAssociationPopup = useCallback(
@@ -1509,6 +1562,17 @@ export function ReaderView({
     [lib.notes, book.title]
   );
 
+  // Use each split pane's own width instead of the browser viewport width.
+  useEffect(() => {
+    const shell = readerShellRef.current;
+    if (!shell) return;
+    const updateWidth = () => setWideReaderPanel(shell.clientWidth >= 960);
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(shell);
+    return () => observer.disconnect();
+  }, [chapter?.id]);
+
   if (!chapter) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -1526,7 +1590,7 @@ export function ReaderView({
     if (item.chapterId === chapter.id && item.paraIndex === undefined) {
       scrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "smooth" });
     }
-    lib.navigate({
+    navigate({
       view: "reader",
       bookId: book.id,
       chapterId: item.chapterId,
@@ -1557,12 +1621,28 @@ export function ReaderView({
       showToast("请先回到阅读模式并关闭 AI 面板");
       return;
     }
+    const target = {
+      bookId: book.id,
+      chapterId: book.chapters[chapterIdx + 1]?.id ?? chapter?.id ?? "",
+      route: { studySetId: activeStudySet?.id },
+    };
+    if (pane) {
+      pane.onSplit(direction, target);
+      return;
+    }
     setSplitLayout(current =>
-      splitReaderPane(current, paneId, direction, {
-        bookId: book.id,
-        chapterId: book.chapters[chapterIdx + 1]?.id ?? chapter?.id ?? "",
-      })
+      splitReaderPane(current, paneId, direction, target)
     );
+  };
+
+  const closePane = (paneId: string) => {
+    const nextLayout = closeReferencePane(splitLayout, paneId);
+    if (countReaderPanes(nextLayout) === 1 && mainPaneTarget) {
+      if (pane) pane.onChange(mainPaneTarget);
+      else lib.navigate(routeForSplitTarget(lib.route, mainPaneTarget));
+      setMainPaneTarget(null);
+    }
+    setSplitLayout(nextLayout);
   };
 
   const toggleBilingual = () => {
@@ -1602,14 +1682,19 @@ export function ReaderView({
   const readerPanelAvailable = posture === "read" || Boolean(aiTarget);
   const readerPanelVisible = readerPanelIsVisible(
     readerPanelAvailable,
-    readerPanelMode,
+    effectiveReaderPanelMode,
     readerPanelTransientOpen
   );
+  const panelWideLayout =
+    pane || countReaderPanes(visibleSplitLayout) > 1
+      ? false
+      : wideReaderPanel;
   const readerPanelReservesSpace = readerPanelReservesLayout(
-    readerPanelMode,
+    effectiveReaderPanelMode,
     readerPanelVisible,
-    wideReaderPanel
+    panelWideLayout
   );
+  const readerPanelId = `reader-side-panel-${pane?.id ?? "main"}`;
   const popupHl = hlPopup
     ? (lib.highlights.find(h => h.id === hlPopup.id) ?? null)
     : null;
@@ -1622,11 +1707,322 @@ export function ReaderView({
     ? (lib.highlights.find(h => h.id === pdfCitationPopup.id) ?? null)
     : null;
 
+  const readerPanel = (
+    <>
+      {/* 右侧：AI 抽屉或书摘面板；固定与自动隐藏共用一个外壳。 */}
+      {readerPanelAvailable && (
+        <>
+          {readerPanelVisible &&
+            readerPanelMode === "auto" &&
+            !panelWideLayout && (
+              <button
+                type="button"
+                aria-label="关闭右侧阅读面板"
+                className="absolute inset-0 z-30 bg-foreground/15 backdrop-blur-[1px]"
+                onClick={closeReaderPanel}
+              />
+            )}
+          {!readerPanelVisible && panelWideLayout && (
+            <div
+              aria-hidden="true"
+              className="absolute inset-y-0 right-0 z-30 w-2"
+              onPointerEnter={event => {
+                if (event.pointerType === "mouse") openReaderPanel();
+              }}
+            />
+          )}
+          <aside
+            id={readerPanelId}
+            aria-label="书摘、批注与问答"
+            aria-hidden={!readerPanelVisible}
+            inert={!readerPanelVisible}
+            onPointerEnter={cancelReaderPanelClose}
+            onPointerLeave={event => {
+              if (
+                event.pointerType === "mouse" &&
+                !event.currentTarget.matches(":focus-within") &&
+                effectiveReaderPanelMode === "auto"
+              ) {
+                scheduleReaderPanelClose();
+              }
+            }}
+            onFocusCapture={cancelReaderPanelClose}
+            onBlurCapture={event => {
+              if (
+                effectiveReaderPanelMode === "auto" &&
+                !event.currentTarget.contains(event.relatedTarget) &&
+                !event.currentTarget.matches(":hover")
+              ) {
+                scheduleReaderPanelClose();
+              }
+            }}
+            className={`flex h-full shrink-0 flex-col border-l transition-[transform,opacity] duration-200 motion-reduce:transition-none ${
+              aiTarget ? "w-[340px]" : "w-72"
+            } ${
+              readerPanelReservesSpace
+                ? "relative"
+                : "absolute inset-y-0 right-0 z-40 max-w-[calc(100%-3rem)] shadow-2xl"
+            } ${
+              readerPanelVisible
+                ? "translate-x-0 opacity-100"
+                : "pointer-events-none translate-x-full opacity-0"
+            }`}
+            style={{ background: theme.panel, borderColor: theme.border }}
+          >
+            {aiTarget ? (
+              <AiDrawer
+                book={book}
+                chapter={chapter}
+                target={aiTarget}
+                theme={theme}
+                onSaveQa={onSaveQa}
+                onApplyStudyCard={applyStudyCard}
+                headerAction={
+                  <ReaderPanelModeButton
+                    mode={readerPanelMode}
+                    color={theme.muted}
+                    onToggle={() =>
+                      changeReaderPanelMode(
+                        toggleReaderPanelMode(readerPanelMode)
+                      )
+                    }
+                  />
+                }
+                onClose={() => {
+                  setAiTargetId(null);
+                  if (readerPanelMode === "auto") closeReaderPanel();
+                }}
+              />
+            ) : (
+              <div className="flex h-full min-h-0 flex-col">
+                <div
+                  className="flex shrink-0 border-b"
+                  style={{ borderColor: theme.border }}
+                >
+                  {panelContentMode === "separate" ? (
+                    (
+                      [
+                        ["marks", `书摘 ${panelMarks.length}`],
+                        ["notes", `批注 ${panelNotes.length}`],
+                        ["qa", `问答 ${panelQa.length}`],
+                      ] as [PanelTab, string][]
+                    ).map(([t, label]) => (
+                      <button
+                        key={t}
+                        onClick={() => setTab(t)}
+                        className={`flex-1 py-2.5 text-[12px] ${tab === t ? "font-medium" : ""}`}
+                        style={{
+                          color: tab === t ? theme.text : theme.muted,
+                          borderBottom:
+                            tab === t
+                              ? "2px solid #f54001"
+                              : "2px solid transparent",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))
+                  ) : (
+                    <div
+                      className="flex flex-1 items-center px-3 text-[12px] font-medium"
+                      style={{ color: theme.text }}
+                    >
+                      合并时间流 · {combinedPanelItems.length} 条
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="flex h-9 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] transition-colors hover:bg-foreground/5"
+                    style={{ color: theme.muted }}
+                    aria-pressed={panelContentMode === "combined"}
+                    aria-label={
+                      panelContentMode === "combined"
+                        ? "切换为分开显示"
+                        : "切换为合并显示"
+                    }
+                    title={
+                      panelContentMode === "combined"
+                        ? "分开显示书摘、批注与问答"
+                        : "合并显示书摘、批注与问答"
+                    }
+                    onClick={() =>
+                      changePanelContentMode(
+                        panelContentMode === "combined"
+                          ? "separate"
+                          : "combined"
+                      )
+                    }
+                  >
+                    <ListPlus size={14} aria-hidden="true" />
+                    {panelContentMode === "combined" ? "分开" : "合并"}
+                  </button>
+                  <ReaderPanelModeButton
+                    mode={readerPanelMode}
+                    color={theme.muted}
+                    onToggle={() =>
+                      changeReaderPanelMode(
+                        toggleReaderPanelMode(readerPanelMode)
+                      )
+                    }
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto p-3">
+                  {panelContentMode === "combined" ? (
+                    combinedPanelItems.length === 0 ? (
+                      <PanelEmpty text="选中正文即可保存书摘、批注或问答，它们会按时间混合显示在这里。" />
+                    ) : (
+                      combinedPanelItems.map(item => (
+                        <CombinedPanelCard
+                          key={`${item.kind}:${item.highlight.id}:${item.kind === "qa" ? item.qaIndex : ""}`}
+                          kind={item.kind}
+                        >
+                          {item.kind === "mark" ? (
+                            <MarkCard
+                              h={item.highlight}
+                              onLocate={() =>
+                                navigate({
+                                  view: "reader",
+                                  bookId: book.id,
+                                  chapterId: item.highlight.chapterId,
+                                  highlightId: item.highlight.id,
+                                })
+                              }
+                              onAskAi={() => setAiTargetId(item.highlight.id)}
+                            />
+                          ) : item.kind === "note" ? (
+                            <AnnotationCard
+                              h={item.highlight}
+                              theme={theme}
+                              onLocate={() =>
+                                navigate({
+                                  view: "reader",
+                                  bookId: book.id,
+                                  chapterId: item.highlight.chapterId,
+                                  highlightId: item.highlight.id,
+                                })
+                              }
+                            />
+                          ) : (
+                            <QaCard
+                              h={item.highlight}
+                              qaIndex={item.qaIndex}
+                              theme={theme}
+                              onOpen={() => setAiTargetId(item.highlight.id)}
+                            />
+                          )}
+                        </CombinedPanelCard>
+                      ))
+                    )
+                  ) : (
+                    <>
+                      {tab === "marks" &&
+                        (panelMarks.length === 0 ? (
+                          <PanelEmpty text="选中正文即可划线：下划线、背景色、字色三种样式五种颜色。" />
+                        ) : (
+                          panelMarks.map(h => (
+                            <MarkCard
+                              key={h.id}
+                              h={h}
+                              onLocate={() =>
+                                navigate({
+                                  view: "reader",
+                                  bookId: book.id,
+                                  chapterId: h.chapterId,
+                                  highlightId: h.id,
+                                })
+                              }
+                              onAskAi={() => setAiTargetId(h.id)}
+                            />
+                          ))
+                        ))}
+                      {tab === "notes" &&
+                        (panelNotes.length === 0 ? (
+                          <PanelEmpty text="选中文字后点「批注」，在文段旁直接写下想法，不打断阅读。" />
+                        ) : (
+                          panelNotes.map(h => (
+                            <AnnotationCard
+                              key={h.id}
+                              h={h}
+                              theme={theme}
+                              onLocate={() =>
+                                navigate({
+                                  view: "reader",
+                                  bookId: book.id,
+                                  chapterId: h.chapterId,
+                                  highlightId: h.id,
+                                })
+                              }
+                            />
+                          ))
+                        ))}
+                      {tab === "qa" &&
+                        (panelQa.length === 0 ? (
+                          <PanelEmpty text="选中文字后点「问 AI」，Codex 会结合全书作答，回答记录在该文段上。" />
+                        ) : (
+                          panelQa.map(h => (
+                            <QaCard
+                              key={h.id}
+                              h={h}
+                              theme={theme}
+                              onOpen={() => setAiTargetId(h.id)}
+                            />
+                          ))
+                        ))}
+                    </>
+                  )}
+
+                  {/* 引用本书的笔记（backlinks） */}
+                  {citingNotes.length > 0 && (
+                    <div
+                      className="mt-4 border-t pt-3"
+                      style={{ borderColor: theme.border }}
+                    >
+                      <div
+                        className="font-meta mb-2 text-[10px] uppercase tracking-[0.16em]"
+                        style={{ color: theme.muted }}
+                      >
+                        引用本书的笔记 · {citingNotes.length}
+                      </div>
+                      {citingNotes.map(n => (
+                        <button
+                          key={n.id}
+                          onClick={() =>
+                            navigate({ view: "note", noteId: n.id })
+                          }
+                          className="mb-1.5 block w-full truncate rounded-md px-2.5 py-1.5 text-left text-[12.5px] hover:opacity-70"
+                          style={{ background: theme.bg }}
+                        >
+                          <Quote
+                            size={10}
+                            className="mr-1.5 inline text-primary"
+                          />
+                          {n.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </aside>
+        </>
+      )}
+
+    </>
+  );
+
   return (
     <div
+      ref={readerShellRef}
       data-reader-posture={posture}
-      className="reader-shell relative flex h-full overflow-hidden"
-      style={{ background: theme.bg, color: theme.text }}
+      className="reader-shell relative flex h-full w-full min-w-0 overflow-hidden"
+      style={
+        {
+          background: theme.bg,
+          color: theme.text,
+          ...(pane ? { "--reader-outline-offset": "0px" } : {}),
+        } as CSSProperties
+      }
     >
       {/* 章节目录（原版模式下由 PDF 大纲代替） */}
       {showToc && posture === "read" && !isOriginal && (
@@ -1643,12 +2039,11 @@ export function ReaderView({
       <div className="min-h-0 min-w-0 flex-1">
         <SplitWorkspace
           node={visibleSplitLayout}
-          books={splitBooks}
           theme={theme}
-          type={type}
-          canSplit={paneCount < 4}
+          canSplit={pane?.canSplit ?? paneCount < 4}
           scopeLabel={
-            activeStudySet ? `学习集：${activeStudySet.name}` : "全书架"
+            pane?.scopeLabel ??
+            (activeStudySet ? `学习集：${activeStudySet.name}` : "全书架")
           }
           showMainSplitControls={!showCite && !showType && !bilingualLanguage}
           onSplit={splitPane}
@@ -1657,14 +2052,40 @@ export function ReaderView({
               updateReferencePane(current, paneId, target)
             )
           }
-          onClose={paneId =>
-            setSplitLayout(current => closeReferencePane(current, paneId))
-          }
+          onClose={closePane}
+          renderPane={(paneId, target) => {
+            const targetBook =
+              lib.books.find(item => item.id === target.bookId) ?? book;
+            return (
+              <ReaderView
+                key={paneId}
+                lib={lib}
+                book={targetBook}
+                pane={{
+                  id: paneId,
+                  target,
+                  canSplit: pane ? pane.canSplit : paneCount < 4,
+                  scopeLabel: activeStudySet
+                    ? `学习集：${activeStudySet.name}`
+                    : "全书架",
+                  onChange: next =>
+                    setSplitLayout(current =>
+                      updateReferencePane(current, paneId, next)
+                    ),
+                  onSplit: (direction, nextTarget) =>
+                    setSplitLayout(current =>
+                      splitReaderPane(current, paneId, direction, nextTarget)
+                    ),
+                  onClose: () => closePane(paneId),
+                }}
+              />
+            );
+          }}
           main={
-            <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
+            <div ref={setMainPaneContainer} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
               {/* 顶栏 */}
               <div
-                className={`h-12 shrink-0 items-center gap-2 border-b px-4 ${
+                className={`h-12 min-w-0 shrink-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b px-4 [&>*]:shrink-0 ${
                   posture === "immersive" ? "hidden" : "flex"
                 }`}
                 style={{ borderColor: theme.border }}
@@ -1672,7 +2093,7 @@ export function ReaderView({
                 {activeStudySet && (
                   <button
                     onClick={() =>
-                      lib.navigate({
+                      navigate({
                         view: "studyset",
                         studySetId: activeStudySet.id,
                       })
@@ -1682,6 +2103,83 @@ export function ReaderView({
                   >
                     返回学习集
                   </button>
+                )}
+                <select
+                  aria-label="当前窗格书籍"
+                  value={book.id}
+                  onChange={event => {
+                    const targetBook = lib.books.find(
+                      item => item.id === event.target.value
+                    );
+                    if (!targetBook) return;
+                    const chapterId = targetBook.chapters[0]?.id ?? "";
+                    if (pane) {
+                      pane.onChange({
+                        bookId: targetBook.id,
+                        chapterId,
+                        route: { studySetId: activeStudySet?.id },
+                      });
+                    } else {
+                      navigate({
+                        view: "reader",
+                        bookId: targetBook.id,
+                        chapterId,
+                        studySetId: activeStudySet?.id,
+                      });
+                    }
+                  }}
+                  className="h-7 max-w-40 rounded-md border bg-transparent px-1.5 text-[11px]"
+                  style={{ borderColor: theme.border, color: theme.text }}
+                >
+                  {splitBooks.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
+                {!isOriginal && (
+                  <select
+                    aria-label="当前窗格章节"
+                    value={chapter.id}
+                    onChange={event => {
+                      if (pane) {
+                        pane.onChange({
+                          bookId: book.id,
+                          chapterId: event.target.value,
+                          route: { studySetId: activeStudySet?.id },
+                        });
+                      } else {
+                        navigate({
+                          view: "reader",
+                          bookId: book.id,
+                          chapterId: event.target.value,
+                          studySetId: activeStudySet?.id,
+                        });
+                      }
+                    }}
+                    className="h-7 max-w-48 rounded-md border bg-transparent px-1.5 text-[11px]"
+                    style={{ borderColor: theme.border, color: theme.text }}
+                  >
+                    {book.chapters.map((item, index) => (
+                      <option key={item.id} value={item.id}>
+                        {String(index + 1).padStart(2, "0")} {item.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {pane && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={pane.onClose}
+                      className="rounded-md p-1.5 hover:opacity-70"
+                      style={{ color: theme.muted }}
+                      aria-label="关闭当前窗格"
+                      title="关闭当前窗格"
+                    >
+                      <X size={14} />
+                    </button>
+                  </>
                 )}
                 {!isOriginal && (
                   <button
@@ -1835,6 +2333,9 @@ export function ReaderView({
                       align="end"
                       sideOffset={8}
                       collisionPadding={12}
+                      collisionBoundary={
+                        pane ? (readerShellRef.current ?? undefined) : undefined
+                      }
                       aria-label="AI 设置"
                       className="relative z-[100] h-[min(80vh,640px)] max-h-[calc(100vh-24px)] w-[360px] overflow-hidden rounded-lg border shadow-lg"
                     >
@@ -1872,6 +2373,11 @@ export function ReaderView({
                         align="end"
                         sideOffset={8}
                         collisionPadding={12}
+                        collisionBoundary={
+                          pane
+                            ? (readerShellRef.current ?? undefined)
+                            : undefined
+                        }
                         aria-label="排版设置"
                         className="z-[100] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
                       >
@@ -1894,7 +2400,7 @@ export function ReaderView({
                     className="rounded-md p-1.5 transition-opacity hover:opacity-70"
                     style={{ color: theme.muted }}
                     aria-label="打开右侧阅读面板"
-                    aria-controls="reader-side-panel"
+                    aria-controls={readerPanelId}
                     aria-expanded="false"
                     title="打开书摘、批注与问答"
                   >
@@ -1961,7 +2467,7 @@ export function ReaderView({
                     onAnchorConsumed={() => {
                       setPdfAnchor(null);
                       setPdfAnchorPage(null);
-                      lib.navigate({
+                      navigate({
                         view: "reader",
                         bookId: book.id,
                         chapterId: chapter.id,
@@ -2049,7 +2555,7 @@ export function ReaderView({
                             type="button"
                             className="rounded-md px-2 py-1 text-primary hover:bg-primary/10"
                             onClick={() => {
-                              lib.navigate({
+                              navigate({
                                 view: "note",
                                 noteId: pdfCitationHighlight.noteId,
                               });
@@ -2439,304 +2945,7 @@ export function ReaderView({
         />
       </div>
 
-      {/* 右侧：AI 抽屉或书摘面板；固定与自动隐藏共用一个外壳。 */}
-      {readerPanelAvailable && (
-        <>
-          {readerPanelVisible &&
-            readerPanelMode === "auto" &&
-            !wideReaderPanel && (
-              <button
-                type="button"
-                aria-label="关闭右侧阅读面板"
-                className="absolute inset-0 z-30 bg-foreground/15 backdrop-blur-[1px]"
-                onClick={closeReaderPanel}
-              />
-            )}
-          {!readerPanelVisible && wideReaderPanel && (
-            <div
-              aria-hidden="true"
-              className="absolute inset-y-0 right-0 z-30 w-2"
-              onPointerEnter={event => {
-                if (event.pointerType === "mouse") openReaderPanel();
-              }}
-            />
-          )}
-          <aside
-            id="reader-side-panel"
-            aria-label="书摘、批注与问答"
-            aria-hidden={!readerPanelVisible}
-            inert={!readerPanelVisible}
-            onPointerEnter={cancelReaderPanelClose}
-            onPointerLeave={event => {
-              if (
-                event.pointerType === "mouse" &&
-                !event.currentTarget.matches(":focus-within") &&
-                readerPanelMode === "auto"
-              ) {
-                scheduleReaderPanelClose();
-              }
-            }}
-            onFocusCapture={cancelReaderPanelClose}
-            onBlurCapture={event => {
-              if (
-                readerPanelMode === "auto" &&
-                !event.currentTarget.contains(event.relatedTarget) &&
-                !event.currentTarget.matches(":hover")
-              ) {
-                scheduleReaderPanelClose();
-              }
-            }}
-            className={`flex h-full shrink-0 flex-col border-l transition-[transform,opacity] duration-200 motion-reduce:transition-none ${
-              aiTarget ? "w-[340px]" : "w-72"
-            } ${
-              readerPanelReservesSpace
-                ? "relative"
-                : "absolute inset-y-0 right-0 z-40 max-w-[calc(100%-3rem)] shadow-2xl"
-            } ${
-              readerPanelVisible
-                ? "translate-x-0 opacity-100"
-                : "pointer-events-none translate-x-full opacity-0"
-            }`}
-            style={{ background: theme.panel, borderColor: theme.border }}
-          >
-            {aiTarget ? (
-              <AiDrawer
-                book={book}
-                chapter={chapter}
-                target={aiTarget}
-                theme={theme}
-                onSaveQa={onSaveQa}
-                onApplyStudyCard={applyStudyCard}
-                headerAction={
-                  <ReaderPanelModeButton
-                    mode={readerPanelMode}
-                    color={theme.muted}
-                    onToggle={() =>
-                      changeReaderPanelMode(
-                        toggleReaderPanelMode(readerPanelMode)
-                      )
-                    }
-                  />
-                }
-                onClose={() => {
-                  setAiTargetId(null);
-                  if (readerPanelMode === "auto") closeReaderPanel();
-                }}
-              />
-            ) : (
-              <div className="flex h-full min-h-0 flex-col">
-                <div
-                  className="flex shrink-0 border-b"
-                  style={{ borderColor: theme.border }}
-                >
-                  {panelContentMode === "separate" ? (
-                    (
-                      [
-                        ["marks", `书摘 ${panelMarks.length}`],
-                        ["notes", `批注 ${panelNotes.length}`],
-                        ["qa", `问答 ${panelQa.length}`],
-                      ] as [PanelTab, string][]
-                    ).map(([t, label]) => (
-                      <button
-                        key={t}
-                        onClick={() => setTab(t)}
-                        className={`flex-1 py-2.5 text-[12px] ${tab === t ? "font-medium" : ""}`}
-                        style={{
-                          color: tab === t ? theme.text : theme.muted,
-                          borderBottom:
-                            tab === t
-                              ? "2px solid #f54001"
-                              : "2px solid transparent",
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))
-                  ) : (
-                    <div
-                      className="flex flex-1 items-center px-3 text-[12px] font-medium"
-                      style={{ color: theme.text }}
-                    >
-                      合并时间流 · {combinedPanelItems.length} 条
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    className="flex h-9 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] transition-colors hover:bg-foreground/5"
-                    style={{ color: theme.muted }}
-                    aria-pressed={panelContentMode === "combined"}
-                    aria-label={
-                      panelContentMode === "combined"
-                        ? "切换为分开显示"
-                        : "切换为合并显示"
-                    }
-                    title={
-                      panelContentMode === "combined"
-                        ? "分开显示书摘、批注与问答"
-                        : "合并显示书摘、批注与问答"
-                    }
-                    onClick={() =>
-                      changePanelContentMode(
-                        panelContentMode === "combined"
-                          ? "separate"
-                          : "combined"
-                      )
-                    }
-                  >
-                    <ListPlus size={14} aria-hidden="true" />
-                    {panelContentMode === "combined" ? "分开" : "合并"}
-                  </button>
-                  <ReaderPanelModeButton
-                    mode={readerPanelMode}
-                    color={theme.muted}
-                    onToggle={() =>
-                      changeReaderPanelMode(
-                        toggleReaderPanelMode(readerPanelMode)
-                      )
-                    }
-                  />
-                </div>
-                <div className="flex-1 overflow-y-auto p-3">
-                  {panelContentMode === "combined" ? (
-                    combinedPanelItems.length === 0 ? (
-                      <PanelEmpty text="选中正文即可保存书摘、批注或问答，它们会按时间混合显示在这里。" />
-                    ) : (
-                      combinedPanelItems.map(item => (
-                        <CombinedPanelCard
-                          key={`${item.kind}:${item.highlight.id}:${item.kind === "qa" ? item.qaIndex : ""}`}
-                          kind={item.kind}
-                        >
-                          {item.kind === "mark" ? (
-                            <MarkCard
-                              h={item.highlight}
-                              onLocate={() =>
-                                lib.navigate({
-                                  view: "reader",
-                                  bookId: book.id,
-                                  chapterId: item.highlight.chapterId,
-                                  highlightId: item.highlight.id,
-                                })
-                              }
-                              onAskAi={() => setAiTargetId(item.highlight.id)}
-                            />
-                          ) : item.kind === "note" ? (
-                            <AnnotationCard
-                              h={item.highlight}
-                              theme={theme}
-                              onLocate={() =>
-                                lib.navigate({
-                                  view: "reader",
-                                  bookId: book.id,
-                                  chapterId: item.highlight.chapterId,
-                                  highlightId: item.highlight.id,
-                                })
-                              }
-                            />
-                          ) : (
-                            <QaCard
-                              h={item.highlight}
-                              qaIndex={item.qaIndex}
-                              theme={theme}
-                              onOpen={() => setAiTargetId(item.highlight.id)}
-                            />
-                          )}
-                        </CombinedPanelCard>
-                      ))
-                    )
-                  ) : (
-                    <>
-                      {tab === "marks" &&
-                        (panelMarks.length === 0 ? (
-                          <PanelEmpty text="选中正文即可划线：下划线、背景色、字色三种样式五种颜色。" />
-                        ) : (
-                          panelMarks.map(h => (
-                            <MarkCard
-                              key={h.id}
-                              h={h}
-                              onLocate={() =>
-                                lib.navigate({
-                                  view: "reader",
-                                  bookId: book.id,
-                                  chapterId: h.chapterId,
-                                  highlightId: h.id,
-                                })
-                              }
-                              onAskAi={() => setAiTargetId(h.id)}
-                            />
-                          ))
-                        ))}
-                      {tab === "notes" &&
-                        (panelNotes.length === 0 ? (
-                          <PanelEmpty text="选中文字后点「批注」，在文段旁直接写下想法，不打断阅读。" />
-                        ) : (
-                          panelNotes.map(h => (
-                            <AnnotationCard
-                              key={h.id}
-                              h={h}
-                              theme={theme}
-                              onLocate={() =>
-                                lib.navigate({
-                                  view: "reader",
-                                  bookId: book.id,
-                                  chapterId: h.chapterId,
-                                  highlightId: h.id,
-                                })
-                              }
-                            />
-                          ))
-                        ))}
-                      {tab === "qa" &&
-                        (panelQa.length === 0 ? (
-                          <PanelEmpty text="选中文字后点「问 AI」，Codex 会结合全书作答，回答记录在该文段上。" />
-                        ) : (
-                          panelQa.map(h => (
-                            <QaCard
-                              key={h.id}
-                              h={h}
-                              theme={theme}
-                              onOpen={() => setAiTargetId(h.id)}
-                            />
-                          ))
-                        ))}
-                    </>
-                  )}
-
-                  {/* 引用本书的笔记（backlinks） */}
-                  {citingNotes.length > 0 && (
-                    <div
-                      className="mt-4 border-t pt-3"
-                      style={{ borderColor: theme.border }}
-                    >
-                      <div
-                        className="font-meta mb-2 text-[10px] uppercase tracking-[0.16em]"
-                        style={{ color: theme.muted }}
-                      >
-                        引用本书的笔记 · {citingNotes.length}
-                      </div>
-                      {citingNotes.map(n => (
-                        <button
-                          key={n.id}
-                          onClick={() =>
-                            lib.navigate({ view: "note", noteId: n.id })
-                          }
-                          className="mb-1.5 block w-full truncate rounded-md px-2.5 py-1.5 text-left text-[12.5px] hover:opacity-70"
-                          style={{ background: theme.bg }}
-                        >
-                          <Quote
-                            size={10}
-                            className="mr-1.5 inline text-primary"
-                          />
-                          {n.title}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </aside>
-        </>
-      )}
+      {splitLayout.kind === "main" ? readerPanel : mainPaneContainer ? createPortal(readerPanel, mainPaneContainer) : null}
 
       {associationPopup && (
         <AssociationPopup

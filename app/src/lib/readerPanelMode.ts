@@ -24,6 +24,14 @@ export function toggleReaderPanelMode(mode: ReaderPanelMode): ReaderPanelMode {
   return toggleSidebarMode(mode);
 }
 
+/** Keep each split pane's tool panel local and floating over its own reader. */
+export function readerPanelModeForPaneLayout(
+  mode: ReaderPanelMode,
+  paneLocal: boolean
+): ReaderPanelMode {
+  return paneLocal ? "auto" : mode;
+}
+
 export function loadReaderPanelMode(
   storage: ReaderPanelModeStorage | undefined = typeof localStorage ===
   "undefined"

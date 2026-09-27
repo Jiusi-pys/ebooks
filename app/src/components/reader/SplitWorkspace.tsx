@@ -1,35 +1,36 @@
 import type { ReactNode } from "react";
 import { Columns2 } from "lucide-react";
-import type { Book, ReaderTheme, TypeSettings } from "@/types";
-import type { ReaderPane, SplitDirection } from "@/lib/splitLayout";
+import type { ReaderTheme } from "@/types";
+import type {
+  ReaderPane,
+  SplitDirection,
+  SplitTarget,
+} from "@/lib/splitLayout";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { SplitPane, type SplitTarget } from "./SplitPane";
 
 export function SplitWorkspace({
   node,
   main,
-  books,
   theme,
-  type,
   canSplit,
   scopeLabel,
   showMainSplitControls = true,
+  renderPane,
   onSplit,
   onChange,
   onClose,
 }: {
   node: ReaderPane;
   main: ReactNode;
-  books: Book[];
   theme: ReaderTheme;
-  type: TypeSettings;
   canSplit: boolean;
   scopeLabel?: string;
   showMainSplitControls?: boolean;
+  renderPane: (paneId: string, target: SplitTarget) => ReactNode;
   onSplit: (paneId: string, direction: SplitDirection) => void;
   onChange: (paneId: string, target: SplitTarget) => void;
   onClose: (paneId: string) => void;
@@ -67,19 +68,7 @@ export function SplitWorkspace({
     );
   }
   if (node.kind === "reference") {
-    return (
-      <SplitPane
-        books={books}
-        value={node.target}
-        onChange={target => onChange(node.id, target)}
-        onClose={() => onClose(node.id)}
-        onSplit={direction => onSplit(node.id, direction)}
-        canSplit={canSplit}
-        scopeLabel={scopeLabel}
-        theme={theme}
-        type={type}
-      />
-    );
+    return renderPane(node.id, node.target);
   }
 
   return (
@@ -92,12 +81,11 @@ export function SplitWorkspace({
         <SplitWorkspace
           node={node.first}
           main={main}
-          books={books}
           theme={theme}
-          type={type}
           canSplit={canSplit}
           scopeLabel={scopeLabel}
           showMainSplitControls={showMainSplitControls}
+          renderPane={renderPane}
           onSplit={onSplit}
           onChange={onChange}
           onClose={onClose}
@@ -108,12 +96,11 @@ export function SplitWorkspace({
         <SplitWorkspace
           node={node.second}
           main={main}
-          books={books}
           theme={theme}
-          type={type}
           canSplit={canSplit}
           scopeLabel={scopeLabel}
           showMainSplitControls={showMainSplitControls}
+          renderPane={renderPane}
           onSplit={onSplit}
           onChange={onChange}
           onClose={onClose}

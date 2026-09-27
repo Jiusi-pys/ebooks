@@ -94,6 +94,15 @@ between separate tabs and a single time-ordered feed. In the feed, excerpts,
 annotations, and individual Q&A records are interleaved and marked in orange,
 blue, and purple respectively.
 
+The reader supports horizontal, vertical, and nested splits with up to four
+resizable panes. Each pane is a full reader with its own book and chapter
+selectors, typography, read/immersive/recall modes, bilingual reading,
+citations, AI controls, and excerpts/annotations/Q&A panel. Changing one pane
+does not navigate the others. Each pane's outline and right panel stay within
+its own area instead of overlapping adjacent text. Book choices follow the
+current bookshelf or study-set scope. Original-layout PDFs keep their page
+layout, with typography and chapter controls following that reading mode.
+
 Keyboard hints are kept out of the reading controls. Open **应用设置 (App
 settings)** from the left sidebar to view the shortcut reference: `Ctrl/⌘ + K`
 opens global search, `Esc` closes transient UI or exits immersive reading, and

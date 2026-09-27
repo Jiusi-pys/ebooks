@@ -1,4 +1,48 @@
-import type { SplitTarget } from "@/components/reader/SplitPane";
+import type { Route } from "@/types";
+
+export interface SplitTarget {
+  bookId: string;
+  chapterId: string;
+  route?: Partial<Omit<Route, "view" | "bookId" | "chapterId">>;
+}
+
+const paneRouteFields = [
+  "studySetId",
+  "highlightId",
+  "anchorText",
+  "passageAnchor",
+  "outlineParaIndex",
+  "outlineNavigationKey",
+] as const;
+
+/** Build a pane-local reader route without inheriting the main pane's anchors. */
+export function routeForSplitTarget(base: Route, target: SplitTarget): Route {
+  return {
+    ...base,
+    ...target.route,
+    view: "reader",
+    bookId: target.bookId,
+    chapterId: target.chapterId,
+    ...Object.fromEntries(
+      paneRouteFields.map(field => [field, target.route?.[field]])
+    ),
+  } as Route;
+}
+
+/** Keep reader navigation local to its pane while retaining jump metadata. */
+export function splitTargetFromRoute(
+  route: Route,
+  fallbackChapterId: string
+): SplitTarget | null {
+  if (route.view !== "reader" || !route.bookId) return null;
+  return {
+    bookId: route.bookId,
+    chapterId: route.chapterId ?? fallbackChapterId,
+    route: Object.fromEntries(
+      paneRouteFields.map(field => [field, route[field]])
+    ),
+  };
+}
 
 export type SplitDirection = "horizontal" | "vertical";
 
