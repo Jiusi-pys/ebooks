@@ -2,6 +2,7 @@ import * as Popover from "@radix-ui/react-popover";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -72,6 +73,7 @@ import { TypePanel } from "./reader/TypePanel";
 import { AiSettingsPanel } from "./reader/AiSettingsPanel";
 import { SelectionToolbar } from "./reader/SelectionToolbar";
 import { AiDrawer } from "./reader/AiDrawer";
+import { HighlightQaDetails } from "./reader/HighlightQaDetails";
 import { CiteBrowser, type CitationTarget } from "./reader/CiteBrowser";
 import {
   TranslationPopup,
@@ -187,7 +189,9 @@ export function ReaderView({
   };
 }) {
   const [splitLayout, setSplitLayout] = useState<ReaderPane>(MAIN_READER_PANE);
-  const [mainPaneTarget, setMainPaneTarget] = useState<SplitTarget | null>(null);
+  const [mainPaneTarget, setMainPaneTarget] = useState<SplitTarget | null>(
+    null
+  );
   const hasMultiplePanes = countReaderPanes(splitLayout) > 1;
   const activeTarget = hasMultiplePanes
     ? (mainPaneTarget ?? pane?.target ?? null)
@@ -200,11 +204,7 @@ export function ReaderView({
     : lib.route;
   const navigate = useCallback(
     (next: Route) => {
-      if (
-        hasMultiplePanes &&
-        next.view === "reader" &&
-        next.bookId
-      ) {
+      if (hasMultiplePanes && next.view === "reader" && next.bookId) {
         const targetBook = lib.books.find(item => item.id === next.bookId);
         const fallbackChapterId =
           targetBook?.progress.chapterId ?? targetBook?.chapters[0]?.id ?? "";
@@ -238,6 +238,7 @@ export function ReaderView({
   const [sel, setSel] = useState<SelInfo | null>(null);
   const [hlPopup, setHlPopup] = useState<HlPopup | null>(null);
   const [aiTargetId, setAiTargetId] = useState<string | null>(null);
+  const [aiFocusRequest, setAiFocusRequest] = useState(0);
   const [showCite, setShowCite] = useState(false);
   const [translationSel, setTranslationSel] = useState<SelInfo | null>(null);
   const [tab, setTab] = useState<PanelTab>("marks");
@@ -1437,6 +1438,8 @@ export function ReaderView({
 
   const askAiOn = useCallback(
     async (existing?: Highlight) => {
+      openReaderPanel();
+      setAiFocusRequest(value => value + 1);
       if (existing) {
         setAiTargetId(existing.id);
         setHlPopup(null);
@@ -1447,7 +1450,7 @@ export function ReaderView({
       });
       if (h) setAiTargetId(h.id);
     },
-    [createFromSelection]
+    [createFromSelection, openReaderPanel]
   );
 
   const onSaveQa = useCallback(
@@ -1686,9 +1689,7 @@ export function ReaderView({
     readerPanelTransientOpen
   );
   const panelWideLayout =
-    pane || countReaderPanes(visibleSplitLayout) > 1
-      ? false
-      : wideReaderPanel;
+    pane || countReaderPanes(visibleSplitLayout) > 1 ? false : wideReaderPanel;
   const readerPanelReservesSpace = readerPanelReservesLayout(
     effectiveReaderPanelMode,
     readerPanelVisible,
@@ -1771,9 +1772,14 @@ export function ReaderView({
           >
             {aiTarget ? (
               <AiDrawer
+                key={aiTarget.id}
                 book={book}
-                chapter={chapter}
+                chapter={
+                  book.chapters.find(c => c.id === aiTarget.chapterId) ??
+                  chapter
+                }
                 target={aiTarget}
+                focusRequest={aiFocusRequest}
                 theme={theme}
                 onSaveQa={onSaveQa}
                 onApplyStudyCard={applyStudyCard}
@@ -2007,7 +2013,6 @@ export function ReaderView({
           </aside>
         </>
       )}
-
     </>
   );
 
@@ -2082,7 +2087,10 @@ export function ReaderView({
             );
           }}
           main={
-            <div ref={setMainPaneContainer} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
+            <div
+              ref={setMainPaneContainer}
+              className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col"
+            >
               {/* 顶栏 */}
               <div
                 className={`h-12 min-w-0 shrink-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b px-4 [&>*]:shrink-0 ${
@@ -2945,7 +2953,11 @@ export function ReaderView({
         />
       </div>
 
-      {splitLayout.kind === "main" ? readerPanel : mainPaneContainer ? createPortal(readerPanel, mainPaneContainer) : null}
+      {splitLayout.kind === "main"
+        ? readerPanel
+        : mainPaneContainer
+          ? createPortal(readerPanel, mainPaneContainer)
+          : null}
 
       {associationPopup && (
         <AssociationPopup
@@ -3345,14 +3357,11 @@ export function Paragraph({
                 return;
               }
               if (h) {
-                const wrap = wrapRef.current?.closest(".relative");
-                const wrect = wrap?.getBoundingClientRect();
                 const rect = (e.target as HTMLElement).getBoundingClientRect();
-                if (!wrect) return;
                 onSegmentClick(
                   h.id,
-                  rect.bottom - wrect.top + 6,
-                  rect.left - wrect.left + rect.width / 2
+                  rect.bottom + 6,
+                  rect.left + rect.width / 2
                 );
               } else openAssociation(e);
             }}
@@ -3462,6 +3471,8 @@ export function HighlightPopup({
   const [editing, setEditing] = useState(false);
   const [citing, setCiting] = useState(false);
   const [tagging, setTagging] = useState(false);
+  const [viewingQa, setViewingQa] = useState(false);
+  const [position, setPosition] = useState({ top, left });
   const [draft, setDraft] = useState(h.note ?? "");
   const [nameDraft, setNameDraft] = useState(h.name ?? "");
   const [tagDraft, setTagDraft] = useState("");
@@ -3469,6 +3480,27 @@ export function HighlightPopup({
   const tags = h.tags ?? [];
   const cloze = h.cloze ?? [];
   const inReview = !!h.review;
+
+  // A portal avoids clipping and transformed coordinates in paginated text.
+  useLayoutEffect(() => {
+    const place = () => {
+      const bounds = ref.current?.getBoundingClientRect();
+      if (!bounds) return;
+      setPosition({
+        top: Math.max(
+          12,
+          Math.min(top, window.innerHeight - bounds.height - 12)
+        ),
+        left: Math.max(
+          bounds.width / 2 + 12,
+          Math.min(left, window.innerWidth - bounds.width / 2 - 12)
+        ),
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [top, left, viewingQa, editing, citing, tagging]);
 
   const addTag = () => {
     const t = tagDraft.trim();
@@ -3492,244 +3524,274 @@ export function HighlightPopup({
     return () => document.removeEventListener("mousedown", onDown);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div
       ref={ref}
-      className="float-pop absolute z-40 w-[300px] -translate-x-1/2 rounded-lg border border-border bg-popover p-3"
-      style={{ top, left }}
+      role="dialog"
+      aria-label="文段操作"
+      onWheel={event => event.stopPropagation()}
+      className={`float-pop fixed z-50 ${viewingQa ? "w-[380px]" : "w-[300px]"} max-h-[calc(100dvh-24px)] max-w-[calc(100vw-24px)] overflow-y-auto -translate-x-1/2 rounded-lg border border-border bg-popover p-3`}
+      style={position}
     >
-      {h.name && (
-        <div className="font-meta mb-1 flex items-center gap-1 text-[10.5px] uppercase tracking-wider text-primary">
-          <MessageSquarePlus size={10} /> {h.name}
-        </div>
-      )}
-      <p className="font-reading max-h-20 overflow-hidden text-[12px] leading-5 text-muted-foreground">
-        「{h.text}」
-      </p>
-
-      {/* 标签与挖空展示 */}
-      {(tags.length > 0 || cloze.length > 0 || inReview) && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1">
-          {inReview && (
-            <span className="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary">
-              复习中
-            </span>
-          )}
-          {tags.map(t => (
-            <span
-              key={t}
-              className="flex items-center gap-0.5 rounded-full bg-secondary px-1.5 py-px text-[10px] text-muted-foreground"
-            >
-              <Tag size={8} />
-              {t}
-              <button
-                className="opacity-50 hover:opacity-100"
-                onClick={() => onEditTags(tags.filter(x => x !== t))}
-                aria-label={`移除标签 ${t}`}
-              >
-                <X size={8} />
-              </button>
-            </span>
-          ))}
-          {cloze.map(c => (
-            <span
-              key={c}
-              className="flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-px text-[10px] text-foreground"
-            >
-              挖空 {c.length > 6 ? c.slice(0, 6) + "…" : c}
-              <button
-                className="opacity-50 hover:opacity-100"
-                onClick={() => onEditCloze(cloze.filter(x => x !== c))}
-                aria-label={`移除挖空 ${c}`}
-              >
-                <X size={8} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* 标签 / 挖空编辑区 */}
-      {tagging && (
-        <div className="mt-2 space-y-1.5 rounded-md bg-secondary/50 p-2">
-          <div className="flex gap-1.5">
-            <input
-              value={tagDraft}
-              onChange={e => setTagDraft(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addTag()}
-              placeholder="新标签，回车添加"
-              className="h-6 flex-1 rounded border border-border bg-card px-1.5 text-[11px] outline-none focus:border-primary/60"
-            />
-            <button
-              onClick={addTag}
-              className="rounded bg-primary px-2 text-[10.5px] text-primary-foreground"
-            >
-              标签
-            </button>
-          </div>
-          <div className="flex gap-1.5">
-            <input
-              value={clozeDraft}
-              onChange={e => setClozeDraft(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addCloze()}
-              placeholder="挖空词（须为原文片段），回车添加"
-              className="h-6 flex-1 rounded border border-border bg-card px-1.5 text-[11px] outline-none focus:border-primary/60"
-            />
-            <button
-              onClick={addCloze}
-              className="rounded bg-primary px-2 text-[10.5px] text-primary-foreground"
-            >
-              挖空
-            </button>
-          </div>
-        </div>
-      )}
-
-      {h.note && !editing && (
-        <p className="mt-2 rounded-md bg-accent/40 p-2 text-[12.5px] leading-6">
-          {h.note}
-        </p>
-      )}
-      {editing && (
-        <div className="mt-2">
-          <input
-            value={nameDraft}
-            onChange={e => setNameDraft(e.target.value)}
-            placeholder="批注名称（可选）"
-            className="mb-1.5 h-7 w-full rounded-md border border-border bg-card px-2 text-[12px] outline-none focus:border-primary/60"
-          />
-          <textarea
-            autoFocus
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            className="h-16 w-full resize-none rounded-md border border-border bg-card p-2 text-[12.5px] leading-5 outline-none focus:border-primary/60"
-          />
-          <div className="mt-1.5 flex justify-end gap-2">
-            <button
-              onClick={() => setEditing(false)}
-              className="px-2 py-0.5 text-[11.5px] text-muted-foreground"
-            >
-              取消
-            </button>
-            <button
-              onClick={() => {
-                onEditNote(draft.trim());
-                onEditName(nameDraft.trim());
-                setEditing(false);
-              }}
-              className="rounded-full bg-primary px-2.5 py-0.5 text-[11.5px] text-primary-foreground"
-            >
-              保存
-            </button>
-          </div>
-        </div>
-      )}
-
-      {(h.aiQa?.length ?? 0) > 0 && (
-        <div className="font-meta mt-2 flex items-center gap-1 text-[10.5px] text-primary">
-          <Sparkles size={10} /> {h.aiQa!.length} 条 AI 问答记录
-        </div>
-      )}
-
-      {citing ? (
-        <div className="relative mt-2 border-t border-border pt-1.5">
-          <CitationNotePicker
-            notes={notes}
-            sourceText={h.text}
-            onSelect={onCite}
-            onClose={() => setCiting(false)}
-            embedded
-          />
-        </div>
+      {viewingQa ? (
+        <HighlightQaDetails
+          qa={h.aiQa ?? []}
+          onBack={() => setViewingQa(false)}
+          onContinue={onAskAi}
+        />
       ) : (
-        <div
-          className="mt-2.5 space-y-1 border-t border-border pt-2"
-          role="toolbar"
-          aria-label="已有书摘的操作"
-        >
-          <div className="flex items-center justify-center gap-1">
-            <ExpandableSelectionAction
-              icon={<MessageSquarePlus size={14} />}
-              label={h.note ? "改批注" : "批注"}
-              onClick={() => setEditing(true)}
-              className="text-muted-foreground hover:bg-secondary hover:text-foreground"
-            />
-            <ExpandableSelectionAction
-              icon={<Tag size={14} />}
-              label="标签"
-              aria-pressed={tagging}
-              onClick={() => setTagging(v => !v)}
-              className={
-                tagging
-                  ? "bg-secondary text-primary"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }
-            />
-            <ExpandableSelectionAction
-              icon={<RefreshCw size={14} />}
-              label={inReview ? "移出复习" : "加入复习"}
-              aria-pressed={inReview}
-              onClick={onToggleReview}
-              className={
-                inReview
-                  ? "bg-primary/10 font-medium text-primary"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }
-            />
-            <ExpandableSelectionAction
-              icon={<GitBranch size={14} />}
-              label="脑图"
-              onClick={onAddToMindMap}
-              className="text-muted-foreground hover:bg-secondary hover:text-foreground"
-            />
-          </div>
-          <div className="flex items-center justify-center gap-1">
-            <ExpandableSelectionAction
-              icon={<ListPlus size={14} />}
-              label="目录"
-              onClick={onAddToOutline}
-              className="text-muted-foreground hover:bg-secondary hover:text-foreground"
-            />
-            <ExpandableSelectionAction
-              icon={<Link2 size={14} />}
-              label={associationCount ? `关联 ${associationCount}` : "关联"}
-              onClick={onAssociate}
-              className={
-                associationCount
-                  ? "bg-sky-500/10 text-sky-700"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }
-            />
-            {h.noteId ? (
-              <ExpandableSelectionAction
-                icon={<Unlink size={14} />}
-                label="取消引用"
-                onClick={() => void onUnlinkCitation()}
-                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        <>
+          {h.name && (
+            <div className="font-meta mb-1 flex items-center gap-1 text-[10.5px] uppercase tracking-wider text-primary">
+              <MessageSquarePlus size={10} /> {h.name}
+            </div>
+          )}
+          <p className="font-reading max-h-20 overflow-hidden text-[12px] leading-5 text-muted-foreground">
+            「{h.text}」
+          </p>
+
+          {/* 标签与挖空展示 */}
+          {(tags.length > 0 || cloze.length > 0 || inReview) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              {inReview && (
+                <span className="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-medium text-primary">
+                  复习中
+                </span>
+              )}
+              {tags.map(t => (
+                <span
+                  key={t}
+                  className="flex items-center gap-0.5 rounded-full bg-secondary px-1.5 py-px text-[10px] text-muted-foreground"
+                >
+                  <Tag size={8} />
+                  {t}
+                  <button
+                    className="opacity-50 hover:opacity-100"
+                    onClick={() => onEditTags(tags.filter(x => x !== t))}
+                    aria-label={`移除标签 ${t}`}
+                  >
+                    <X size={8} />
+                  </button>
+                </span>
+              ))}
+              {cloze.map(c => (
+                <span
+                  key={c}
+                  className="flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-px text-[10px] text-foreground"
+                >
+                  挖空 {c.length > 6 ? c.slice(0, 6) + "…" : c}
+                  <button
+                    className="opacity-50 hover:opacity-100"
+                    onClick={() => onEditCloze(cloze.filter(x => x !== c))}
+                    aria-label={`移除挖空 ${c}`}
+                  >
+                    <X size={8} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* 标签 / 挖空编辑区 */}
+          {tagging && (
+            <div className="mt-2 space-y-1.5 rounded-md bg-secondary/50 p-2">
+              <div className="flex gap-1.5">
+                <input
+                  value={tagDraft}
+                  onChange={e => setTagDraft(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && addTag()}
+                  placeholder="新标签，回车添加"
+                  className="h-6 flex-1 rounded border border-border bg-card px-1.5 text-[11px] outline-none focus:border-primary/60"
+                />
+                <button
+                  onClick={addTag}
+                  className="rounded bg-primary px-2 text-[10.5px] text-primary-foreground"
+                >
+                  标签
+                </button>
+              </div>
+              <div className="flex gap-1.5">
+                <input
+                  value={clozeDraft}
+                  onChange={e => setClozeDraft(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && addCloze()}
+                  placeholder="挖空词（须为原文片段），回车添加"
+                  className="h-6 flex-1 rounded border border-border bg-card px-1.5 text-[11px] outline-none focus:border-primary/60"
+                />
+                <button
+                  onClick={addCloze}
+                  className="rounded bg-primary px-2 text-[10.5px] text-primary-foreground"
+                >
+                  挖空
+                </button>
+              </div>
+            </div>
+          )}
+
+          {h.note && !editing && (
+            <p className="mt-2 rounded-md bg-accent/40 p-2 text-[12.5px] leading-6">
+              {h.note}
+            </p>
+          )}
+          {editing && (
+            <div className="mt-2">
+              <input
+                value={nameDraft}
+                onChange={e => setNameDraft(e.target.value)}
+                placeholder="批注名称（可选）"
+                className="mb-1.5 h-7 w-full rounded-md border border-border bg-card px-2 text-[12px] outline-none focus:border-primary/60"
               />
-            ) : (
-              <ExpandableSelectionAction
-                icon={<Quote size={14} />}
-                label="引用"
-                onClick={() => setCiting(true)}
-                className="text-muted-foreground hover:bg-secondary hover:text-foreground"
+              <textarea
+                autoFocus
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                className="h-16 w-full resize-none rounded-md border border-border bg-card p-2 text-[12.5px] leading-5 outline-none focus:border-primary/60"
               />
-            )}
-            <ExpandableSelectionAction
-              icon={<Sparkles size={14} />}
-              label="问 AI"
-              onClick={onAskAi}
-              className="font-medium text-primary hover:bg-accent/40"
-            />
-            <ExpandableSelectionAction
-              icon={<Trash2 size={14} />}
-              label="删除"
-              onClick={onDelete}
-              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            />
-          </div>
-        </div>
+              <div className="mt-1.5 flex justify-end gap-2">
+                <button
+                  onClick={() => setEditing(false)}
+                  className="px-2 py-0.5 text-[11.5px] text-muted-foreground"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    onEditNote(draft.trim());
+                    onEditName(nameDraft.trim());
+                    setEditing(false);
+                  }}
+                  className="rounded-full bg-primary px-2.5 py-0.5 text-[11.5px] text-primary-foreground"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          )}
+
+          {(h.aiQa?.length ?? 0) > 0 && (
+            <div className="mt-2 rounded-md bg-primary/5 p-2">
+              <div className="font-meta mb-2 flex items-center gap-1 text-[10.5px] text-primary">
+                <Sparkles size={10} /> {h.aiQa!.length} 条 AI 问答记录
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setViewingQa(true)}
+                  className="rounded border border-border px-2 py-1.5 text-[11px] hover:bg-secondary"
+                >
+                  查看完整回答
+                </button>
+                <button
+                  onClick={onAskAi}
+                  className="rounded bg-primary px-2 py-1.5 text-[11px] text-primary-foreground"
+                >
+                  到右侧继续追问
+                </button>
+              </div>
+            </div>
+          )}
+
+          {citing ? (
+            <div className="relative mt-2 border-t border-border pt-1.5">
+              <CitationNotePicker
+                notes={notes}
+                sourceText={h.text}
+                onSelect={onCite}
+                onClose={() => setCiting(false)}
+                embedded
+              />
+            </div>
+          ) : (
+            <div
+              className="mt-2.5 space-y-1 border-t border-border pt-2"
+              role="toolbar"
+              aria-label="已有书摘的操作"
+            >
+              <div className="flex items-center justify-center gap-1">
+                <ExpandableSelectionAction
+                  icon={<MessageSquarePlus size={14} />}
+                  label={h.note ? "改批注" : "批注"}
+                  onClick={() => setEditing(true)}
+                  className="text-muted-foreground hover:bg-secondary hover:text-foreground"
+                />
+                <ExpandableSelectionAction
+                  icon={<Tag size={14} />}
+                  label="标签"
+                  aria-pressed={tagging}
+                  onClick={() => setTagging(v => !v)}
+                  className={
+                    tagging
+                      ? "bg-secondary text-primary"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  }
+                />
+                <ExpandableSelectionAction
+                  icon={<RefreshCw size={14} />}
+                  label={inReview ? "移出复习" : "加入复习"}
+                  aria-pressed={inReview}
+                  onClick={onToggleReview}
+                  className={
+                    inReview
+                      ? "bg-primary/10 font-medium text-primary"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  }
+                />
+                <ExpandableSelectionAction
+                  icon={<GitBranch size={14} />}
+                  label="脑图"
+                  onClick={onAddToMindMap}
+                  className="text-muted-foreground hover:bg-secondary hover:text-foreground"
+                />
+              </div>
+              <div className="flex items-center justify-center gap-1">
+                <ExpandableSelectionAction
+                  icon={<ListPlus size={14} />}
+                  label="目录"
+                  onClick={onAddToOutline}
+                  className="text-muted-foreground hover:bg-secondary hover:text-foreground"
+                />
+                <ExpandableSelectionAction
+                  icon={<Link2 size={14} />}
+                  label={associationCount ? `关联 ${associationCount}` : "关联"}
+                  onClick={onAssociate}
+                  className={
+                    associationCount
+                      ? "bg-sky-500/10 text-sky-700"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  }
+                />
+                {h.noteId ? (
+                  <ExpandableSelectionAction
+                    icon={<Unlink size={14} />}
+                    label="取消引用"
+                    onClick={() => void onUnlinkCitation()}
+                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  />
+                ) : (
+                  <ExpandableSelectionAction
+                    icon={<Quote size={14} />}
+                    label="引用"
+                    onClick={() => setCiting(true)}
+                    className="text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  />
+                )}
+                <ExpandableSelectionAction
+                  icon={<Sparkles size={14} />}
+                  label={h.aiQa?.length ? "继续追问" : "问 AI"}
+                  onClick={onAskAi}
+                  className="font-medium text-primary hover:bg-accent/40"
+                />
+                <ExpandableSelectionAction
+                  icon={<Trash2 size={14} />}
+                  label="删除"
+                  onClick={onDelete}
+                  className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }

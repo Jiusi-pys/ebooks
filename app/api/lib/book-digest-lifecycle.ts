@@ -1,7 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { bookDigests } from "@db/schema";
 import { mirrorBooks } from "@db/mirror-schema";
+import { syncEntities, syncHeads } from "@db/sync-schema";
+import { materialize, type EntityState } from "@contracts/sync";
 import { getDb } from "../queries/connection";
 
 type DatabaseClient = ReturnType<typeof getDb>;
@@ -22,8 +24,8 @@ export interface DigestSnapshot {
 }
 
 /**
- * Persist a digest only while at least one mirrored book still owns its hash.
- * Lock the book row before the digest row, matching the deletion path: if AI
+ * Persist a digest only while the active book store still owns its hash.
+ * Lock the owner before the digest row, matching the deletion path: if AI
  * generation finishes after a deletion, it observes no owner and cannot
  * recreate an orphaned database cache.
  */
@@ -32,13 +34,43 @@ export async function saveDigestIfReferenced(
   digest: DigestSnapshot
 ): Promise<boolean> {
   if (!digest.contentHash) return false;
-  const owners = await database
-    .select({ extId: mirrorBooks.extId })
-    .from(mirrorBooks)
-    .where(eq(mirrorBooks.contentHash, digest.contentHash))
-    .limit(1)
-    .for("update");
-  if (owners.length === 0) return false;
+  if (process.env.SYNC_ENABLED === "true") {
+    const workspace = process.env.SYNC_WORKSPACE_ID;
+    if (!workspace) throw new Error("SYNC_WORKSPACE_ID is required");
+    // SyncStore.accept takes this same lock before imports, updates and
+    // tombstones. A delayed AI response must inspect the committed sync state,
+    // never fall back to legacy rows left behind by the migration.
+    const heads = await database
+      .select({ workspace: syncHeads.workspace })
+      .from(syncHeads)
+      .where(eq(syncHeads.workspace, workspace))
+      .limit(1)
+      .for("update");
+    if (heads.length === 0) return false;
+    const books = await database
+      .select({ state: syncEntities.state })
+      .from(syncEntities)
+      .where(
+        and(
+          eq(syncEntities.workspace, workspace),
+          eq(syncEntities.kind, "books")
+        )
+      )
+      .for("update");
+    const referenced = books.some(row => {
+      const book = materialize(JSON.parse(row.state) as EntityState);
+      return book?.contentHash === digest.contentHash;
+    });
+    if (!referenced) return false;
+  } else {
+    const owners = await database
+      .select({ extId: mirrorBooks.extId })
+      .from(mirrorBooks)
+      .where(eq(mirrorBooks.contentHash, digest.contentHash))
+      .limit(1)
+      .for("update");
+    if (owners.length === 0) return false;
+  }
 
   await database
     .select({ contentHash: bookDigests.contentHash })

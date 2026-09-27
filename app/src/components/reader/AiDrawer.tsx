@@ -21,12 +21,14 @@ import { trpc } from "@/lib/trpc-client";
 import { contentHashOfBook, scanBookStructure } from "@/lib/reading";
 import { AI_PROVIDERS, useAiConfig } from "@/lib/aiConfig";
 import { AiSettingsPanel } from "./AiSettingsPanel";
+import { conversationHistory } from "@/lib/aiConversation";
 
 interface Props {
   book: Book;
   chapter: Chapter;
   /** 本次问答锚定的文段（可能刚创建，aiQa 会增长） */
   target: Highlight;
+  focusRequest?: number;
   theme: ReaderTheme;
   onSaveQa: (qa: { q: string; a: string; ts: number }) => void;
   onApplyStudyCard: (card: {
@@ -55,6 +57,7 @@ export function AiDrawer({
   book,
   chapter,
   target,
+  focusRequest = 0,
   theme,
   onSaveQa,
   onApplyStudyCard,
@@ -87,6 +90,15 @@ export function AiDrawer({
     return "提问失败，请重试";
   };
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const focusedTargetRef = useRef<string | null>(null);
+  useEffect(() => {
+    const focusKey = `${target.id}:${focusRequest}`;
+    if (phase === "ready" && focusedTargetRef.current !== focusKey) {
+      inputRef.current?.focus({ preventScroll: true });
+      focusedTargetRef.current = focusKey;
+    }
+  }, [phase, target.id, focusRequest]);
 
   const qaList = useMemo(() => target.aiQa ?? [], [target.aiQa]);
 
@@ -160,7 +172,7 @@ export function AiDrawer({
 
   const ask = useCallback(async () => {
     const q = input.trim();
-    if (!q || phase === "asking") return;
+    if (!q || phase !== "ready") return;
     setInput("");
     setError("");
     setPhase("asking");
@@ -180,6 +192,7 @@ export function AiDrawer({
         config: aiConfig,
         messages: [
           { role: "system", content: system },
+          ...conversationHistory(qaList),
           { role: "user", content: user },
         ],
       });
@@ -199,6 +212,7 @@ export function AiDrawer({
     utils,
     onSaveQa,
     aiConfig,
+    qaList,
   ]);
 
   const makeStudyCard = useCallback(async () => {
@@ -264,6 +278,7 @@ export function AiDrawer({
         </button>
         <button
           onClick={onClose}
+          aria-label="关闭 AI 伴读"
           className="rounded p-1 hover:opacity-70"
           style={{ color: theme.muted }}
         >
@@ -380,6 +395,7 @@ export function AiDrawer({
         </div>
         <div className="flex items-end gap-2">
           <textarea
+            ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => {

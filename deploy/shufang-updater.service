@@ -1,0 +1,23 @@
+[Unit]
+Description=Shufang deployment REST API
+After=network-online.target docker.service
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/shufang
+EnvironmentFile=/opt/shufang/deploy.env
+ExecStart=/usr/bin/python3 /opt/shufang/updater/update_service.py
+Restart=on-failure
+RestartSec=5
+UMask=0077
+# Administrative deployment process: Docker control is equivalent to host root.
+# Keep it loopback-only; Nginx exposes only the authenticated API route.
+NoNewPrivileges=true
+PrivateTmp=true
+TimeoutStopSec=40
+
+[Install]
+WantedBy=multi-user.target
