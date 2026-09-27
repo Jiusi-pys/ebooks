@@ -11,7 +11,7 @@ flowchart LR
   W[Windows 浏览器 / IndexedDB] <-->|同源会话 / v2| A[Windows Node]
   A <--> M[Windows MySQL]
   A <--> F[Windows SHA-256 文件目录]
-  A <-->|节点凭据 / SSH 隧道| B[Linux 容器]
+  A <-->|HTTPS REST / 节点凭据，连接由 Windows 发起| B[Linux 容器]
   B <--> N[Linux MySQL 独立数据库]
   B <--> G[Linux SHA-256 文件目录]
   B <-->|同源会话 / v2| L[Linux 节点浏览器 / IndexedDB]
@@ -98,6 +98,32 @@ node scripts/sync-api-example.mjs --write  # 新增一本合成 TXT 书籍及原
 两端使用同一个 `SYNC_WORKSPACE_ID`，不同且长期稳定的 `SYNC_NODE_ID`。
 每个节点必须使用独立数据库，不能让两个节点共享一组 sync 表。
 
+### 正式环境：单端主动建立 HTTPS 连接
+
+Windows 在 `SYNC_PEERS_JSON` 配置云端 URL（本次为 `https://us.jiusi.org`）、
+`linux-personal` 节点 ID，以及由云端签发的工作区节点 token。Linux 使用
+`SYNC_PEERS_JSON=[]`，通过现有 HTTPS 入口接收请求，无需反向连接 Windows。
+Windows 不需要公网 IP、端口转发或 SSH 隧道。
+
+每轮 Windows 都会：
+
+1. 查询 `/api/v2/capabilities`，核对节点、工作区、版本和日志世代。
+2. 通过 `POST /api/v2/sync/push` 推送本地增量，逐项检查持久化回执，
+   全部确认后才保存发送游标。回执丢失或部分失败时按原操作 ID 重发。
+3. 通过 `GET /api/v2/sync/changes` 拉取云端增量并保存接收游标。
+4. 按内容引用上传或下载缺失文件，沿用上传会话、缺块查询、SHA-256 校验。
+   上传会话持久化，重启后续传；已确认的文件在当前进程内避免重复检查。
+
+发送游标与文件上传状态绑定云端世代；云端恢复时按恢复流程更新世代，
+客户端重新交换操作和检查文件。文件错误不回退已经确认的元数据游标。
+恢复时未更新世代或手工删除已确认文件，不属于正常恢复流程。
+
+健康空闲时约每 5 秒发起下一轮。双向指的是数据方向，TCP/TLS 连接始终由
+Windows 主动发起。SSH 仅用于人工测试和部署管理，不参与正式数据传输。
+
+本版本采用 REST 轮询，没有新增 webhook 依赖。未来有可公开访问的接收端时，
+webhook 可以通知立即拉取；仍需周期性拉取兜底，不能把通知当作持久化回执。
+
 ```dotenv
 NODE_ENV=production
 HOST=127.0.0.1
@@ -115,7 +141,7 @@ AUTO_UPDATE_ENABLED=false
 各节点账户独立；账户和密钥不复制。配置文件权限只给运行账号。
 新建节点先启动空 peers，分别在另一端签发入站凭据，再将对应 token 写入
 自己的 `SYNC_PEERS_JSON=[{"id":"linux-personal","url":"http://127.0.0.1:3102","token":"…"}]`。
-URL 仅允许 HTTPS 或 SSH 隧道的环回 HTTP。
+正式 URL 使用 HTTPS。环回 HTTP 仅保留给本机或 SSH 隧道测试。
 
 Windows 原生 Git 检出：`npm ci`、`npm run build` 后运行
 `powershell -File scripts/start-sync-windows.ps1 -EnvFile .env.sync`。
@@ -126,7 +152,7 @@ Linux Docker：在资源充裕的机器执行 `docker build -t shufang-sync:loca
 `docker compose -f compose.sync-linux.yml up -d`。该模板使用 Linux host 网络，
 MySQL 由 `DATABASE_URL` 指定，可以是已有实例里的独立库及专用账号。
 
-本次实验隧道：
+以下隧道仅用于历史实验，不用于正式同步：
 
 ```sh
 ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \

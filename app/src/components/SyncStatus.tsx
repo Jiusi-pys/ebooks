@@ -31,7 +31,7 @@ export function SyncStatus() {
               ([id, peer]) =>
                 `${id}：${peer.error ?? (peer.lastSuccess ? `最近同步 ${peer.lastSuccess}` : "等待连接")}`
             )
-            .join("\n") || "尚未配置其他节点"
+            .join("\n") || "未配置主动连接；其他节点仍可通过 API 与本站同步"
         );
       } catch {
         if (alive) setText("本机已保存 · 服务暂不可达");
@@ -47,7 +47,9 @@ export function SyncStatus() {
   if (!text) return null;
   return (
     <details className="border-t border-border pt-4 text-xs">
-      <summary className="cursor-pointer text-[13px] font-medium">同步与离线书籍</summary>
+      <summary className="cursor-pointer text-[13px] font-medium">
+        同步与离线书籍
+      </summary>
       <p className="mt-2 text-muted-foreground">{text}</p>
       <pre className="my-2 whitespace-pre-wrap">{detail}</pre>
       <button
