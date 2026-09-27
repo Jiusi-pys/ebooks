@@ -28,9 +28,23 @@ const KEY_KEY = "shufang:ai-api-key:";
 const CHANGE_EVENT = "shufang:ai-config-change";
 
 export function readProviderApiKey(provider: Exclude<AiProviderId, "codex">) {
-  return typeof window === "undefined"
-    ? undefined
-    : sessionStorage.getItem(`${KEY_KEY}${provider}`) || undefined;
+  if (typeof window === "undefined") return undefined;
+  const key = `${KEY_KEY}${provider}`;
+  const saved = localStorage.getItem(key);
+  if (saved) return saved;
+
+  const legacy =
+    sessionStorage.getItem(key) ||
+    (provider === "deepseek"
+      ? sessionStorage.getItem("shufang:deepseek-api-key")
+      : null);
+  if (!legacy) return undefined;
+
+  localStorage.setItem(key, legacy);
+  sessionStorage.removeItem(key);
+  if (provider === "deepseek")
+    sessionStorage.removeItem("shufang:deepseek-api-key");
+  return legacy;
 }
 
 export const DEFAULT_AI_CONFIG: AiConfig = {
@@ -69,11 +83,7 @@ export function loadAiConfig(): AiConfig {
         saved.effort && options.efforts.includes(saved.effort)
           ? saved.effort
           : defaults.effort,
-      apiKey:
-        readProviderApiKey(provider) ||
-        (provider === "deepseek"
-          ? sessionStorage.getItem("shufang:deepseek-api-key") || undefined
-          : undefined),
+      apiKey: readProviderApiKey(provider),
     };
   } catch {
     return DEFAULT_AI_CONFIG;
@@ -89,8 +99,11 @@ export function saveAiConfig(config: AiConfig) {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(publicConfig));
   if (config.provider !== "codex") {
     const key = `${KEY_KEY}${config.provider}`;
-    if (config.apiKey) sessionStorage.setItem(key, config.apiKey);
-    else sessionStorage.removeItem(key);
+    if (config.apiKey) localStorage.setItem(key, config.apiKey);
+    else localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+    if (config.provider === "deepseek")
+      sessionStorage.removeItem("shufang:deepseek-api-key");
   }
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
 }

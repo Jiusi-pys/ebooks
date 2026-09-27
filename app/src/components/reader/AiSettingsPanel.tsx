@@ -424,8 +424,8 @@ export function AiSettingsPanel({
             className="mt-1 text-[10px] leading-4"
             style={{ color: theme.muted }}
           >
-            密钥仅保存在当前浏览器会话；关闭浏览器后清除。也可在服务端配置对应
-            Provider 的环境变量。
+            密钥会长期保存在此浏览器中；清除浏览器数据后需要重新填写。也可在
+            服务端配置对应 Provider 的环境变量。
           </p>
         </Field>
       )}
