@@ -1,3 +1,4 @@
+import { persistPreference } from "./syncPreferences";
 import type {
   Book,
   Chapter,
@@ -241,6 +242,7 @@ export function saveTypeSettings(
   storage: Pick<TypeSettingsStorage, "setItem"> = localStorage
 ) {
   storage.setItem(TYPE_SETTINGS_KEY, JSON.stringify(normalizeTypeSettings(t)));
+    persistPreference(TYPE_SETTINGS_KEY, JSON.stringify(normalizeTypeSettings(t)), storage);
 }
 
 export interface ReaderScrollMetrics {

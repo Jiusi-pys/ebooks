@@ -1,3 +1,4 @@
+import { persistPreference } from "./syncPreferences";
 export type ReaderPanelContentMode = "separate" | "combined";
 
 export const DEFAULT_READER_PANEL_CONTENT_MODE: ReaderPanelContentMode =
@@ -44,6 +45,7 @@ export function saveReaderPanelContentMode(
   if (!storage) return;
   try {
     storage.setItem(READER_PANEL_CONTENT_MODE_STORAGE_KEY, mode);
+    persistPreference(READER_PANEL_CONTENT_MODE_STORAGE_KEY, mode, storage);
   } catch {
     // Storage can be unavailable in private browsing or restricted webviews.
   }

@@ -14,6 +14,7 @@ import {
 import { syncBookMirror } from "./mirrorSync";
 import { emitEvent } from "./events";
 import { dispatchAppAuthRequired } from "./auth-events";
+import { trySyncWorkspace, isWorkspaceSyncActive } from "./workspaceSync";
 
 export interface SourceManifest {
   uploadId: string;
@@ -39,6 +40,7 @@ interface Catalog {
  * the browser cache with a server-side version.
  */
 export async function syncBrowserToMySql() {
+  if (await trySyncWorkspace()) return;
   const catalog = (await (await libraryRequest("/books")).json()) as Catalog;
   for (const folder of await getAllFolders()) {
     if (!catalog.folders.some(remote => remote.id === folder.id))
@@ -72,12 +74,14 @@ export async function syncBrowserToMySql() {
 
 /** Merge server books into this browser while retaining browser-only books. */
 export async function syncMySqlToBrowser() {
+  if (await trySyncWorkspace()) return;
   const catalog = (await (await libraryRequest("/books")).json()) as Catalog;
   await downloadCatalog(catalog);
 }
 
 /** Mirror MySQL into this browser, removing books that are absent remotely. */
 export async function syncMySqlMirrorToBrowser() {
+  if (await trySyncWorkspace()) return;
   const catalog = (await (await libraryRequest("/books")).json()) as Catalog;
   const remoteBookIds = new Set(catalog.books.map(book => book.id));
   // A mirror pull makes the server catalog authoritative. deleteBook performs
@@ -207,6 +211,7 @@ export async function uploadBookSource(book: Book, file: StoredFile) {
 }
 
 export async function persistImportedBook(book: Book, file?: StoredFile) {
+  if (await trySyncWorkspace()) return;
   await saveReaderState(book);
   if (file) await uploadBookSource(book, file);
 }
@@ -230,6 +235,7 @@ function flushPendingReaderStates() {
 
 /** Wait for cache hydration so its snapshot cannot race an acknowledged edit. */
 export function flushReaderStates(): Promise<void> {
+  if (isWorkspaceSyncActive()) return trySyncWorkspace().then(() => undefined);
   return synchronizing
     ? synchronizing.then(flushPendingReaderStates)
     : flushPendingReaderStates();
@@ -240,6 +246,7 @@ let synchronizing: Promise<void> | undefined;
 export function synchronizeLibrary() {
   if (synchronizing) return synchronizing;
   synchronizing = (async () => {
+    if (await trySyncWorkspace()) return;
     const catalog = (await (await libraryRequest("/books")).json()) as Catalog;
     const deleted = new Set(catalog.deletedBookIds);
     for (const folder of await getAllFolders()) {

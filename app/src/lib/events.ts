@@ -1,4 +1,5 @@
 import { deliverMirrorEvent } from "./mirrorSync";
+import { isWorkspaceSyncActive } from "./workspaceSync";
 
 export const MIRROR_ERROR_EVENT = "shufang:mirror-error";
 
@@ -47,4 +48,5 @@ export function createMirrorEventEmitter(
  * Browser mirror events remain non-blocking for reading interactions, but the
  * returned promise is awaitable and failures are visible to diagnostics/UI.
  */
-export const emitEvent = createMirrorEventEmitter();
+const legacyEmitEvent = createMirrorEventEmitter();
+export const emitEvent: typeof legacyEmitEvent = (type, data) => isWorkspaceSyncActive() ? Promise.resolve() : legacyEmitEvent(type, data);

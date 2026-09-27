@@ -1,5 +1,6 @@
 import type { BookMetadata, Chapter } from "@/types";
 import { dispatchAppAuthRequired } from "./auth-events";
+import { isWorkspaceSyncActive } from "./workspaceSync";
 
 export const BACKEND_BODY_LIMIT_BYTES = 50 * 1024 * 1024;
 export const DEFAULT_MIRROR_REQUEST_BYTES = 512 * 1024;
@@ -417,6 +418,7 @@ export async function syncBookMirror(
   options: BookMirrorSyncOptions = {}
 ): Promise<void> {
   let protocol: BookMirrorProtocol;
+  if (isWorkspaceSyncActive()) return;
   try {
     options.onProgress?.({ phase: "preparing", sentChunks: 0, totalChunks: 0 });
     protocol = createBookMirrorProtocol(snapshot, options);

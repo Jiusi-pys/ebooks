@@ -1,3 +1,4 @@
+import { persistPreference } from "./syncPreferences";
 import { useCallback, useEffect, useState } from "react";
 
 export type SearchEngine = "google" | "bing";
@@ -33,6 +34,7 @@ export function useSearchEngine(): [
   }, []);
   const save = useCallback((next: SearchEngine) => {
     localStorage.setItem(STORAGE_KEY, next);
+    persistPreference(STORAGE_KEY, next, localStorage);
     window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
     setEngine(next);
   }, []);

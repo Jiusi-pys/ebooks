@@ -1,0 +1,1179 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Shufang workspace replication",
+    "version": "2.0.0"
+  },
+  "servers": [
+    {
+      "url": "/api/v2"
+    }
+  ],
+  "security": [
+    {
+      "BrowserSession": []
+    },
+    {
+      "ApiKey": []
+    },
+    {
+      "NodeToken": [],
+      "Workspace": []
+    }
+  ],
+  "paths": {
+    "/capabilities": {
+      "get": {
+        "summary": "Protocol, node, workspace and transfer limits",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/sync/push": {
+      "post": {
+        "summary": "Persist operations; retry the same IDs after a lost response",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "operations"
+                ],
+                "properties": {
+                  "operations": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "$ref": "#/components/schemas/Operation"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-item durable receipts; entries with error and persisted=false must be repaired or retried",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "receipts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Receipt"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Single operation ID reuse with different content"
+          }
+        }
+      }
+    },
+    "/sync/changes": {
+      "get": {
+        "summary": "Read commit-ordered changes using a node-scoped opaque cursor",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cursor binds workspace, node and log epoch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cursor": {
+                      "type": "string"
+                    },
+                    "hasMore": {
+                      "type": "boolean"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "$ref": "#/components/schemas/Operation"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Cursor scope or generation mismatch"
+          }
+        }
+      }
+    },
+    "/sync/snapshots": {
+      "post": {
+        "summary": "Create a fixed-watermark snapshot",
+        "parameters": [],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/sync/snapshots/{id}": {
+      "get": {
+        "summary": "Read a snapshot page; continue with after=next",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/entities": {
+      "get": {
+        "summary": "Read entity states, field versions and tombstones",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/entities/{kind}/{id}/history": {
+      "get": {
+        "summary": "Read the last 100 immutable operations for one entity",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/entities/{kind}/{id}/restore": {
+      "post": {
+        "summary": "Restore to a new entity ID; original tombstone remains",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "operationId",
+                  "newEntityId"
+                ],
+                "properties": {
+                  "operationId": {
+                    "type": "string"
+                  },
+                  "newEntityId": {
+                    "type": "string",
+                    "description": "Must differ from the source ID"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/mutations": {
+      "post": {
+        "summary": "Create a locally clocked operation; use operationId for retries",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "operationId",
+                  "kind",
+                  "entityId"
+                ],
+                "properties": {
+                  "operationId": {
+                    "type": "string",
+                    "description": "Reuse unchanged on retry"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "entityId": {
+                    "type": "string"
+                  },
+                  "clock": {
+                    "type": "string"
+                  },
+                  "patch": {
+                    "type": "object"
+                  },
+                  "unset": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "deleted": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "summary": "Read local sequence and peer transfer status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/peers": {
+      "post": {
+        "summary": "Owner: issue an inbound workspace-scoped credential",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/peers/{id}": {
+      "delete": {
+        "summary": "Owner: revoke an inbound credential",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/blobs/uploads": {
+      "post": {
+        "summary": "Create a resumable upload session",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Manifest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/blobs/uploads/{id}": {
+      "get": {
+        "summary": "Read manifest and missing chunk indexes",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/blobs/uploads/{id}/{index}": {
+      "put": {
+        "summary": "Upload bytes with X-Chunk-SHA256",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Chunk-SHA256",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 262144
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/blobs/uploads/{id}/commit": {
+      "post": {
+        "summary": "Verify total size and SHA-256 before publishing",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/blobs/{hash}": {
+      "get": {
+        "summary": "Download a verified original or JSON field payload",
+        "parameters": [
+          {
+            "name": "hash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    },
+    "/blobs/{hash}/chunks/{index}": {
+      "get": {
+        "summary": "Download one 256 KiB chunk",
+        "parameters": [
+          {
+            "name": "hash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable result or requested page"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication or workspace mismatch"
+          },
+          "403": {
+            "description": "Owner access required"
+          },
+          "409": {
+            "description": "ID reuse, cursor mismatch or missing chunks"
+          },
+          "413": {
+            "description": "Payload exceeds limit"
+          },
+          "422": {
+            "description": "Checksum mismatch"
+          },
+          "503": {
+            "description": "Retry with the same operation ID"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BrowserSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "shufang_session"
+      },
+      "ApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "NodeToken": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "Workspace": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Workspace-Id"
+      }
+    },
+    "schemas": {
+      "Operation": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[\\w.:-]+$"
+          },
+          "operationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[\\w.:-]+$"
+          },
+          "replicaId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[\\w.:-]+$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "books",
+              "folders",
+              "notes",
+              "highlights",
+              "associations",
+              "translations",
+              "mindMaps",
+              "studySets",
+              "reviews",
+              "preferences",
+              "sources"
+            ]
+          },
+          "entityId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[\\w.:-]+$"
+          },
+          "clock": {
+            "type": "string",
+            "pattern": "^\\d{1,16}:\\d{1,10}$"
+          },
+          "patch": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "additionalProperties": {
+              "$ref": "#/$defs/__schema0"
+            }
+          },
+          "unset": {
+            "default": [],
+            "maxItems": 256,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "deleted": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "operationId",
+          "replicaId",
+          "kind",
+          "entityId",
+          "clock",
+          "patch",
+          "unset",
+          "deleted"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "__schema0": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "Receipt": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "duplicate": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          },
+          "persisted": {
+            "const": false
+          }
+        }
+      },
+      "EntityState": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "deleted",
+          "fields"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string"
+                },
+                "value": {},
+                "removed": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Manifest": {
+        "type": "object",
+        "required": [
+          "sha256",
+          "size",
+          "name",
+          "type"
+        ],
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 268435456
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      }
+    }
+  }
+}

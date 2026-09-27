@@ -1,3 +1,4 @@
+import { persistPreference } from "./syncPreferences";
 import {
   parseSidebarMode,
   toggleSidebarMode,
@@ -47,6 +48,7 @@ export function saveReaderPanelMode(
   if (!storage) return;
   try {
     storage.setItem(READER_PANEL_MODE_STORAGE_KEY, mode);
+    persistPreference(READER_PANEL_MODE_STORAGE_KEY, mode, storage);
   } catch {
     // Storage can be unavailable in private browsing or restricted webviews.
   }

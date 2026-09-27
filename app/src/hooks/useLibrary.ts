@@ -65,6 +65,7 @@ import {
   synchronizeLibrary,
 } from "@/lib/librarySync";
 import { emitEvent } from "@/lib/events";
+import { isWorkspaceSyncActive } from "@/lib/workspaceSync";
 import { mirrorImportTrayProgress, syncBookMirror } from "@/lib/mirrorSync";
 import { selectImportedPdfMode } from "@/lib/pdfReaderState";
 import { contentHashOfBook } from "@/lib/reading";
@@ -196,7 +197,7 @@ export function useLibrary() {
             setSyncError(
               error instanceof Error ? error.message : "服务端书库同步失败"
             );
-          if (!(await getAllBooks()).length) throw error;
+          if (!isWorkspaceSyncActive() && !(await getAllBooks()).length) throw error;
         }
         await reload();
         if (!cancelled) setReady(true);
@@ -273,6 +274,8 @@ export function useLibrary() {
 
   useEffect(() => {
     if (!ready) return;
+    const refreshed = () => { void reload(); };
+    window.addEventListener("shufang:sync-updated", refreshed);
     const flush = () => {
       void flushReaderStates().catch(error =>
         setSyncError(
@@ -288,8 +291,9 @@ export function useLibrary() {
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("online", online);
+      window.removeEventListener("shufang:sync-updated", refreshed);
     };
-  }, [ready, syncLibrary]);
+  }, [ready, syncLibrary, reload]);
 
   const retryInitialization = useCallback(() => {
     setReady(false);

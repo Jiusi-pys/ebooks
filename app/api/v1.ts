@@ -1,3 +1,5 @@
+import { activeSyncStore } from "./sync/active";
+import { makeOperation, nextClock } from "../contracts/sync";
 /**
  * 書房开放 API —— /api/v1
  *
@@ -1773,7 +1775,12 @@ v1.post(
       },
     ]);
     const extId = q.extId || crypto.randomUUID();
-    await getDb()
+    if (activeSyncStore) {
+      const now = Date.now();
+      const operation = makeOperation(activeSyncStore.workspace, activeSyncStore.nodeId, "translations", extId, { bookId: q.bookExtId, chapterId: "", chapterTitle: q.chapterTitle, targetLang: q.targetLang, scope: q.mode, text: translation, createdAt: now, updatedAt: now });
+      operation.clock = nextClock((await activeSyncStore.head()).clock);
+      await activeSyncStore.accept(operation);
+    } else await getDb()
       .insert(mirrorTranslations)
       .values({
         extId,

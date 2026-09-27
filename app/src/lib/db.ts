@@ -1,4 +1,5 @@
 import { openDB, type IDBPDatabase } from "idb";
+import { trackDatabase, upgradeSyncDatabase } from "./syncDatabase";
 import type {
   Association,
   Book,
@@ -20,7 +21,7 @@ import {
 } from "./citations";
 
 export const SHUFANG_DB_NAME = "shufang";
-export const SHUFANG_DB_VERSION = 7;
+export const SHUFANG_DB_VERSION = 9;
 
 const SEED_MARKER_KEY = "example-library-v1";
 
@@ -73,7 +74,13 @@ export function closeDatabaseConnection() {
 function db() {
   if (!dbp) {
     const pending = openDB(SHUFANG_DB_NAME, SHUFANG_DB_VERSION, {
-      upgrade(d, oldVersion) {
+      upgrade(d, oldVersion, _newVersion, tx) {
+        if (oldVersion >= 6 && oldVersion < 9) {
+          const associations = tx.objectStore("associations");
+          associations.deleteIndex("by-pair");
+          associations.createIndex("by-pair", "pairKey");
+        }
+        if (oldVersion < 8) upgradeSyncDatabase(d);
         if (oldVersion < 1) {
           d.createObjectStore("books", { keyPath: "id" });
           d.createObjectStore("notes", { keyPath: "id" });
@@ -100,7 +107,7 @@ function db() {
           });
           associations.createIndex("by-source-book", "source.bookId");
           associations.createIndex("by-target-book", "target.bookId");
-          associations.createIndex("by-pair", "pairKey", { unique: true });
+          associations.createIndex("by-pair", "pairKey");
         }
         if (oldVersion < 7) {
           const metadata = d.createObjectStore("metadata", {
@@ -148,7 +155,7 @@ function db() {
       .then(database => {
         openedDatabase = database;
         publishDatabaseIssue(null);
-        return database;
+        return trackDatabase(database);
       })
       .catch(reason => {
         if (dbp === pending) dbp = null;
@@ -164,6 +171,12 @@ function db() {
     dbp = pending;
   }
   return dbp;
+}
+
+/** Raw handle only for applying acknowledged replication data without re-emitting it. */
+export async function syncDatabase() {
+  await db();
+  return openedDatabase!;
 }
 
 export const uid = () =>
@@ -604,7 +617,8 @@ export async function putFile(f: StoredFile) {
 }
 
 export async function getFile(id: string): Promise<StoredFile | undefined> {
-  return (await (await db()).get("files", id)) as StoredFile | undefined;
+  const local = (await (await db()).get("files", id)) as StoredFile | undefined;
+  return local ?? (await import("./workspaceSync")).downloadSource(id);
 }
 
 export async function deleteFile(id: string) {

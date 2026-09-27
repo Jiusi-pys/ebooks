@@ -80,6 +80,10 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.id]);
 
+  useEffect(() => {
+    if (!dirty.current) { setTitle(note.title); setContent(note.content); }
+  }, [note.title, note.content]);
+
   useEffect(
     () => () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);

@@ -107,9 +107,19 @@ export function useAppSession() {
     }
     try {
       const nextSession = await flight.promise;
-      if (requests.canCommitRefresh(flight)) setSession(nextSession);
+      if (requests.canCommitRefresh(flight)) {
+        setSession(nextSession);
+        if (nextSession.authenticated && !nextSession.setupRequired) localStorage.setItem("shufang:offline-owner", JSON.stringify(nextSession.user));
+        else localStorage.removeItem("shufang:offline-owner");
+      }
     } catch (reason) {
       if (requests.canCommitRefresh(flight)) {
+        const offlineOwner = localStorage.getItem("shufang:offline-owner");
+        if (reason instanceof TypeError && offlineOwner) {
+          try {
+            setSession({ configured: true, authenticated: true, user: JSON.parse(offlineOwner), expiresAt: null, setupRequired: false, accountInitialized: true });
+          } catch { localStorage.removeItem("shufang:offline-owner"); }
+        }
         setError(reason instanceof Error ? reason.message : String(reason));
       }
     } finally {
@@ -277,6 +287,7 @@ export function useAppSession() {
   );
 
   const logout = useCallback(async () => {
+    localStorage.removeItem("shufang:offline-owner");
     const requests = coordinator.current!;
     const ticket = requests.beginMutation();
     setError("");

@@ -9,3 +9,4 @@ const migrationsFolder = fileURLToPath(
 
 await migrate(getDb(), { migrationsFolder });
 console.log("Database migrations are up to date.");
+await getDb().$client.end();

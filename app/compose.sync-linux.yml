@@ -1,0 +1,15 @@
+# Linux host networking keeps SSH loopback tunnels private to the host.
+services:
+  sync-app:
+    image: ${SYNC_IMAGE:-shufang-sync:local}
+    network_mode: host
+    env_file: ${SYNC_ENV_FILE:-.env.sync}
+    environment:
+      HOST: 127.0.0.1
+      AUTO_UPDATE_ENABLED: "false"
+      SYNC_BLOB_DIR: /data/blobs
+    volumes:
+      - sync-files:/data
+    restart: unless-stopped
+volumes:
+  sync-files:

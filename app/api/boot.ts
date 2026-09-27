@@ -9,8 +9,11 @@ import { v1 } from "./v1";
 import { auth } from "./auth";
 import { library } from "./library";
 import { startAutoUpdate } from "./lib/auto-update";
+import { configureSync } from "./sync/api";
+import { legacyBridge } from "./sync/legacy";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
+const sync = process.env.SYNC_ENABLED === "true" ? await configureSync() : undefined;
 
 const limitRequestBody = bodyLimit({ maxSize: 50 * 1024 * 1024 });
 app.use(async (c, next) => {
@@ -21,7 +24,12 @@ app.use(async (c, next) => {
   return limitRequestBody(c, next);
 });
 app.route("/api/auth", auth);
+if (sync) {
+  app.route("/api/library", legacyBridge(sync.store, sync.blobs, true));
+  app.route("/api/v1", legacyBridge(sync.store, sync.blobs));
+}
 app.route("/api/library", library);
+if (sync) app.route("/api/v2", sync.api);
 app.route("/api/v1", v1);
 app.use("/api/trpc/*", async c => {
   return fetchRequestHandler({
@@ -36,6 +44,7 @@ app.all("/api/*", c => c.json({ error: "Not Found" }, 404));
 export default app;
 
 if (env.isProduction) {
+  sync?.worker.start();
   const { serve } = await import("@hono/node-server");
   const { serveStaticFiles } = await import("./lib/vite");
   serveStaticFiles(app);

@@ -1,3 +1,4 @@
+import { persistPreference } from "./syncPreferences";
 export type SidebarMode = "pinned" | "auto";
 
 export const DEFAULT_SIDEBAR_MODE: SidebarMode = "pinned";
@@ -45,6 +46,7 @@ export function saveSidebarMode(
   if (!storage) return;
   try {
     storage.setItem(SIDEBAR_MODE_STORAGE_KEY, mode);
+    persistPreference(SIDEBAR_MODE_STORAGE_KEY, mode, storage);
   } catch {
     // Storage may be unavailable in private browsing or restricted webviews.
   }
