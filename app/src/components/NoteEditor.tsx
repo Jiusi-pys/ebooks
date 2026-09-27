@@ -1,3 +1,4 @@
+import { draftSaver } from "@/lib/draftSaver";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -35,7 +36,12 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
   } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  const saveTimer = useRef<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const latestSave = useRef(lib.saveNote);
+  latestSave.current = lib.saveNote;
+  const latestId = useRef(note.id);
+  latestId.current = note.id;
   const dirty = useRef(false);
 
   useEffect(() => {
@@ -61,38 +67,55 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
 
   const openByTitle = lib.openByTitle;
 
-  // 自动保存（防抖）
+  const saver = useMemo(() => {
+    const id = note.id;
+    return draftSaver<Note>(
+      value => latestSave.current(value),
+      state => {
+        if (latestId.current !== id) return;
+        dirty.current = state.dirty;
+        setSaving(state.dirty);
+        setSaveError(state.error ?? null);
+      }
+    );
+  }, [note.id]);
   const persist = useCallback(
     (t: string, c: string) => {
-      if (saveTimer.current) window.clearTimeout(saveTimer.current);
-      saveTimer.current = window.setTimeout(() => {
-        lib.saveNote({ ...note, title: t.trim() || "未命名笔记", content: c });
-        dirty.current = false;
-      }, 700);
+      saver.update({ ...note, title: t.trim() || "未命名笔记", content: c });
     },
-    [lib, note]
+    [note, saver]
   );
 
   useEffect(() => {
     setTitle(note.title);
     setContent(note.content);
     dirty.current = false;
+    setSaving(false);
+    setSaveError(null);
+    // The identity change starts a separate draft; field updates below respect dirty state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.id]);
 
   useEffect(() => {
-    if (!dirty.current) { setTitle(note.title); setContent(note.content); }
+    if (!dirty.current) {
+      setTitle(note.title);
+      setContent(note.content);
+    }
   }, [note.title, note.content]);
 
-  useEffect(
-    () => () => {
-      if (saveTimer.current) window.clearTimeout(saveTimer.current);
-      if (dirty.current)
-        lib.saveNote({ ...note, title: title.trim() || "未命名笔记", content });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [note.id]
-  );
+  useEffect(() => {
+    const closing = (event: BeforeUnloadEvent) => {
+      if (!saver.dirty()) return;
+      event.preventDefault();
+      event.returnValue = "";
+      void saver.flush().catch(() => undefined);
+    };
+    window.addEventListener("beforeunload", closing);
+    return () => {
+      window.removeEventListener("beforeunload", closing);
+      void saver.flush().catch(() => undefined);
+    };
+  }, [saver]);
 
   /** 检测光标前的 [[ 触发联想 */
   const updateSuggest = useCallback(
@@ -201,8 +224,7 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
         )
       : content;
 
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    dirty.current = false;
+    await saver.flush();
     setContent(nextContent);
     await lib.unlinkCitation(highlight.id, {
       ...latestNote,
@@ -212,6 +234,19 @@ export function NoteEditor({ lib, note }: { lib: Library; note: Note }) {
 
   return (
     <div className="flex h-full flex-col">
+      {saveError ? (
+        <p role="alert" className="text-destructive">
+          保存失败：{saveError}。请保留此页面并重试。{" "}
+          <button onClick={() => void saver.flush().catch(() => undefined)}>
+            重试保存
+          </button>
+        </p>
+      ) : saving ? (
+        <p role="status" className="text-xs text-muted-foreground">
+          正在保存到此浏览器…
+        </p>
+      ) : null}
+
       {/* 顶栏 */}
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
         <button
