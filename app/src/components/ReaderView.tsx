@@ -3333,7 +3333,7 @@ export function Paragraph({
             data-recall-state={
               recall ? (isConcealed ? "concealed" : "revealed") : undefined
             }
-            className={`hl-clickable ${highlightClass} ${h?.noteId ? "hl-citation" : ""} ${firstAssociation ? "hl-association" : ""} ${isConcealed ? "hl-recall-hidden" : ""}`}
+            className={`hl-clickable ${highlightClass} ${h?.aiQa?.length ? "hl-ai-qa" : ""} ${h?.noteId ? "hl-citation" : ""} ${firstAssociation ? "hl-association" : ""} ${isConcealed ? "hl-recall-hidden" : ""}`}
             style={
               {
                 "--hl-solid": isConcealed ? "transparent" : c.solid,

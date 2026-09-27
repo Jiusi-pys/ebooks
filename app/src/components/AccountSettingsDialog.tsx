@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { KeyRound, ShieldCheck, UserRoundPen } from "lucide-react";
+import { APP_VERSION } from "@/lib/appVersion";
 import {
   Dialog,
   DialogContent,
@@ -127,6 +128,10 @@ export function AccountSettingsDialog({
               required
             />
           )}
+          <div className="flex items-center justify-between rounded-[13px] border border-border bg-background/50 px-3.5 py-2.5 text-[12px]">
+            <span className="text-muted-foreground">应用版本</span>
+            <span className="font-meta font-medium">v{APP_VERSION}</span>
+          </div>
           {error && (
             <p role="alert" className="text-[12px] text-destructive">
               {error}

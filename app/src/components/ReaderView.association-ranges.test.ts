@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import type { TextPassageAnchor } from "@/types";
+import type { Highlight, TextPassageAnchor } from "@/types";
 import { passageAnchorKey } from "@/lib/associations";
 import { Paragraph } from "./ReaderView";
 
@@ -42,6 +42,34 @@ function renderRanges(items: TextPassageAnchor[]): string {
 }
 
 describe("Paragraph association ranges", () => {
+  it("marks the full passage carrying an AI answer", () => {
+    const highlight: Highlight = {
+      id: "highlight-qa",
+      bookId: "book-1",
+      chapterId: "chapter-1",
+      chapterTitle: "第一章",
+      text: "bcdefg",
+      style: { kind: "none", color: "blue" },
+      aiQa: [{ q: "为什么？", a: "因为如此。", ts: 1 }],
+      createdAt: 1,
+    };
+    const html = renderToStaticMarkup(
+      createElement(Paragraph, {
+        index: 0,
+        text: "abcdefghij",
+        ranges: [{ h: highlight, start: 1, end: 7 }],
+        associationRanges: [],
+        recall: false,
+        onSegmentClick: vi.fn(),
+        onAssociationClick: vi.fn(),
+      })
+    );
+
+    expect(html).toMatch(
+      /class="[^"]*hl-ai-qa[^"]*"[^>]*>bcdefg<svg/
+    );
+  });
+
   it("keeps every anchor key on segments shared by nested associations", () => {
     const outer = anchor(0, 10);
     const nested = anchor(2, 8);

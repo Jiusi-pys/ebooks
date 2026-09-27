@@ -239,6 +239,15 @@
 .hl-color {
   color: var(--hl-solid);
 }
+.hl-ai-qa {
+  background-color: rgba(245, 64, 1, 0.075);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: rgba(245, 64, 1, 0.55);
+  text-underline-offset: 3px;
+}
 .hl-clickable {
   cursor: pointer;
   transition: filter 0.15s;
