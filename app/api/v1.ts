@@ -86,6 +86,7 @@ import {
   type ValidatedBookMetadata,
 } from "./lib/book-metadata";
 import { requireBrowserMutation } from "./auth";
+import { readerStateSchema } from "./lib/library-state";
 import {
   BookMirrorUploadError,
   completeBookMirrorUpload,
@@ -151,6 +152,7 @@ v1.get("/", c =>
     endpoints: [
       "GET/POST /api/v1/books",
       "GET/PATCH/DELETE /api/v1/books/:extId",
+      "GET /api/v1/books/:extId/state",
       "GET /api/v1/books/:extId/chapters",
       "GET /api/v1/books/:extId/chapters/:index",
       "GET /api/v1/digest/:contentHash",
@@ -656,6 +658,29 @@ v1.get("/books/:extId", async c => {
   const b = await findBook(c.req.param("extId"));
   if (!b) return c.json({ error: "not_found" }, 404);
   return c.json(bookJson(b));
+});
+
+/** Machine-readable reader state; deliberately excludes covers and layout data. */
+v1.get("/books/:extId/state", async c => {
+  const rows = await getDb()
+    .select({ readerData: mirrorBooks.readerData })
+    .from(mirrorBooks)
+    .where(eq(mirrorBooks.extId, c.req.param("extId")))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return c.json({ error: "not_found" }, 404);
+  const state = readerStateSchema
+    .pick({ progress: true, lastOpenedAt: true })
+    .passthrough()
+    .parse(JSON.parse(row.readerData ?? "{}"));
+  return c.json({
+    state: {
+      ...(state.progress ? { progress: state.progress } : {}),
+      ...(state.lastOpenedAt !== undefined
+        ? { lastOpenedAt: state.lastOpenedAt }
+        : {}),
+    },
+  });
 });
 
 v1.patch(

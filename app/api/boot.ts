@@ -12,6 +12,7 @@ import { startAutoUpdate } from "./lib/auto-update";
 import { configureSync } from "./sync/api";
 import { legacyBridge } from "./sync/legacy";
 import { autoStart } from "./auto-start";
+import { mcp } from "./mcp";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 const sync =
@@ -34,6 +35,7 @@ if (sync) {
 app.route("/api/library", library);
 if (sync) app.route("/api/v2", sync.api);
 app.route("/api/v1", v1);
+app.route("/mcp", mcp);
 app.use("/api/trpc/*", async c => {
   return fetchRequestHandler({
     endpoint: "/api/trpc",

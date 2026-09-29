@@ -67,6 +67,8 @@ AI Provider API Key 由用户在 AI 设置中输入时保存在该浏览器的 `
 
 开放机器 API 必须单独配置 `OPEN_API_KEY`；留空时受保护的 `/api/v1/*` 资源接口返回 503，不会回退使用登录密码。
 
+构建后 `npm run mcp:stdio` 可供本地 Codex / Claude Code 使用，并以 `OPEN_API_KEY` 读取已有 API。远程 Streamable HTTP 服务由应用提供在 `/mcp`，使用独立的 `MCP_API_KEY`，远程客户端不需要持有可写的机器 API 密钥。远程地址应经 HTTPS 反向代理发布。ChatGPT Web 尚不能连接：ChatGPT 不接受 MCP 自定义 API Key，而当前服务还未实现 OAuth 2.1。可用工具及客户端配置参见根目录 README 的“MCP 书库工具”章节。MCP 仅读取服务端已同步数据，不读取浏览器内尚未同步的 IndexedDB 状态。
+
 若 HTTPS 在反向代理处终止，请把浏览器实际访问的完整源配置为 `PUBLIC_ORIGIN`，例如 `PUBLIC_ORIGIN=https://books.example.com`（只包含协议、主机和可选端口）。应用不会信任客户端可伪造的 `X-Forwarded-*` 请求头；未配置时，同源校验仍以直连请求 URL 为准。HTTPS `PUBLIC_ORIGIN` 也会让会话 Cookie 自动带上 `Secure`。
 
 服务默认只监听 `127.0.0.1`。远程部署建议使用同源 HTTPS 反向代理。浏览器通过登录会话访问 `/api/library/*` 和事件接口；机器客户端访问开放 API 时使用 `X-API-Key`，不要把 `.env` 或密钥提交到仓库。

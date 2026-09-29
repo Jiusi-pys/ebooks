@@ -295,6 +295,8 @@ openssl rand -hex 32
 | `SESSION_TTL_SECONDS`   | 会话时长，实际范围限制为 300–604800 秒             |
 | `SESSION_COOKIE_SECURE` | 强制会话 Cookie 使用 `Secure` 属性                 |
 | `OPEN_API_KEY`          | `/api/v1/*` 机器客户端密钥；空值时禁用机器接口     |
+| `MCP_API_KEY`           | 远程只读 `/mcp` 的独立客户端密钥                   |
+| `MCP_API_BASE_URL`      | 本地 stdio MCP 的可选 API 地址；缺省使用 localhost 与 `PORT` |
 | `CODEX_*`               | Codex 可执行文件、默认模型/强度和超时时间          |
 | `DEEPSEEK_*`            | 可选的 DeepSeek 密钥和超时时间                     |
 
@@ -409,6 +411,32 @@ docker run --rm --name shufang \
 访问 `GET /api/v1/` 可以查看机器可读的接口目录。资源接口要求请求头 `X-API-Key: <OPEN_API_KEY>` 或 `Authorization: Bearer <OPEN_API_KEY>`。当前 API 覆盖书籍与章节、书摘、复习卡、文段关联、笔记、文件夹、译文、脑图、事件和 WebHook。浏览器写入事件时也可使用已签名的应用会话与同源校验。
 
 `OPEN_API_KEY` 为空时机器访问被禁用，不会回退使用 `APP_SECRET`。
+
+### MCP 书库工具
+
+应用同时提供远程 Streamable HTTP MCP（`/mcp`）和本地 stdio 入口。所有工具都是只读的：可列出书籍、查看服务端已同步的阅读进度、搜索书摘/批注、查询复习队列及搜索/读取笔记。进度只包含已同步到服务端的章节 ID、章节内比例和最近打开时间；尚留在浏览器 IndexedDB 的本地状态不会显示。工具结果有数量上限，不读取原书文件或整本正文。
+
+本地 stdio 使用 `OPEN_API_KEY` 访问书房 API。远程入口使用独立的 `MCP_API_KEY` Bearer/API Key 认证；它不会替代或暴露可写的 `OPEN_API_KEY`。远程服务可通过 TLS 反向代理发布为稳定的 HTTPS `/mcp` 地址，Codex/Claude Code 等支持自定义 HTTP headers 的客户端可配置该密钥。不要把密钥写入仓库。
+
+**ChatGPT Web 连接尚未完成**：ChatGPT 不支持向 MCP 服务发送用户自定义 API Key；私有书库需要 OAuth 2.1。当前 `/mcp` 尚未实现 OAuth，因此部署该入口后不能直接在 ChatGPT 中完成安全授权。不要为了连接而关闭 MCP 认证。ChatGPT 自定义应用/MCP 能力也取决于账号方案和工作区策略。
+
+构建后，Codex 与 Claude Code 可用 stdio 在本机启动服务。本地 `.env` 需设置 `OPEN_API_KEY`，`MCP_API_BASE_URL` 默认为 `http://127.0.0.1:3000`：
+
+```powershell
+cd app
+npm.cmd run build
+npm.cmd run mcp:stdio
+```
+
+Codex 配置示例（把路径替换成当前工作区的绝对路径；由启动 Codex 的进程环境提供密钥）：
+
+```toml
+[mcp_servers.shufang]
+command = "node"
+args = ["C:\\path\\to\\书籍管理\\app\\dist\\mcp\\stdio.js"]
+```
+
+Claude Code 可用 `claude mcp add shufang -- node "C:\\path\\to\\书籍管理\\app\\dist\\mcp\\stdio.js"` 添加 stdio 服务；或连接远程入口：`claude mcp add --transport http shufang https://books.example.com/mcp`。如远程服务配置了静态 API Key，请按客户端支持的 HTTP headers 配置 `X-API-Key`。启动后可在 Codex/Claude Code 的 MCP 状态界面确认连接。
 
 ## 文件支持限制
 

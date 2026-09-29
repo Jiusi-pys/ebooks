@@ -451,6 +451,8 @@ openssl rand -hex 32
 | `SESSION_TTL_SECONDS`   | Session lifetime, clamped to 300–604800 seconds                            |
 | `SESSION_COOKIE_SECURE` | Force the session cookie's `Secure` flag                                   |
 | `OPEN_API_KEY`          | Owner key for machine APIs and v2 credential issuance; distinct from node tokens |
+| `MCP_API_KEY`           | Independent key for the remote read-only `/mcp` endpoint                  |
+| `MCP_API_BASE_URL`      | Optional API origin for local stdio MCP; defaults to localhost and `PORT`  |
 | `SYNC_ENABLED`          | Enable v2 workspace replication (`false` by default) |
 | `SYNC_WORKSPACE_ID`     | Same workspace ID on paired servers |
 | `SYNC_NODE_ID`          | Stable, unique identity for this database; different on each server |
@@ -831,6 +833,22 @@ events, and webhooks. Browser event writes may instead use the signed applicatio
 session and same-origin checks.
 If `OPEN_API_KEY` is blank, machine access is disabled rather than falling back
 to `APP_SECRET`.
+
+### MCP library tools
+
+The app serves a remote Streamable HTTP MCP endpoint at `/mcp` and a local
+stdio entry at `app/dist/mcp/stdio.js`. Its tools are read-only: list books, inspect
+server-synced reading progress, search highlights and notes, and retrieve due
+review cards. Progress reflects only state synced from the browser to the
+server; unsynced IndexedDB state is not visible. Local stdio uses `OPEN_API_KEY`
+to read the existing API. The remote endpoint additionally requires the
+separate `MCP_API_KEY`, so remote clients do not receive the writable machine
+API credential. Publish it behind HTTPS and configure that key in the MCP
+clients that support custom HTTP headers. **ChatGPT Web support is pending
+OAuth 2.1**: ChatGPT does not accept a user-supplied MCP API key, and this
+endpoint does not yet implement OAuth. Do not disable authentication to work
+around this. For local Codex or Claude Code, build the app and run
+`npm run mcp:stdio` with `OPEN_API_KEY` in the process environment.
 
 ## Supported-file Limits
 
