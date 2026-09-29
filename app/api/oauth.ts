@@ -195,7 +195,9 @@ export function createOAuthServer(options: {
   router.use("*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     c.header("Pragma", "no-cache");
-    c.header("Referrer-Policy", "no-referrer");
+    // Preserve Origin on native same-origin consent forms while suppressing
+    // the authorization URL on cross-origin callback navigation.
+    c.header("Referrer-Policy", "same-origin");
     c.header("X-Content-Type-Options", "nosniff");
     await next();
   });
