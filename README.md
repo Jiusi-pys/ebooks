@@ -841,14 +841,15 @@ stdio entry at `app/dist/mcp/stdio.js`. Its tools are read-only: list books, ins
 server-synced reading progress, search highlights and notes, and retrieve due
 review cards. Progress reflects only state synced from the browser to the
 server; unsynced IndexedDB state is not visible. Local stdio uses `OPEN_API_KEY`
-to read the existing API. The remote endpoint additionally requires the
-separate `MCP_API_KEY`, so remote clients do not receive the writable machine
-API credential. Publish it behind HTTPS and configure that key in the MCP
-clients that support custom HTTP headers. **ChatGPT Web support is pending
-OAuth 2.1**: ChatGPT does not accept a user-supplied MCP API key, and this
-endpoint does not yet implement OAuth. Do not disable authentication to work
-around this. For local Codex or Claude Code, build the app and run
-`npm run mcp:stdio` with `OPEN_API_KEY` in the process environment.
+to read the existing API. The remote endpoint accepts its independent
+`MCP_API_KEY` or OAuth access tokens when `MCP_OAUTH_ENABLED=true`.
+OAuth requires an exact HTTPS `PUBLIC_ORIGIN` and uses the existing book-owner
+login with explicit read-only consent, PKCE S256, DCR, token rotation and
+revocation. ChatGPT must use **OAuth / Dynamic Client Registration (DCR)**;
+no client secret is needed. See [ChatGPT configuration and operations](docs/mcp-chatgpt-setup.md)
+and [design, state upgrade and recovery](docs/mcp-oauth-design.md).
+For local Codex or Claude Code, build the app and run `npm run mcp:stdio`
+with `OPEN_API_KEY` in the process environment.
 
 ## Supported-file Limits
 

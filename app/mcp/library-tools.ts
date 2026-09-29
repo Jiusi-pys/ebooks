@@ -5,6 +5,7 @@ export interface LibraryMcpOptions {
   baseUrl: string;
   apiKey: string;
   fetch?: typeof fetch;
+  oauth?: boolean;
 }
 
 type JsonObject = Record<string, unknown>;
@@ -32,6 +33,13 @@ export function createLibraryMcpServer(options: LibraryMcpOptions) {
 
   const server = new McpServer({ name: "shufang-library", version: "1.0.0" });
   const readonly = { readOnlyHint: true, destructiveHint: false } as const;
+  const authMetadata = options.oauth
+    ? {
+        _meta: {
+          securitySchemes: [{ type: "oauth2", scopes: ["library:read"] }],
+        },
+      }
+    : {};
 
   server.registerTool(
     "list_books",
@@ -44,6 +52,7 @@ export function createLibraryMcpServer(options: LibraryMcpOptions) {
         limit: z.number().int().min(1).max(100).default(50),
       },
       annotations: readonly,
+      ...authMetadata,
     },
     async ({ query, limit }) => {
       const result = await get<{ books: JsonObject[] }>("/books");
@@ -75,6 +84,7 @@ export function createLibraryMcpServer(options: LibraryMcpOptions) {
       description: "读取一本书已同步到服务端的阅读进度和最近打开时间。",
       inputSchema: { book_id: z.string().trim().min(1).max(64) },
       annotations: readonly,
+      ...authMetadata,
     },
     async ({ book_id }) => {
       const result = await get<{ state: JsonObject }>(
@@ -101,6 +111,7 @@ export function createLibraryMcpServer(options: LibraryMcpOptions) {
         limit: z.number().int().min(1).max(100).default(30),
       },
       annotations: readonly,
+      ...authMetadata,
     },
     async ({ query, book_id, limit }) => {
       const result = await get<{ highlights: JsonObject[] }>(
@@ -135,6 +146,7 @@ export function createLibraryMcpServer(options: LibraryMcpOptions) {
         limit: z.number().int().min(1).max(100).default(50),
       },
       annotations: readonly,
+      ...authMetadata,
     },
     async ({ include_all, limit }) => {
       const result = await get<{
@@ -160,6 +172,7 @@ export function createLibraryMcpServer(options: LibraryMcpOptions) {
         limit: z.number().int().min(1).max(50).default(20),
       },
       annotations: readonly,
+      ...authMetadata,
     },
     async ({ query, limit }) => {
       const listing = await get<{ notes: JsonObject[] }>("/notes");
@@ -203,6 +216,7 @@ export function createLibraryMcpServer(options: LibraryMcpOptions) {
       description: "按 ID 读取一条已同步笔记。",
       inputSchema: { note_id: z.string().trim().min(1).max(64) },
       annotations: readonly,
+      ...authMetadata,
     },
     async ({ note_id }) => {
       const note = await get<JsonObject>(
