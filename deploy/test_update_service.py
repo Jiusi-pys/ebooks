@@ -1,5 +1,5 @@
-import tempfile
 import json
+import tempfile
 import threading
 import unittest
 from http.client import HTTPConnection
@@ -13,6 +13,11 @@ SHA = 'a' * 40
 
 
 class UpdateTests(unittest.TestCase):
+    def test_production_entrypoints_match_build_output(self):
+        package = json.loads((Path(__file__).parents[1] / 'app' / 'package.json').read_text())
+        self.assertIn('dist/api/migrate.js', package['scripts']['start'])
+        self.assertIn('dist/api/boot.js', package['scripts']['start'])
+
     def test_auth_fails_closed(self):
         self.assertFalse(authorized('', 'Bearer '))
         self.assertFalse(authorized('x' * 48, 'Bearer wrong'))
@@ -60,12 +65,13 @@ class UpdateTests(unittest.TestCase):
         commands = []
         def run(args, **kwargs):
             commands.append(args)
-            if 'dist/migrate.js' in args:
+            if 'dist/api/migrate.js' in args:
                 raise RuntimeError('migration failed')
             return ''
         with self.assertRaises(RuntimeError):
             Rollout(run=run, healthy=lambda: True).switch(SHA)
         self.assertNotIn(['docker', 'stop', '-t', '30', 'shufang-app'], commands)
+        self.assertIn('dist/api/migrate.js', commands[0])
 
     def test_success_retains_previous(self):
         commands = []
@@ -73,6 +79,7 @@ class UpdateTests(unittest.TestCase):
         rollout.switch(SHA)
         self.assertIn(['docker', 'rename', 'shufang-app', 'shufang-previous'], commands)
         self.assertNotIn(['docker', 'rename', 'shufang-previous', 'shufang-app'], commands)
+        self.assertTrue(any('dist/api/boot.js' in command for command in commands))
 
 
 class HttpTests(unittest.TestCase):

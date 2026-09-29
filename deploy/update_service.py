@@ -109,7 +109,7 @@ class Rollout:
                        '-v', str(ROOT / 'runtime') + ':/app/.runtime']
         migration = 'shufang-migrate-' + sha[:12]
         try:
-            self.run(['docker', 'run', '--rm', '--name', migration, *environment, image, 'node', 'dist/migrate.js'], timeout=180)
+            self.run(['docker', 'run', '--rm', '--name', migration, *environment, image, 'node', 'dist/api/migrate.js'], timeout=180)
         finally:
             self.run(['docker', 'rm', '-f', migration], check=False)
         # Keep the currently running container intact until the build/migration succeeds.
@@ -122,7 +122,7 @@ class Rollout:
             renamed = True
             self.run(['docker', 'run', '-d', '--name', 'shufang-app', '--restart', 'unless-stopped',
                       *environment, '--label', 'org.opencontainers.image.revision=' + sha,
-                      image, 'node', 'dist/boot.js'])
+                      image, 'node', 'dist/api/boot.js'])
             if not self.healthy():
                 raise RuntimeError('Candidate failed readiness checks')
         except Exception:

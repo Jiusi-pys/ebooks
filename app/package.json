@@ -8,7 +8,7 @@
     "build": "vite build && esbuild api/boot.ts api/migrate.ts mcp/stdio.ts --platform=node --bundle --format=esm --outdir=dist --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\"",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "cross-env NODE_ENV=production node dist/migrate.js && cross-env NODE_ENV=production node dist/boot.js",
+    "start": "cross-env NODE_ENV=production node dist/api/migrate.js && cross-env NODE_ENV=production node dist/api/boot.js",
     "mcp:stdio": "node dist/mcp/stdio.js",
     "check": "tsc -b",
     "format": "prettier --write .",
