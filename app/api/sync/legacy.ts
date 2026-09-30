@@ -11,6 +11,7 @@ import {
 } from "../../contracts/sync";
 import { requireBrowserMutation, requireBrowserSession } from "../auth";
 import { requireApiKey, extractKey } from "../lib/openapi-auth";
+import { requireReaderOrMachine } from "../lib/reader-auth";
 import { restoreBook, sourceSchema } from "../lib/library-state";
 import { associationFromRow } from "../lib/association";
 import { normalizeReaderMirrorEvent } from "../lib/mirror-event";
@@ -447,7 +448,7 @@ export function legacyBridge(
       ? c.req.method === "GET"
         ? requireBrowserSession
         : requireBrowserMutation
-      : requireApiKey;
+      : requireReaderOrMachine;
     return authorize(c, async () => {
       c.header("Cache-Control", "no-store");
       if (extra === "source") {
