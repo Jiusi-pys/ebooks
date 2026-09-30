@@ -12,10 +12,6 @@ vi.mock("../auth", () => ({
   requireBrowserMutation: (...args: unknown[]) => guards.browserWrite(...args),
 }));
 vi.mock("./openapi-auth", () => ({
-  extractKey: (c: { req: { header: (name: string) => string | undefined } }) =>
-    c.req.header("X-API-Key") ||
-    c.req.header("Authorization")?.replace(/^Bearer /i, "") ||
-    "",
   requireApiKey: (...args: unknown[]) => guards.machine(...args),
 }));
 
@@ -94,4 +90,13 @@ it("keeps machine keys separate and never falls back to a cookie after an invali
   });
   expect(allowed.status).toBe(200);
   expect(guards.machine).toHaveBeenCalledTimes(2);
+});
+
+it("does not treat an empty machine credential as an account session", async () => {
+  const app = router();
+  await app.request("/books", {
+    headers: { "X-API-Key": "", Cookie: "shufang_session=signed" },
+  });
+  expect(guards.machine).toHaveBeenCalledTimes(1);
+  expect(guards.browserRead).not.toHaveBeenCalled();
 });
