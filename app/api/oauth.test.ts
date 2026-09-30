@@ -76,6 +76,9 @@ describe("MCP OAuth authorization boundary", () => {
     // Native same-origin POST forms need a non-opaque Origin for CSRF checks.
     // Do not leak the authorization request URL to the external callback.
     expect(response.headers.get("referrer-policy")).toBe("same-origin");
+    expect(response.headers.get("content-security-policy")).toContain(
+      "form-action 'self' https://chatgpt.com;"
+    );
     const requestId = html.match(/name="request_id" value="([^"]+)"/)![1];
     const csrf = html.match(/name="csrf" value="([^"]+)"/)![1];
     const cookie = response.headers.get("set-cookie")!.split(";")[0];

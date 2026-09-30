@@ -332,7 +332,9 @@ export function createOAuthServer(options: {
     });
     c.header(
       "Content-Security-Policy",
-      `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`
+      // Chromium applies form-action to the POST response redirect as well.
+      // This origin comes from the exact registered redirect validated above.
+      `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; form-action 'self' ${new URL(request.redirect_uri).origin}; base-uri 'none'; frame-ancestors 'none'`
     );
     c.header("X-Frame-Options", "DENY");
     return c.html(
