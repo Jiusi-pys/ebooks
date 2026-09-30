@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   readerStateSchema,
+  mergeReaderSessions,
   restoreBook,
   validateSourceChunks,
 } from "./library-state";
@@ -70,6 +71,45 @@ describe("server library restoration", () => {
     expect(readerStateSchema.safeParse({ typeSettings: null }).success).toBe(
       true
     );
+  });
+  it("validates, stores and restores reading sessions", () => {
+    const readingSessions = [
+      { id: "session-1", bookId: "b", startedAt: 100, endedAt: 200 },
+    ];
+    expect(readerStateSchema.safeParse({ readingSessions }).success).toBe(true);
+    expect(
+      readerStateSchema.safeParse({
+        readingSessions: [{ ...readingSessions[0], endedAt: 99 }],
+      }).success
+    ).toBe(false);
+    expect(
+      restoreBook({
+        extId: "b",
+        title: "Book",
+        author: "",
+        format: "txt",
+        folder: "",
+        contentHash: "",
+        metadata: null,
+        readerData: JSON.stringify({ readingSessions }),
+        chapters: "[]",
+        createdAt: new Date(123),
+      }).readingSessions
+    ).toEqual(readingSessions);
+  });
+  it("merges retried and cross-device reader-state patches by session ID", () => {
+    const first = { id: "a", bookId: "b", startedAt: 100, endedAt: 200 };
+    const merged = mergeReaderSessions(
+      [first],
+      [
+        { ...first, endedAt: 300 },
+        { id: "c", bookId: "b", startedAt: 200, endedAt: 350 },
+      ]
+    );
+    expect(merged).toEqual([
+      { ...first, endedAt: 300 },
+      { id: "c", bookId: "b", startedAt: 200, endedAt: 350 },
+    ]);
   });
   it("rejects invalid progress and executable cover URLs", () => {
     expect(

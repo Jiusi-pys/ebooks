@@ -12,6 +12,7 @@ import { getDb } from "./queries/connection";
 import { requireBrowserSession, requireBrowserMutation } from "./auth";
 import {
   readerStateSchema,
+  mergeReaderSessions,
   restoreBook,
   sourceSchema,
   validateSourceChunks,
@@ -79,6 +80,12 @@ library.patch(
   zValidator("json", readerStateSchema),
   async c => {
     const patch = c.req.valid("json");
+    if (
+      patch.readingSessions?.some(
+        session => session.bookId !== c.req.param("id")
+      )
+    )
+      return c.json({ error: "reading_session_book_mismatch" }, 400);
     const found = await getDb().transaction(async tx => {
       const [row] = await tx
         .select({ state: mirrorBooks.readerData })
@@ -86,9 +93,18 @@ library.patch(
         .where(eq(mirrorBooks.extId, c.req.param("id")))
         .for("update");
       if (!row) return false;
+      const previous = readerStateSchema.parse(JSON.parse(row.state ?? "{}"));
       const state = {
-        ...readerStateSchema.parse(JSON.parse(row.state ?? "{}")),
+        ...previous,
         ...patch,
+        ...(previous.readingSessions || patch.readingSessions
+          ? {
+              readingSessions: mergeReaderSessions(
+                previous.readingSessions,
+                patch.readingSessions
+              ),
+            }
+          : {}),
       };
       await tx
         .update(mirrorBooks)

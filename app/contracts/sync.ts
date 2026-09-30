@@ -44,6 +44,19 @@ export const operationSchema = z
   );
 export type Operation = z.infer<typeof operationSchema>;
 const common = { id: z.string(), createdAt: z.number().finite() };
+const readingSessionSchema = z
+  .object({
+    id: identifier,
+    bookId: z
+      .string()
+      .min(1)
+      .max(128)
+      .regex(/^[\p{L}\p{M}\p{N}_.:-]+$/u),
+    startedAt: z.number().finite().min(0),
+    endedAt: z.number().finite().min(0),
+  })
+  .strict()
+  .refine(session => session.endedAt >= session.startedAt, "invalid interval");
 export const projectionSchemas = {
   sources: z.object({
     id: z.string(),
@@ -77,6 +90,7 @@ export const projectionSchemas = {
       })
     ),
     progress: z.object({ chapterId: z.string(), ratio: z.number() }),
+    readingSessions: z.array(readingSessionSchema).optional(),
   }),
   folders: z.object({ ...common, name: z.string() }),
   highlights: z.object({
@@ -215,6 +229,16 @@ export function flattenFields(
     delete result.bookIds;
     for (const id of value.bookIds) result[`@member:${id}`] = true;
   }
+  if (kind === "books" && Array.isArray(value.readingSessions)) {
+    delete result.readingSessions;
+    for (const session of value.readingSessions as {
+      id: string;
+      bookId: string;
+      startedAt: number;
+      endedAt: number;
+    }[])
+      result[`@readingSession:${session.id}`] = session;
+  }
   if (kind === "mindMaps" && value.root && typeof value.root === "object") {
     delete result.root;
     const visit = (
@@ -282,6 +306,18 @@ export function materialize(
       .sort();
     for (const key of Object.keys(data))
       if (key.startsWith("@member:")) delete data[key];
+  }
+  if (state.kind === "books") {
+    data.readingSessions = Object.keys(data)
+      .filter(key => key.startsWith("@readingSession:"))
+      .map(key => data[key]);
+    (data.readingSessions as { id: string }[]).sort((a, b) =>
+      a.id.localeCompare(b.id)
+    );
+    for (const key of Object.keys(data))
+      if (key.startsWith("@readingSession:")) delete data[key];
+    if ((data.readingSessions as unknown[]).length === 0)
+      delete data.readingSessions;
   }
   if (state.kind === "mindMaps") {
     const nodes: Record<string, Record<string, unknown>> = Object.create(null);

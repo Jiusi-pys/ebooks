@@ -90,6 +90,26 @@ describe("replica convergence", () => {
       materialize(applyOperation(applyOperation(undefined, x), y))!.bookIds
     ).toEqual(["a", "b"]);
   });
+  it("merges reading sessions as independent per-book fields and reconstructs them", () => {
+    const a = makeOperation("w", "a", "books", "book", {
+      readingSessions: [
+        { id: "session-a", bookId: "book", startedAt: 100, endedAt: 200 },
+      ],
+    });
+    const b = makeOperation("w", "b", "books", "book", {
+      readingSessions: [
+        { id: "session-b", bookId: "book", startedAt: 150, endedAt: 250 },
+      ],
+    });
+    const first = materialize(applyOperation(applyOperation(undefined, a), b));
+    const second = materialize(applyOperation(applyOperation(undefined, b), a));
+
+    expect(first).toEqual(second);
+    expect(first?.readingSessions).toEqual([
+      { id: "session-a", bookId: "book", startedAt: 100, endedAt: 200 },
+      { id: "session-b", bookId: "book", startedAt: 150, endedAt: 250 },
+    ]);
+  });
   it("converges independently of arrival order, preserves unrelated fields and never resurrects deletes", () => {
     const a = makeOperation(
       "w",

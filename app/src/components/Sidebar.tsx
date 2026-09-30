@@ -3,6 +3,7 @@ import {
   BookOpen,
   GitBranch,
   GraduationCap,
+  History,
   Highlighter,
   Import,
   Layers,
@@ -41,6 +42,7 @@ const NAV = [
   { view: "mind" as const, label: "脑图", icon: GitBranch },
   { view: "review" as const, label: "复习", icon: GraduationCap },
   { view: "studyset" as const, label: "学习集", icon: Layers },
+  { view: "readingHistory" as const, label: "阅读记录", icon: History },
   { view: "graph" as const, label: "图谱", icon: Network },
 ];
 

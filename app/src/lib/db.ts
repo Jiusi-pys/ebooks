@@ -11,6 +11,7 @@ import type {
   MindMap,
   Note,
   OutlineItem,
+  ReadingSession,
   StudySet,
 } from "@/types";
 import {
@@ -307,6 +308,7 @@ async function patchStoredBook(
     "readerMode",
     "typeSettings",
     "lastOpenedAt",
+    "readingSessions",
   ] as const) {
     if (JSON.stringify(current[field]) !== JSON.stringify(updated[field]))
       patch[field] = updated[field] ?? null;
@@ -324,6 +326,42 @@ async function patchStoredBook(
   }
   await tx.done;
   return updated;
+}
+
+/** Store one idempotent reader interval, merging duplicate checkpoints by ID. */
+export async function patchBookReadingSession(
+  bookId: string,
+  session: ReadingSession
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => ({
+    ...current,
+    readingSessions: mergeSessionsById(current.readingSessions ?? [], [
+      session,
+    ]),
+  }));
+}
+
+function mergeSessionsById(
+  current: ReadingSession[],
+  incoming: ReadingSession[]
+): ReadingSession[] {
+  const sessions = new Map(current.map(item => [item.id, item]));
+  for (const item of incoming) {
+    const previous = sessions.get(item.id);
+    sessions.set(
+      item.id,
+      previous
+        ? {
+            ...previous,
+            startedAt: Math.min(previous.startedAt, item.startedAt),
+            endedAt: Math.max(previous.endedAt, item.endedAt),
+          }
+        : item
+    );
+  }
+  return [...sessions.values()].sort(
+    (a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id)
+  );
 }
 
 /**
@@ -616,6 +654,11 @@ export async function cacheServerBook(book: Book, file?: StoredFile) {
     .objectStore("metadata")
     .get(`reader-state:${book.id}`)) as PendingReaderState | undefined;
   const merged = { ...book, ...pending?.patch };
+  if (book.readingSessions?.length || pending?.patch.readingSessions)
+    merged.readingSessions = mergeSessionsById(
+      book.readingSessions ?? [],
+      (pending?.patch.readingSessions as ReadingSession[] | undefined) ?? []
+    );
   if (merged.cover === null) delete merged.cover;
   if (merged.customCover === null) delete merged.customCover;
   if (merged.typeSettings === null) delete merged.typeSettings;

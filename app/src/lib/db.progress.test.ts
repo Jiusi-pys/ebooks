@@ -12,6 +12,7 @@ import {
   patchBookCustomCover,
   patchBookOutline,
   patchBookProgress,
+  patchBookReadingSession,
   patchBookReaderMode,
   patchBookTitle,
   patchFolderIcon,
@@ -92,6 +93,25 @@ describe("atomic book progress updates", () => {
       patchBookProgress(id, "chapter-1", 0.5)
     ).resolves.toBeUndefined();
     expect((await getAllBooks()).some(item => item.id === id)).toBe(false);
+  });
+
+  it("stores reading intervals idempotently beside progress and sync state", async () => {
+    const id = `reading-session-${Date.now()}-${Math.random()}`;
+    createdIds.push(id);
+    await putBook(book(id));
+    const first = {
+      id: "device-session",
+      bookId: id,
+      startedAt: 100,
+      endedAt: 200,
+    };
+    await patchBookReadingSession(id, first);
+    await patchBookReadingSession(id, { ...first, endedAt: 300 });
+    await patchBookProgress(id, "chapter-2", 0.5);
+
+    const stored = (await getAllBooks()).find(item => item.id === id);
+    expect(stored?.readingSessions).toEqual([{ ...first, endedAt: 300 }]);
+    expect(stored?.progress).toEqual({ chapterId: "chapter-2", ratio: 0.5 });
   });
 
   it("updates and clears only the custom cover field", async () => {

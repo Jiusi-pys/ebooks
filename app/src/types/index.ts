@@ -100,6 +100,15 @@ export interface Book {
   pageCount?: number;
   /** 用户自定义导航目录；缺省时由 chapters 自动生成。 */
   outline?: OutlineItem[];
+  /** 以不可变会话 ID 合并的阅读区间；结束时间会随阅读器心跳更新。 */
+  readingSessions?: ReadingSession[];
+}
+
+export interface ReadingSession {
+  id: string;
+  bookId: string;
+  startedAt: number;
+  endedAt: number;
 }
 
 export type FolderIconKey =
@@ -328,7 +337,8 @@ export type ViewName =
   | "highlights"
   | "mind"
   | "review"
-  | "studyset";
+  | "studyset"
+  | "readingHistory";
 
 export interface Route {
   view: ViewName;

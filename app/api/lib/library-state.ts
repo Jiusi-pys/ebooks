@@ -2,6 +2,36 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Book } from "../../src/types";
 
+export interface ReaderSession {
+  id: string;
+  bookId: string;
+  startedAt: number;
+  endedAt: number;
+}
+
+export function mergeReaderSessions(
+  current: ReaderSession[] = [],
+  incoming: ReaderSession[] = []
+): ReaderSession[] {
+  const sessions = new Map(current.map(session => [session.id, session]));
+  for (const session of incoming) {
+    const previous = sessions.get(session.id);
+    sessions.set(
+      session.id,
+      previous
+        ? {
+            ...previous,
+            startedAt: Math.min(previous.startedAt, session.startedAt),
+            endedAt: Math.max(previous.endedAt, session.endedAt),
+          }
+        : session
+    );
+  }
+  return [...sessions.values()].sort(
+    (a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id)
+  );
+}
+
 const image = z
   .string()
   .max(12 * 1024 * 1024)
@@ -52,6 +82,19 @@ export const readerStateSchema = z
           .strict()
       )
       .max(20_000)
+      .optional(),
+    readingSessions: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1).max(128),
+            bookId: z.string().min(1).max(128),
+            startedAt: z.number().finite().min(0),
+            endedAt: z.number().finite().min(0),
+          })
+          .strict()
+          .refine(item => item.endedAt >= item.startedAt, "invalid interval")
+      )
       .optional(),
   })
   .strict();

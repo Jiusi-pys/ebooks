@@ -28,6 +28,8 @@ import { GraphView } from "@/components/GraphView";
 import { MindView } from "@/components/MindView";
 import { ReviewView } from "@/components/ReviewView";
 import { StudySetView } from "@/components/StudySetView";
+import { ReadingHistoryView } from "@/components/ReadingHistoryView";
+import { ReadingTimer } from "@/components/ReadingTimer";
 import { ImportTray } from "@/components/ImportTray";
 import { LoginView } from "@/components/LoginView";
 import { FirstRunSetupView } from "@/components/FirstRunSetupView";
@@ -323,12 +325,19 @@ function WorkspaceApp({
           {lib.route.view === "library" && <LibraryView lib={lib} />}
           {lib.route.view === "reader" &&
             (book ? (
-              <ReaderView
-                key={book.id}
-                lib={lib}
-                book={book}
-                onImmersiveChange={setReaderImmersive}
-              />
+              <>
+                <ReadingTimer
+                  key={`reading-timer:${book.id}`}
+                  bookId={book.id}
+                  onSave={lib.saveReadingSession}
+                />
+                <ReaderView
+                  key={book.id}
+                  lib={lib}
+                  book={book}
+                  onImmersiveChange={setReaderImmersive}
+                />
+              </>
             ) : (
               <LibraryView lib={lib} />
             ))}
@@ -343,6 +352,9 @@ function WorkspaceApp({
           {lib.route.view === "mind" && <MindView lib={lib} />}
           {lib.route.view === "review" && <ReviewView lib={lib} />}
           {lib.route.view === "studyset" && <StudySetView lib={lib} />}
+          {lib.route.view === "readingHistory" && (
+            <ReadingHistoryView lib={lib} />
+          )}
           {lib.route.view === "graph" && <GraphView lib={lib} />}
         </div>
       </main>

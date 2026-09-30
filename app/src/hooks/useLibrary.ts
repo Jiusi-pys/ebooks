@@ -11,6 +11,7 @@ import type {
   OutlineItem,
   PassageAnchor,
   Route,
+  ReadingSession,
   StudySet,
 } from "@/types";
 import {
@@ -36,6 +37,7 @@ import {
   patchBookMetadataWithNotes,
   patchBookOutline,
   patchBookProgress,
+  patchBookReadingSession,
   patchBookCustomCover,
   patchBookReaderMode,
   patchBookTypeSettings,
@@ -197,7 +199,8 @@ export function useLibrary() {
             setSyncError(
               error instanceof Error ? error.message : "服务端书库同步失败"
             );
-          if (!isWorkspaceSyncActive() && !(await getAllBooks()).length) throw error;
+          if (!isWorkspaceSyncActive() && !(await getAllBooks()).length)
+            throw error;
         }
         await reload();
         if (!cancelled) setReady(true);
@@ -274,7 +277,9 @@ export function useLibrary() {
 
   useEffect(() => {
     if (!ready) return;
-    const refreshed = () => { void reload(); };
+    const refreshed = () => {
+      void reload();
+    };
     window.addEventListener("shufang:sync-updated", refreshed);
     const flush = () => {
       void flushReaderStates().catch(error =>
@@ -543,6 +548,18 @@ export function useLibrary() {
     },
     []
   );
+
+  const saveReadingSession = useCallback(async (session: ReadingSession) => {
+    const updated = await patchBookReadingSession(session.bookId, session);
+    if (!updated) return;
+    setBooks(current =>
+      current.map(book =>
+        book.id === session.bookId
+          ? { ...book, readingSessions: updated.readingSessions }
+          : book
+      )
+    );
+  }, []);
 
   const createNote = useCallback(
     async (title: string): Promise<Note> => {
@@ -1099,6 +1116,7 @@ export function useLibrary() {
     dismissImport,
     openReader,
     saveProgress,
+    saveReadingSession,
     createNote,
     openByTitle,
     saveNote,

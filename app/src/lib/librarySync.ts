@@ -162,6 +162,7 @@ export function bookReaderState(book: Book) {
     typeSettings: book.typeSettings,
     pageCount: book.pageCount,
     outline: book.outline,
+    readingSessions: book.readingSessions,
   };
 }
 
