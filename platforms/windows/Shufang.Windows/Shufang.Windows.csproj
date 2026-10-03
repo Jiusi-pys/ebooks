@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <CoreProfile Condition="'$(Configuration)' == 'Release'">release</CoreProfile>
+    <CoreProfile Condition="'$(CoreProfile)' == ''">debug</CoreProfile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.260224002" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.3916" />
+    <ProjectReference Include="../CoreBridge/CoreBridge.csproj" />
+    <ProjectReference Include="../Updates/Updates.csproj" />
+    <None Include="../../../base/target/$(CoreProfile)/shufang_bindings.dll" Link="shufang_bindings.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../base/target/$(CoreProfile)/shufang-service.exe" Link="shufang-service.exe" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Reader/**/*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../app/node_modules/pdfjs-dist/build/pdf.mjs" Link="Reader/vendor/pdf.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../app/node_modules/pdfjs-dist/build/pdf.worker.mjs" Link="Reader/vendor/pdf.worker.mjs" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../app/node_modules/pdfjs-dist/cmaps/**/*" Link="Reader/vendor/cmaps/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../app/node_modules/pdfjs-dist/standard_fonts/**/*" Link="Reader/vendor/standard_fonts/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../app/node_modules/pdfjs-dist/LICENSE" Link="Reader/vendor/pdfjs-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../.tools/native/dist/**/*" Link="%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CoreProfile Condition="'$(CoreProfile)' == ''">debug</CoreProfile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../CoreBridge/CoreBridge.csproj" />
+    <Compile Include="../Shufang.Windows/NotesViewModel.cs" Link="NotesViewModel.cs" />
+    <Compile Include="../Shufang.Windows/LibraryViewModel.cs" Link="LibraryViewModel.cs" />
+    <Compile Include="../Shufang.Windows/NotePresentation.cs" Link="NotePresentation.cs" />
+    <None Include="../../../base/target/$(CoreProfile)/shufang_bindings.dll" Link="shufang_bindings.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
