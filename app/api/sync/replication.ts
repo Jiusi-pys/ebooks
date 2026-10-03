@@ -10,16 +10,28 @@ import {
   type Operation,
   materialize,
   isBlobReference,
+  operationSchema,
 } from "../../contracts/sync";
 import { BlobStore, blobManifest, type BlobManifest, chunkSize } from "./blobs";
 import { SyncStore, SyncError, digest } from "./store";
+import { IncomingSnapshots } from "./snapshots";
+import { sharedCore } from "../../contracts/core-runtime";
+import { readPeerBytes, readPeerJson } from "./peer-response";
 
 export interface Peer {
   id: string;
   url: string;
   token: string;
 }
-export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
+export function replication(
+  store: SyncStore,
+  blobs: BlobStore,
+  peers: Peer[],
+  snapshots: Pick<
+    IncomingSnapshots,
+    "pending" | "age" | "begin" | "stage" | "finish" | "abandon"
+  > = new IncomingSnapshots(store)
+) {
   const confirmedUploads = new Set<string>();
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -42,8 +54,6 @@ export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
       }
     );
     if (!response.ok) {
-      if (response.status === 409 && path.startsWith("/sync/changes"))
-        await store.savePeerCursor(peer.id, "");
       throw new SyncError(
         `peer ${peer.id}: HTTP ${response.status}`,
         response.status
@@ -56,6 +66,8 @@ export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  const requestJson = async (peer: Peer, path: string, init?: RequestInit) =>
+    readPeerJson(await request(peer, path, init));
   // Hash compound keys to stay within sync_cursors.peer's 128-character limit.
   const checkpointKey = (type: string, peer: Peer, epoch: string, hash = "") =>
     `${type}:${digest(JSON.stringify([peer.id, peer.url, epoch, hash]))}`;
@@ -89,24 +101,16 @@ export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
               .max(100),
           })
           .parse(
-            await (
-              await request(peer, "/sync/push", jsonPost({ operations: batch }))
-            ).json()
+            await requestJson(
+              peer,
+              "/sync/push",
+              jsonPost({ operations: batch })
+            )
           );
-        if (
-          !Array.isArray(receipts) ||
-          receipts.length !== batch.length ||
-          receipts.some(
-            (r, i) =>
-              !r ||
-              r.operationId !== batch[i].operationId ||
-              r.persisted === false ||
-              r.error ||
-              typeof r.seq !== "string" ||
-              !/^\d+$/.test(r.seq)
-          )
-        )
-          throw new Error("peer did not acknowledge every operation");
+        sharedCore().execute("validateSyncReceipts", {
+          operationIds: batch.map(op => op.operationId),
+          receipts,
+        });
         batch = [];
       };
       for (const op of page.operations) {
@@ -136,9 +140,7 @@ export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
     if (id) {
       try {
         progress = uploadProgress.parse(
-          await (
-            await request(peer, `/blobs/uploads/${encodeURIComponent(id)}`)
-          ).json()
+          await requestJson(peer, `/blobs/uploads/${encodeURIComponent(id)}`)
         );
       } catch (error) {
         if (!(error instanceof SyncError) || error.status !== 404) throw error;
@@ -148,18 +150,14 @@ export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
     if (!id) {
       const session = z
         .object({ id: z.string().regex(/^[a-f0-9-]{36}$/) })
-        .parse(
-          await (
-            await request(peer, "/blobs/uploads", jsonPost(manifest))
-          ).json()
-        );
+        .parse(await requestJson(peer, "/blobs/uploads", jsonPost(manifest)));
       if (typeof session.id !== "string" || !/^[a-f0-9-]{36}$/.test(session.id))
         throw new Error("invalid peer upload session");
       id = session.id;
       await store.savePeerCursor(key, id!);
     }
     progress ??= uploadProgress.parse(
-      await (await request(peer, `/blobs/uploads/${id}`)).json()
+      await requestJson(peer, `/blobs/uploads/${id}`)
     );
     if (
       !progress ||
@@ -202,9 +200,7 @@ export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
       await file.close();
     }
     const committed = blobManifest.parse(
-      await (
-        await request(peer, `/blobs/uploads/${id}/commit`, { method: "POST" })
-      ).json()
+      await requestJson(peer, `/blobs/uploads/${id}/commit`, { method: "POST" })
     );
     if (
       committed.sha256 !== manifest.sha256 ||
@@ -234,7 +230,7 @@ export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
         peer,
         `/blobs/${manifest.sha256}/chunks/${index}`
       );
-      const bytes = Buffer.from(await response.arrayBuffer());
+      const bytes = Buffer.from(await readPeerBytes(response, chunkSize));
       if (bytes.length > chunkSize) throw new Error("oversized_peer_chunk");
       await blobs.put(
         id,
@@ -244,6 +240,86 @@ export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
       );
     }
     await blobs.commit(id);
+  }
+  async function restore(peer: Peer, epoch: string, force = false) {
+    const key = checkpointKey("pull", peer, epoch);
+    let pending = await snapshots.pending(key);
+    if (
+      !force &&
+      !pending &&
+      (await store.peerCursor(key)) &&
+      Date.now() - (await snapshots.age(key)) < 300000
+    )
+      return;
+    if (!pending) {
+      const created = z
+        .object({ id: z.string(), cursor: z.string() })
+        .parse(await requestJson(peer, "/sync/snapshots", { method: "POST" }));
+      await snapshots.begin(key, created, Date.now());
+      pending = await snapshots.pending(key);
+    }
+    while (pending && !stopped) {
+      if (pending.after === null) {
+        await snapshots.finish(key, Date.now());
+        return;
+      }
+      try {
+        const page = z
+          .object({
+            cursor: z.string(),
+            entities: z.array(z.unknown()).max(100),
+            next: z.string().nullable(),
+          })
+          .parse(
+            await requestJson(
+              peer,
+              `/sync/snapshots/${encodeURIComponent(pending.snapshotId)}?after=${encodeURIComponent(pending.after)}`
+            )
+          );
+        await snapshots.stage(
+          key,
+          { after: pending.after, pages: pending.pages },
+          page
+        );
+        pending = await snapshots.pending(key);
+      } catch (error) {
+        if (error instanceof SyncError && [404, 410].includes(error.status))
+          await snapshots.abandon(key);
+        throw error;
+      }
+    }
+    throw new SyncError("snapshot_incomplete");
+  }
+  async function pull(peer: Peer, key: string) {
+    for (let pages = 0; pages < 100 && !stopped; pages++) {
+      const cursor = await store.peerCursor(key);
+      const page = z
+        .object({
+          operations: z.array(operationSchema).max(100),
+          cursor: z.string().min(1).max(4096),
+          hasMore: z.boolean(),
+        })
+        .parse(
+          await requestJson(
+            peer,
+            `/sync/changes${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`
+          )
+        );
+      if (
+        !Array.isArray(page.operations) ||
+        page.operations.length > 100 ||
+        typeof page.cursor !== "string" ||
+        !page.cursor ||
+        page.cursor.length > 4096 ||
+        typeof page.hasMore !== "boolean" ||
+        (page.hasMore && (!page.operations.length || page.cursor === cursor))
+      )
+        throw new SyncError("invalid_peer_page");
+      for (const op of page.operations) await store.accept(op);
+      await store.savePeerCursor(key, page.cursor);
+      if (!page.hasMore) return;
+    }
+    throw new SyncError("sync_history_incomplete");
   }
   async function tick() {
     for (const peer of peers) {
@@ -255,7 +331,7 @@ export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
             nodeId: z.string(),
             epoch: z.string().min(1).max(128),
           })
-          .parse(await (await request(peer, "/capabilities")).json());
+          .parse(await requestJson(peer, "/capabilities"));
         if (
           capabilities.version !== 2 ||
           capabilities.workspaceId !== store.workspace ||
@@ -265,25 +341,28 @@ export function replication(store: SyncStore, blobs: BlobStore, peers: Peer[]) {
         )
           throw new Error("peer identity or protocol mismatch");
         await push(peer, capabilities.epoch);
-        let more = true;
-        let pages = 0;
-        while (more && pages++ < 100 && !stopped) {
-          const cursor = await store.peerCursor(peer.id);
-          const page = (await (
-            await request(
-              peer,
-              `/sync/changes${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`
-            )
-          ).json()) as {
-            operations: Operation[];
-            cursor: string;
-            hasMore: boolean;
-          };
-          if (!Array.isArray(page.operations) || page.operations.length > 100)
-            throw new Error("invalid_peer_page");
-          for (const op of page.operations) await store.accept(op);
-          await store.savePeerCursor(peer.id, page.cursor);
-          more = page.hasMore;
+        await restore(peer, capabilities.epoch);
+        const history = checkpointKey("history", peer, capabilities.epoch);
+        const complete = checkpointKey(
+          "history-complete",
+          peer,
+          capabilities.epoch
+        );
+        if (!(await store.peerCursor(complete))) {
+          await pull(peer, history);
+          await store.savePeerCursor(complete, "1");
+        }
+        const receive = checkpointKey("pull", peer, capabilities.epoch);
+        try {
+          await pull(peer, receive);
+        } catch (error) {
+          if (
+            !(error instanceof SyncError) ||
+            ![400, 409].includes(error.status)
+          )
+            throw error;
+          await restore(peer, capabilities.epoch, true);
+          await pull(peer, receive);
         }
         // Scan references separately: missing bytes must not hold up metadata or cursors.
         let after = "";

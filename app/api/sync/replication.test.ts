@@ -6,6 +6,7 @@ import { replication } from "./replication";
 import { BlobStore, chunkSize } from "./blobs";
 import { SyncStore, digest } from "./store";
 import { makeOperation } from "../../contracts/sync";
+import type { IncomingSnapshot } from "./snapshots";
 
 const dirs: string[] = [];
 afterEach(async () => {
@@ -45,6 +46,45 @@ async function fixture() {
     partial = false,
     failChunk = -1;
   const chunks: number[] = [];
+  const staged = new Map<string, IncomingSnapshot>();
+  const ages = new Map<string, number>();
+  let snapshotCreates = 0,
+    dropSnapshot = false,
+    zeroReceipt = false;
+  const snapshots = {
+    pending: async (key: string) => staged.get(key),
+    age: async (key: string) => ages.get(key) ?? 0,
+    begin: async (key: string, remote: { id: string; cursor: string }) => {
+      staged.set(key, {
+        version: 1,
+        snapshotId: remote.id,
+        cursor: remote.cursor,
+        after: "",
+        pages: 0,
+        expectedCursor: checkpoints.get(key) ?? null,
+      });
+    },
+    stage: async (
+      key: string,
+      _expected: { after: string; pages: number },
+      page: { next: string | null }
+    ) => {
+      const pending = staged.get(key)!;
+      staged.set(key, {
+        ...pending,
+        pages: pending.pages + 1,
+        after: page.next,
+      });
+    },
+    finish: async (key: string, now: number) => {
+      checkpoints.set(key, staged.get(key)!.cursor);
+      staged.delete(key);
+      ages.set(key, now);
+    },
+    abandon: async (key: string) => {
+      staged.delete(key);
+    },
+  };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string, init: RequestInit = {}) => {
@@ -59,6 +99,21 @@ async function fixture() {
         new Response(JSON.stringify(x), { status });
       if (path === "/capabilities")
         return json({ version: 2, workspaceId: "w", nodeId: "linux", epoch });
+      if (path === "/sync/snapshots") {
+        snapshotCreates++;
+        return json({ id: "snapshot", cursor: "snapshot-watermark" });
+      }
+      if (path === "/sync/snapshots/snapshot") {
+        if (u.searchParams.get("after") === "next" && dropSnapshot) {
+          dropSnapshot = false;
+          throw new Error("snapshot disconnected");
+        }
+        return json({
+          cursor: "snapshot-watermark",
+          entities: [],
+          next: u.searchParams.get("after") ? null : "next",
+        });
+      }
       if (path === "/sync/push") {
         const body = JSON.parse(String(init.body));
         pushes.push(
@@ -73,7 +128,7 @@ async function fixture() {
             operationId: o.operationId,
             ...(partial
               ? { persisted: false, error: "failure" }
-              : { seq: "1", duplicate: pushes.length > 1 }),
+              : { seq: zeroReceipt ? "0" : "1", duplicate: pushes.length > 1 }),
           })),
         });
       }
@@ -112,9 +167,12 @@ async function fixture() {
     })
   );
   const worker = () =>
-    replication(store as unknown as SyncStore, local, [
-      { id: "linux", url: "https://sync.example", token: "scoped-token" },
-    ]);
+    replication(
+      store as unknown as SyncStore,
+      local,
+      [{ id: "linux", url: "https://sync.example", token: "scoped-token" }],
+      snapshots
+    );
   return {
     store,
     local,
@@ -129,9 +187,40 @@ async function fixture() {
     loseAck: () => (dropAck = true),
     rejectReceipt: () => (partial = true),
     failChunk: (n: number) => (failChunk = n),
+    disconnectSnapshot: () => {
+      dropSnapshot = true;
+    },
+    snapshotCreates: () => snapshotCreates,
+    staged,
+    zeroReceipt: (value: boolean) => {
+      zeroReceipt = value;
+    },
   };
 }
 describe("outbound HTTPS bidirectional replication", () => {
+  it("resumes an interrupted snapshot across worker restart", async () => {
+    const f = await fixture();
+    f.disconnectSnapshot();
+    await f.worker().tick();
+    expect(f.snapshotCreates()).toBe(1);
+    expect([...f.staged.values()]).toMatchObject([{ after: "next", pages: 1 }]);
+    expect(f.store.accept).not.toHaveBeenCalled();
+    await f.worker().tick();
+    expect(f.snapshotCreates()).toBe(1);
+    expect(f.staged.size).toBe(0);
+    expect(f.store.accept).toHaveBeenCalledWith(f.remoteOp);
+  });
+  it("rejects zero sequence receipts without advancing the send cursor", async () => {
+    const f = await fixture();
+    f.zeroReceipt(true);
+    await f.worker().tick();
+    f.zeroReceipt(false);
+    await f.worker().tick();
+    expect(f.pushes).toEqual([
+      [f.localOp.operationId],
+      [f.localOp.operationId],
+    ]);
+  });
   it("pushes local changes and pulls remote changes from one outbound connection", async () => {
     const f = await fixture();
     await f.worker().tick();

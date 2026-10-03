@@ -1,0 +1,58 @@
+name: Native shared core
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.93.1
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - run: cargo fmt --manifest-path base/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path base/Cargo.toml --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path base/Cargo.toml --workspace --locked
+        env:
+          # Public isolated test key; production key comes from deployment secrets.
+          SHUFANG_CREDENTIAL_KEY: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+          SHUFANG_SERVICE_TOKEN: "isolated-ci-service-token-at-least-32-chars"
+      - run: cargo build --manifest-path base/Cargo.toml -p shufang-bindings --target wasm32-unknown-unknown --release --locked
+      - uses: actions/setup-dotnet@v4
+        if: runner.os == 'Windows' && hashFiles('platforms/windows/CoreBridge/CoreBridge.csproj') != ''
+        with:
+          dotnet-version: 8.0.x
+      - name: Build native library and verify C# binding
+        if: runner.os == 'Windows' && hashFiles('platforms/windows/CoreBridge/CoreBridge.csproj') != ''
+        run: |
+          cargo build --manifest-path base/Cargo.toml -p shufang-bindings -p shufang-service --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project platforms/windows/CoreBridge.Smoke/CoreBridge.Smoke.csproj
+      - uses: actions/setup-node@v4
+        if: runner.os == 'Windows' && hashFiles('platforms/windows/CoreBridge/CoreBridge.csproj') != ''
+        with:
+          node-version: 22
+      - name: Prepare document rendering dependencies
+        if: runner.os == 'Windows' && hashFiles('platforms/windows/CoreBridge/CoreBridge.csproj') != ''
+        run: |
+          npm ci --prefix app --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./platforms/windows/native/build.ps1
+          $env:SHUFANG_PDFIUM = (Resolve-Path .tools/native/dist/pdfium.dll).Path
+          $env:SHUFANG_MOBITOOL = (Resolve-Path .tools/native/dist/mobitool.exe).Path
+          cargo test --manifest-path base/Cargo.toml -p shufang-native --test native_parsers --locked -- --ignored
+      - name: Build WinUI desktop
+        if: runner.os == 'Windows' && hashFiles('platforms/windows/CoreBridge/CoreBridge.csproj') != ''
+        run: dotnet build platforms/windows/Shufang.Windows/Shufang.Windows.csproj -p:Platform=x64
+      - name: Windows renderer and independent service acceptance
+        if: runner.os == 'Windows' && hashFiles('platforms/windows/CoreBridge/CoreBridge.csproj') != ''
+        run: |
+          node --test platforms/windows/reader.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python platforms/windows/service-smoke.py platforms/windows/Shufang.Windows/bin/x64/Debug/net8.0-windows10.0.19041.0/win-x64

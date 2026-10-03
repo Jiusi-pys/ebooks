@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { sharedCore } from "./core-runtime";
+import { applyCoreOperation, mergeCoreStates } from "./core-fields";
 
 export const entityKinds = [
   "books",
@@ -179,29 +181,16 @@ export function mergeStates(
   prior: EntityState | undefined,
   incoming: EntityState
 ): EntityState {
-  if (!prior) return structuredClone(incoming);
-  const merged = structuredClone(prior);
-  merged.deleted ||= incoming.deleted;
-  for (const [key, field] of Object.entries(incoming.fields)) {
-    if (!merged.fields[key] || merged.fields[key].version < field.version)
-      merged.fields[key] = structuredClone(field);
-  }
-  return merged;
+  return mergeCoreStates(prior, incoming);
 }
 
 export function nextClock(previous = "0:0", now = Date.now()): string {
-  const [wall, counter] = previous.split(":").map(BigInt);
-  return BigInt(now) > wall ? `${now}:0` : `${wall}:${counter + 1n}`;
+  return sharedCore().execute<string>("nextClock", { previous, now });
 }
 export function compareClock(a: string, b: string): number {
-  const [aw, ac] = a.split(":").map(BigInt);
-  const [bw, bc] = b.split(":").map(BigInt);
-  return aw < bw ? -1 : aw > bw ? 1 : ac < bc ? -1 : ac > bc ? 1 : 0;
+  return sharedCore().execute<number>("compareClock", { a, b });
 }
-function version(op: Operation) {
-  const [wall, count] = op.clock.split(":");
-  return `${wall.padStart(16, "0")}:${count.padStart(10, "0")}:${op.replicaId}:${op.operationId}`;
-}
+
 export function makeOperation(
   workspaceId: string,
   replicaId: string,
@@ -263,22 +252,9 @@ export function applyOperation(
   prior: EntityState | undefined,
   op: Operation
 ): EntityState {
-  const state: EntityState = structuredClone(
-    prior ?? { id: op.entityId, kind: op.kind, deleted: false, fields: {} }
-  );
-  state.deleted ||= op.deleted;
-  const stamp = version(op);
-  const patch = { ...op.patch };
-  if (op.kind === "books" && patch.progress)
-    patch[`@progress:${op.replicaId}`] = patch.progress;
-  for (const key of new Set([...Object.keys(patch), ...op.unset])) {
-    if (state.fields[key] && state.fields[key].version >= stamp) continue;
-    state.fields[key] = op.unset.includes(key)
-      ? { version: stamp, removed: true }
-      : { version: stamp, value: patch[key] };
-  }
-  return state;
+  return applyCoreOperation(prior, op);
 }
+
 export function materialize(
   state: EntityState
 ): Record<string, unknown> | null {
@@ -363,11 +339,8 @@ export function materialize(
   return data;
 }
 export function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-  if (value && typeof value === "object")
-    return `{${Object.entries(value)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
-      .join(",")}}`;
-  return JSON.stringify(value);
+  return sharedCore().execute<string>("normalizeJson", {
+    json: JSON.stringify(value),
+    canonical: true,
+  });
 }

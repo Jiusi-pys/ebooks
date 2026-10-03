@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-03",
+  "scope": "native sync phase; full business migration incomplete",
+  "logs": [
+    {
+      "path": ".tools\\native-sync-rust.log",
+      "sha256": "1fbbc132956f8fbaba999769f4bbedd8092a49fbedb3ec03829bb4e2cfa84dc7",
+      "passed": 80,
+      "failed": 0,
+      "ignored": 6
+    },
+    {
+      "path": ".tools\\native-sync-linux-tests.log",
+      "sha256": "080ca6fa2490bd56680c68754bcedb5a93131eeeece1c66cb79f18f5fca7a789",
+      "passed": 81,
+      "failed": 0,
+      "ignored": 6
+    },
+    {
+      "path": ".tools\\native-sync-linux-clippy.log",
+      "sha256": "5f23f14d8927c56c3a16e25bf8ebe641c4fbe7705aa2f4aea244af4e80fdd067"
+    },
+    {
+      "path": ".tools\\native-sync-web-check.log",
+      "sha256": "762e2845f7004d471716da2ffaac5e241f0a6090a5374db4d3ec73599985f97a"
+    },
+    {
+      "path": ".tools\\native-sync-web-lint.log",
+      "sha256": "20913582ee678278c1c0311cb53509ce9f1fb891f016e6be539b4459dbee77e9"
+    },
+    {
+      "path": ".tools\\native-sync-web-tests.log",
+      "sha256": "89eaf366f25541d36738a160d3b831c7ac897b96e480b8e525829174a663a38e"
+    },
+    {
+      "path": ".tools\\native-sync-web-build.log",
+      "sha256": "fde0ca33f62c17b0cc1b7f09353e9f2a1e41a75b126733f6ca0a92f04f70cc13"
+    },
+    {
+      "path": ".tools\\native-sync-three-nodes.log",
+      "sha256": "571d561c4daaeff472d270b56989f717ff81a5106a3e20397828531592ce16fa"
+    },
+    {
+      "path": ".tools\\native-sync-winui-build.log",
+      "sha256": "4d007f617382b5ed5be2d9e6dcad5f7d9864a5f03525921c2fdf58b2ed5a4294"
+    }
+  ]
+}

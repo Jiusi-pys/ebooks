@@ -1,3 +1,5 @@
+> 当前状态（2026-10-03）：见[工程状态与验收门槛](../docs/current-status.md)。本文件中的日期/版本记录保留其历史范围；当前迁移为 MySQL 0014 / SQLite 0003 / IndexedDB 11，生产尚未正式切换。
+
 # 书房
 
 一个以 MySQL 保存书库、浏览器缓存支持本地阅读的书籍管理器。产品工作流参考 MarginNote 4：同一条摘录可以在原文、脑图和复习队列中复用，同时保留回到来源的定位关系。
@@ -27,7 +29,7 @@ npm.cmd test -- src/lib/search.test.ts src/lib/searchPdf.test.ts src/components/
 
 ## 本地运行与登录
 
-需要 Node.js 22.13 或更高版本。先复制配置文件，并设置强随机的 `APP_ID`、`APP_SECRET`、独立的 `APP_DATA_SECRET` 与 MySQL `DATABASE_URL`。用户表建立后，前两个初始凭据可以退役。
+需要 Node.js 22.13 或更高版本，以及 Rust 1.93.1 和 `wasm32-unknown-unknown` 目标；npm 预脚本从同一源码构建共享核心 WASM。先复制配置文件，并设置强随机的 `APP_ID`、`APP_SECRET`、独立的 `APP_DATA_SECRET` 与 MySQL `DATABASE_URL`。用户表建立后，前两个初始凭据可以退役。
 
 ```powershell
 # Windows PowerShell（npm.cmd 可绕过 npm.ps1 执行策略）

@@ -1,0 +1,29 @@
+[package]
+name = "shufang-service"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shufang-application = { path = "../application" }
+shufang-domain = { path = "../domain" }
+shufang-native = { path = "../native" }
+serde.workspace = true
+serde_json.workspace = true
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["multipart"] }
+tower-http = { version = "0.6", features = ["limit"] }
+uuid = { version = "1.21", features = ["v4"] }
+sha2 = "0.10"
+base64 = "0.22"
+fs2 = "0.4"
+url = "2"
+hmac = "0.12"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+reqwest = { version = "0.12", default-features = false, features = ["json","rustls-tls"] }
+futures-util = "0.3"
+tempfile = "3.26"
+
+[dev-dependencies]
+tempfile = "3.26"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

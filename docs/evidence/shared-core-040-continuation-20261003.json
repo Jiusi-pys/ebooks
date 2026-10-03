@@ -1,0 +1,193 @@
+{
+  "baseCommit": "f6879718dbc2333b3d39dcfafadb6b8318e0047e",
+  "workingTree": "uncommitted",
+  "date": "2026-10-03",
+  "migrations": {
+    "mysql": "0014",
+    "sqlite": "0003",
+    "indexeddb": 11,
+    "archive": "app/db/migration-history/20261003-through-mysql0014-sqlite0003-indexeddb0011.tar.gz",
+    "archiveSha256": "b91edf88c99c50beaf6bc013237884bc5470159b8a681a7c884db7543216d6db",
+    "verifiedEntries": 42
+  },
+  "checks": {
+    "web": {
+      "passed": 605,
+      "skipped": 50,
+      "passedFiles": 118,
+      "skippedFiles": 7,
+      "check": "passed",
+      "lint": "passed",
+      "build": "passed-existing-large-chunk-warning"
+    },
+    "windowsRust": {
+      "passed": 101,
+      "ignored": 6,
+      "clippy": "passed"
+    },
+    "linuxRust": {
+      "passed": 102,
+      "ignored": 6,
+      "clippy": "passed",
+      "releaseBuild": "passed"
+    },
+    "mysqlSnapshot": 3,
+    "mysqlLegacy": 6,
+    "deployPython": 11,
+    "bridge": "passed",
+    "winUIRelease": {
+      "warnings": 0,
+      "errors": 0
+    },
+    "updater": "passed-with-test-keys-not-production-signing"
+  },
+  "productionRehearsal": {
+    "backupUTC": "2026-10-03T02:05:11Z",
+    "backupScope": "online-precheck-not-quiesced-cutover",
+    "databaseSha256": "65cc6a71a16122acbc9924865ddb819c52f40d7152360e175233331f3da2de9c",
+    "runtimeSha256": "bf7bb0b1480fe1d5d7eb6bde5c863c00a2a58175920ccd2581da1d910da22e7a1",
+    "isolatedStates": 66,
+    "originalOperations": 2644,
+    "currentObjectsVerified": 20,
+    "digestDifferences": 0,
+    "missingObjects": 0,
+    "corruptObjects": 0,
+    "httpsPlatforms": [
+      "Windows native",
+      "Linux native"
+    ],
+    "originalsOpenedPerPlatform": 9,
+    "restart": true,
+    "localIncrements": "user-confirmed-none",
+    "productionCutover": false,
+    "newPackagePublished": false
+  },
+  "openGates": [
+    "full-Web-business-migration",
+    "native-business-lone-UTF16-surrogates",
+    "snapshot-and-upload-GC-quotas",
+    "legacy-unpaired-and-oversized-operation-transition",
+    "remaining-preallocation-of-REST-operation-IDs",
+    "account-AI-configuration-handoff",
+    "actual-Web-login-and-interaction",
+    "clean-Windows-login-reboot",
+    "production-signing-and-HTTPS-update-source",
+    "quiesced-cutover-backup-single-writer-and-24-hour-observation"
+  ],
+  "artifacts": [
+    {
+      "path": ".tools/shared-core-040-cont-check-final5.log",
+      "sha256": "7a6840b7a52b96e2590ec678975150fbd18d8869c80bb4d1454403fe16916ddc"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-lint-final5.log",
+      "sha256": "20913582ee678278c1c0311cb53509ce9f1fb891f016e6be539b4459dbee77e9"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-web-final5.log",
+      "sha256": "140f63b96257bad2b553d30cb19a1c8b465ea8969470ee31a4b13ebc0ff98f32"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-build-final5.log",
+      "sha256": "4562887eb633bdf749ad41d88e174549eb94ee6d4fd453d60026f8291227a65c"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-rust-final3.log",
+      "sha256": "66115a1e3c260cece425268f21c9015b4b4dd34d4b82dec1f5fa28becac4453e"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-clippy-final3.log",
+      "sha256": "44159e419ec6d894a134a60a255b69224bdaaf36263257e73ec18acc9bd0d52e"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-linux-final3.log",
+      "sha256": "33bbc91131571f8c112b92800c016117d8f00499c73f96ba5be004dab3033242"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-winui-final4.log",
+      "sha256": "f3e63bd0694e7782a93c063ca3cb7b7e4ad763f02413b4421da7e49ebe60d3c8"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-bridge-final5.log",
+      "sha256": "2012c32fe97417ef33c71a0bea6ca0edc321d24dc21f9542c4a5f07ccd457a1b"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-updates-final5.log",
+      "sha256": "a3fa2755ba68eb8942ed0c99731797fd5c91783209c7a5bf3956b4699e09f77d"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-python-final5.log",
+      "sha256": "416e6c62d505d5dd56c412a74476810f71d82803adf828e5418c806dc8f719e1"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-snapshot-mysql-final5.log",
+      "sha256": "4de8fbbb7365f8aa0ce95a9b69b56e3bcfd4477cf4aa0197137af12b2d136f60"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-legacy-mysql-final5.log",
+      "sha256": "f2d3916ab557b6c39d168a5ca6e96abcc105ecffe72a0df9ecc0a3f85f937e04"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-https-native-final.log",
+      "sha256": "18fc666649de2a6f0a7b11a9dc3f35ddffcd98ccc6e918e27a673e1fc73ef5d0"
+    },
+    {
+      "path": ".tools/shared-core-040-cont-https-linux-final.log",
+      "sha256": "7ecfd578143d8372ca93896e4f192483d77c9c99aeacf97008ead41921b41a57"
+    }
+  ],
+  "sources": [
+    {
+      "path": "base/Cargo.toml",
+      "sha256": "5fb002b90164cbc9b7c156a10cf958411bbb53be57b35e459c22bf9ea7ba523c"
+    },
+    {
+      "path": "base/Cargo.lock",
+      "sha256": "6233d24f0a17341c09b4e014ddcefbe1e06fee2884914b2a33eb11be270dd477"
+    },
+    {
+      "path": "base/crates/native/src/workspace.rs",
+      "sha256": "9024c5aaff0773292d680c17ae8d40e04c798440b2ff57b298eebca9a1a32601"
+    },
+    {
+      "path": "app/src/lib/syncSnapshots.ts",
+      "sha256": "dad80fd2fa6366fe9a70c012ee4973ea359a59eae33014a7702f5e59117e6e35"
+    },
+    {
+      "path": "app/src/lib/workspaceSync.ts",
+      "sha256": "612f940c6686476c1bb55f1a6bc980f0a0043e2e7519a666190b4253c9abf497"
+    },
+    {
+      "path": "app/api/sync/replication.ts",
+      "sha256": "4e86078f67058088aff0922265b487fed17d1e142d0e7c4135a5e9f4609483d8"
+    },
+    {
+      "path": "app/api/sync/peer-response.ts",
+      "sha256": "650bcea07695c54d46390ff241d64eab007310840f18f034e6cb614bda6a73f2"
+    },
+    {
+      "path": "app/api/sync/blobs.ts",
+      "sha256": "fdaa321737e9b9baed918ffeb58130f5fa016d8e4374b1133cda8b56b02289f6"
+    },
+    {
+      "path": "app/api/sync/snapshots.ts",
+      "sha256": "f5477707a086db56444839994280a32f1caf99a955a6b202811c339d49452924"
+    },
+    {
+      "path": "app/api/sync/local-operation.ts",
+      "sha256": "4271531ba736b4ecdbe7ee1de4de06a746db77eda0e4fee750cfd58c50c6c139"
+    },
+    {
+      "path": "app/api/sync/legacy.ts",
+      "sha256": "21f0f8c416c72207aea5f095c33dc7e6e8a96e1023b9dc10ee6421ee07ac7a61"
+    },
+    {
+      "path": "docs/shared-core-040-execution.md",
+      "sha256": "1868dd6fd5588e0ff882f4362473e1c93be4422cb8479e519396b453f3aec1ee"
+    },
+    {
+      "path": "docs/mysql-incoming-snapshot-format.md",
+      "sha256": "0ac345a471721c34c5a9273d3dc4b4c2f190d701c0285c68d467691c1d96b0c5"
+    }
+  ]
+}

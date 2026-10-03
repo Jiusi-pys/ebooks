@@ -2,3 +2,5 @@
 app/db/migrations/** text eol=lf
 app/db/migration-history/*.json text eol=lf
 app/db/migration-history/*.tar.gz binary
+base/crates/sqlite/migrations/** text eol=lf
+app/db/indexeddb-migrations/*.source -text -whitespace

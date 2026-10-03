@@ -3,22 +3,18 @@ import { bodyLimit } from "hono/body-limit";
 import { createReadStream } from "node:fs";
 import { open } from "node:fs/promises";
 import { Readable } from "node:stream";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { ZodError } from "zod";
 import { requireBrowserMutation, requireBrowserSession } from "../auth";
 import { extractKey, validKey } from "../lib/openapi-auth";
-import {
-  identifier,
-  makeOperation,
-  nextClock,
-  entityKinds,
-} from "../../contracts/sync";
+import { identifier, nextClock, entityKinds } from "../../contracts/sync";
 import { SyncError, SyncStore } from "./store";
 import { BlobStore, chunkSize } from "./blobs";
 import { replication, type Peer } from "./replication";
 import { importLegacy } from "./legacy";
 import { syncOpenApi } from "../../contracts/sync-openapi";
 import { setActiveSyncStore } from "./active";
+import { localOperation } from "./local-operation";
 
 export function createSyncApi(
   store: SyncStore,
@@ -128,7 +124,14 @@ export function createSyncApi(
         .map(([key, field]) => [key, field.value])
     );
     const op = {
-      ...makeOperation(store.workspace, store.nodeId, state.kind, id, patch),
+      ...(await localOperation(
+        store.workspace,
+        store.nodeId,
+        state.kind,
+        id,
+        patch,
+        blobs
+      )),
       operationId,
       clock: prior?.clock ?? nextClock((await store.head()).clock),
     };
@@ -144,16 +147,23 @@ export function createSyncApi(
   );
   api.post("/mutations", async c => {
     const input = await c.req.json();
-    const operationId = input.operationId ?? randomUUID();
-    const previous = await store.operation(operationId);
+    const previous = input.operationId
+      ? await store.operation(input.operationId)
+      : undefined;
+    const draft = await localOperation(
+      store.workspace,
+      store.nodeId,
+      input.kind,
+      input.kind === "reviews"
+        ? (input.operationId ?? "new-review")
+        : input.entityId,
+      input.patch ?? {},
+      blobs
+    );
+    const operationId = input.operationId ?? draft.operationId;
     const op = {
-      ...makeOperation(
-        store.workspace,
-        store.nodeId,
-        input.kind,
-        input.kind === "reviews" ? operationId : input.entityId,
-        input.patch ?? {}
-      ),
+      ...draft,
+      entityId: input.kind === "reviews" ? operationId : draft.entityId,
       operationId,
       clock:
         input.clock ?? previous?.clock ?? nextClock((await store.head()).clock),
@@ -246,7 +256,7 @@ export async function configureSync() {
     process.env.SYNC_BLOB_DIR ?? `.runtime/blobs/${workspace}`
   );
   await importLegacy(store, blobs);
-  setActiveSyncStore(store);
+  setActiveSyncStore(store, blobs);
   const peers: Peer[] = JSON.parse(process.env.SYNC_PEERS_JSON ?? "[]");
   for (const peer of peers) {
     identifier.parse(peer.id);

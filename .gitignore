@@ -1,0 +1,4 @@
+/base/target/
+/.tools/
+/platforms/**/bin/
+/platforms/**/obj/

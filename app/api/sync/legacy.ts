@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import {
-  makeOperation,
   materialize,
   nextClock,
   isBlobReference,
@@ -20,34 +19,14 @@ import { readFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
 import { ZodError } from "zod";
+import { localOperation } from "./local-operation";
+import { camelLegacyRow } from "./legacy-row";
 import {
   assembleBookMirrorUpload,
   bookImportStartedSchema,
   bookImportChunkSchema,
   bookImportCompletedSchema,
 } from "../lib/book-mirror-upload";
-
-async function externalize(op: Operation, blobs: BlobStore) {
-  for (const [key, value] of Object.entries(op.patch)) {
-    const bytes = Buffer.from(JSON.stringify(value));
-    if (bytes.length <= 128 * 1024) continue;
-    const manifest = {
-      sha256: digest(bytes),
-      size: bytes.length,
-      name: "field.json",
-      type: "application/json",
-    };
-    const upload = await blobs.create(manifest);
-    if (!upload.present)
-      for (let i = 0; i < upload.chunks; i++) {
-        const part = bytes.subarray(i * 262144, (i + 1) * 262144);
-        await blobs.put(upload.id, i, part, digest(part));
-      }
-    await blobs.commit(upload.id);
-    op.patch[key] = { $blob: manifest };
-  }
-  return op;
-}
 
 export async function legacyBookImport(
   store: SyncStore,
@@ -125,28 +104,35 @@ export async function legacyBookImport(
   );
   const assembled = assembleBookMirrorUpload(
     data,
-    staged.map(camel) as Parameters<typeof assembleBookMirrorUpload>[1]
+    staged.map(camelLegacyRow) as Parameters<typeof assembleBookMirrorUpload>[1]
   );
   if (prior) return store.accept(prior);
   const existing = await store.entity("books", data.extId);
-  const op = makeOperation(store.workspace, store.nodeId, "books", data.extId, {
-    title: assembled.title,
-    author: assembled.author,
-    format: assembled.format,
-    folderId: assembled.folder,
-    contentHash: assembled.contentHash,
-    chapters: assembled.chapters,
-    ...(!existing
-      ? {
-          coverTone: 0,
-          createdAt: Date.now(),
-          progress: { chapterId: assembled.chapters[0]?.id ?? "", ratio: 0 },
-        }
-      : {}),
-  });
+  const op = await localOperation(
+    store.workspace,
+    store.nodeId,
+    "books",
+    data.extId,
+    {
+      title: assembled.title,
+      author: assembled.author,
+      format: assembled.format,
+      folderId: assembled.folder,
+      contentHash: assembled.contentHash,
+      chapters: assembled.chapters,
+      ...(!existing
+        ? {
+            coverTone: 0,
+            createdAt: Date.now(),
+            progress: { chapterId: assembled.chapters[0]?.id ?? "", ratio: 0 },
+          }
+        : {}),
+    },
+    blobs
+  );
   op.operationId = operationId;
   op.clock = nextClock((await store.head()).clock);
-  return store.accept(await externalize(op, blobs));
+  return store.accept(op);
 }
 
 const kinds: Record<string, Operation["kind"]> = {
@@ -168,14 +154,6 @@ const tables: [string, Operation["kind"]][] = [
   ["mirror_translations", "translations"],
   ["mirror_mindmaps", "mindMaps"],
 ];
-function camel(row: RowDataPacket) {
-  return Object.fromEntries(
-    Object.entries(row).map(([key, value]) => [
-      key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
-      value,
-    ])
-  );
-}
 export async function importLegacy(store: SyncStore, blobs: BlobStore) {
   if (await store.peerCursor("legacy-import-v1")) return;
   for (const [table, kind] of tables) {
@@ -183,7 +161,7 @@ export async function importLegacy(store: SyncStore, blobs: BlobStore) {
       `SELECT * FROM ${table}`
     );
     for (const raw of rows) {
-      const row = camel(raw);
+      const row = camelLegacyRow(raw);
       const id = String(row.extId);
       let data: Record<string, unknown> = {
         ...row,
@@ -243,35 +221,7 @@ export async function importLegacy(store: SyncStore, blobs: BlobStore) {
       void _id;
       for (const key of Object.keys(patch))
         if (patch[key] == null) delete patch[key];
-      const op = makeOperation(
-        store.workspace,
-        "legacy-import",
-        kind,
-        id,
-        JSON.parse(JSON.stringify(patch)),
-        0
-      );
-      for (const [field, value] of Object.entries(op.patch)) {
-        const bytes = Buffer.from(JSON.stringify(value));
-        if (bytes.length <= 128 * 1024) continue;
-        const manifest = {
-          sha256: digest(bytes),
-          size: bytes.length,
-          name: "field.json",
-          type: "application/json",
-        };
-        const upload = await blobs.create(manifest);
-        if (!upload.present) {
-          for (let i = 0; i < upload.chunks; i++) {
-            const part = bytes.subarray(i * 262144, (i + 1) * 262144);
-            await blobs.put(upload.id, i, part, digest(part));
-          }
-          await blobs.commit(upload.id);
-        }
-        op.patch[field] = { $blob: manifest };
-      }
-      op.operationId = `legacy-${digest(JSON.stringify(op.patch) + kind + id)}`;
-      await store.accept(op);
+      let sourcePatch: Record<string, unknown> | undefined;
       if (kind === "books" && row.sourceManifest) {
         const manifest = JSON.parse(row.sourceManifest);
         const upload = await blobs.create(manifest);
@@ -286,17 +236,35 @@ export async function importLegacy(store: SyncStore, blobs: BlobStore) {
           }
           await blobs.commit(upload.id);
         }
-        const sourceOp = makeOperation(
-          store.workspace,
-          "legacy-import",
-          "sources",
-          id,
-          { ...manifest, format: row.format },
-          0
-        );
-        sourceOp.operationId = `legacy-source-${digest(id + manifest.sha256)}`;
-        await store.accept(sourceOp);
+        sourcePatch = { ...manifest, format: row.format };
       }
+      const op = await localOperation(
+        store.workspace,
+        "legacy-import",
+        kind,
+        id,
+        JSON.parse(JSON.stringify(patch)),
+        blobs,
+        0
+      );
+      op.operationId = `legacy-${digest(JSON.stringify(op.patch) + kind + id)}`;
+      const sourceOp = sourcePatch
+        ? await localOperation(
+            store.workspace,
+            "legacy-import",
+            "sources",
+            id,
+            sourcePatch,
+            blobs,
+            0
+          )
+        : undefined;
+      if (sourceOp)
+        sourceOp.operationId = `legacy-source-${digest(id + sourcePatch!.sha256)}`;
+      await store.transaction(async db => {
+        await store.accept(op, db);
+        if (sourceOp) await store.accept(sourceOp, db);
+      });
     }
   }
   for (const [table, kind] of [
@@ -307,12 +275,13 @@ export async function importLegacy(store: SyncStore, blobs: BlobStore) {
       `SELECT ext_id FROM ${table}`
     );
     for (const row of rows) {
-      const op = makeOperation(
+      const op = await localOperation(
         store.workspace,
         "legacy-import",
         kind,
         row.ext_id,
         {},
+        blobs,
         0
       );
       op.operationId = `legacy-delete-${digest(kind + row.ext_id)}`;
@@ -424,18 +393,19 @@ export function legacyBridge(
           if (["created", "imported"].includes(action))
             data.createdAt ??= Number(clock.split(":")[0]);
           const operation = {
-            ...makeOperation(
+            ...(await localOperation(
               store.workspace,
               store.nodeId,
               eventKind,
               entityId,
-              data
-            ),
+              data,
+              blobs
+            )),
             operationId,
             clock,
             deleted: action === "deleted",
           };
-          await store.mutate(await externalize(operation, blobs));
+          await store.mutate(operation);
           c.res = c.json({ ok: true, mirrored: true });
         }
       );
@@ -489,12 +459,13 @@ export function legacyBridge(
           await blobs.completeLegacy(id, manifest);
           const operationId = `source-${digest(id + manifest.sha256)}`;
           const prior = await store.operation(operationId);
-          const op = makeOperation(
+          const op = await localOperation(
             store.workspace,
             store.nodeId,
             "sources",
             id,
-            { ...manifest, format: materialize(book)?.format }
+            { ...manifest, format: materialize(book)?.format },
+            blobs
           );
           op.operationId = operationId;
           op.clock = nextClock((await store.head()).clock);
@@ -606,12 +577,19 @@ export function legacyBridge(
         patch.updatedAt ??= patch.createdAt;
       }
       const op = {
-        ...makeOperation(store.workspace, store.nodeId, kind, entityId, patch),
+        ...(await localOperation(
+          store.workspace,
+          store.nodeId,
+          kind,
+          entityId,
+          patch,
+          blobs
+        )),
         clock,
         deleted: c.req.method === "DELETE",
         operationId,
       };
-      await store.mutate(await externalize(op, blobs));
+      await store.mutate(op);
       c.res = c.json({ ok: true, extId: entityId });
     });
   });

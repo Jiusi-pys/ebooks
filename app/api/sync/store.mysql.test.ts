@@ -250,4 +250,45 @@ describe.skipIf(!url)("real MySQL replication transactions", () => {
     ).toBe(true);
     expect((await store.mutate(op)).duplicate).toBe(true);
   });
+  it("does not commit a migrated book when its original file cannot be verified", async () => {
+    const isolated = new SyncStore(
+      url!,
+      `test-${randomUUID()}`,
+      "atomic-import"
+    );
+    const root = await mkdtemp(join(tmpdir(), "sync-atomic-import-"));
+    const id = randomUUID();
+    try {
+      await isolated.initialize();
+      const manifest = {
+        sha256: "a".repeat(64),
+        size: 10,
+        name: "missing.txt",
+        type: "text/plain",
+        uploadId: "missing",
+      };
+      await store.pool.query(
+        "INSERT INTO mirror_books(ext_id,title,format,chapters,source_manifest) VALUES (?,?,?,?,?)",
+        [id, "Missing source", "txt", "[]", JSON.stringify(manifest)]
+      );
+      await expect(importLegacy(isolated, new BlobStore(root))).rejects.toThrow(
+        "missing_chunks"
+      );
+      expect(await isolated.entity("books", id)).toBeUndefined();
+      expect(await isolated.entity("sources", id)).toBeUndefined();
+    } finally {
+      await store.pool.query("DELETE FROM mirror_books WHERE ext_id=?", [id]);
+      for (const table of [
+        "sync_operations",
+        "sync_entities",
+        "sync_cursors",
+        "sync_heads",
+      ])
+        await store.pool.query(`DELETE FROM ${table} WHERE workspace=?`, [
+          isolated.workspace,
+        ]);
+      await isolated.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

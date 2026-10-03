@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import type { Book } from "../../src/types";
+import type { Book } from "../../contracts/domain";
 
 export interface ReaderSession {
   id: string;

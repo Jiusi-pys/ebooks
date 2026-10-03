@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
+import {
+  createCoreRecord,
+  normalizeCoreStudySet,
+} from "@contracts/core-library";
 import type {
   Association,
   AssociationDirection,
@@ -563,13 +567,13 @@ export function useLibrary() {
 
   const createNote = useCallback(
     async (title: string): Promise<Note> => {
-      const note: Note = {
-        id: uid(),
-        title: title.trim() || "未命名笔记",
-        content: "",
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
+      const note = createCoreRecord(
+        "notes",
+        uid(),
+        title,
+        Date.now(),
+        Date.now()
+      );
       await putNote(note);
       await emitEvent("note.created", {
         extId: note.id,
@@ -791,11 +795,7 @@ export function useLibrary() {
   );
 
   const createFolder = useCallback(async (name: string): Promise<Folder> => {
-    const folder: Folder = {
-      id: uid(),
-      name: name.trim() || "未命名文件夹",
-      createdAt: Date.now(),
-    };
+    const folder = createCoreRecord("folders", uid(), name, Date.now());
     await emitEvent("folder.created", { extId: folder.id, name: folder.name });
     await putFolder(folder);
     setFolders(s => [...s, folder]);
@@ -839,14 +839,7 @@ export function useLibrary() {
   const createStudySet = useCallback(
     async (name: string): Promise<StudySet> => {
       const now = Date.now();
-      const set: StudySet = {
-        id: uid(),
-        name: name.trim() || "未命名学习集",
-        description: "",
-        bookIds: [],
-        createdAt: now,
-        updatedAt: now,
-      };
+      const set = createCoreRecord("studySets", uid(), name, now);
       await putStudySet(set);
       setStudySets(current => [set, ...current]);
       emitEvent("studyset.created", {
@@ -860,12 +853,7 @@ export function useLibrary() {
   );
 
   const saveStudySet = useCallback(async (set: StudySet) => {
-    const updated = {
-      ...set,
-      name: set.name.trim() || "未命名学习集",
-      bookIds: [...new Set(set.bookIds)],
-      updatedAt: Date.now(),
-    };
+    const updated = normalizeCoreStudySet(set, Date.now());
     await putStudySet(updated);
     setStudySets(current =>
       current

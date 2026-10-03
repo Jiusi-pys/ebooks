@@ -1,5 +1,6 @@
-import { activeSyncStore } from "./sync/active";
-import { makeOperation, nextClock } from "../contracts/sync";
+import { localOperation } from "./sync/local-operation";
+import { activeSyncStore, activeSyncBlobs } from "./sync/active";
+import { nextClock } from "../contracts/sync";
 /**
  * 書房开放 API —— /api/v1
  *
@@ -1802,23 +1803,40 @@ v1.post(
     const extId = q.extId || crypto.randomUUID();
     if (activeSyncStore) {
       const now = Date.now();
-      const operation = makeOperation(activeSyncStore.workspace, activeSyncStore.nodeId, "translations", extId, { bookId: q.bookExtId, chapterId: "", chapterTitle: q.chapterTitle, targetLang: q.targetLang, scope: q.mode, text: translation, createdAt: now, updatedAt: now });
+      const operation = await localOperation(
+        activeSyncStore.workspace,
+        activeSyncStore.nodeId,
+        "translations",
+        extId,
+        {
+          bookId: q.bookExtId,
+          chapterId: "",
+          chapterTitle: q.chapterTitle,
+          targetLang: q.targetLang,
+          scope: q.mode,
+          text: translation,
+          createdAt: now,
+          updatedAt: now,
+        },
+        activeSyncBlobs
+      );
       operation.clock = nextClock((await activeSyncStore.head()).clock);
       await activeSyncStore.accept(operation);
-    } else await getDb()
-      .insert(mirrorTranslations)
-      .values({
-        extId,
-        bookExtId: q.bookExtId,
-        bookTitle: q.bookTitle,
-        chapterTitle: q.chapterTitle,
-        targetLang: q.targetLang,
-        scope: q.mode,
-        text: translation,
-      })
-      .onDuplicateKeyUpdate({
-        set: { text: translation, targetLang: q.targetLang, scope: q.mode },
-      });
+    } else
+      await getDb()
+        .insert(mirrorTranslations)
+        .values({
+          extId,
+          bookExtId: q.bookExtId,
+          bookTitle: q.bookTitle,
+          chapterTitle: q.chapterTitle,
+          targetLang: q.targetLang,
+          scope: q.mode,
+          text: translation,
+        })
+        .onDuplicateKeyUpdate({
+          set: { text: translation, targetLang: q.targetLang, scope: q.mode },
+        });
     fanout({
       type: "translation.created",
       source: "api",

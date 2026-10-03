@@ -1,5 +1,7 @@
 import { openDB, type IDBPDatabase } from "idb";
 import { trackDatabase, upgradeSyncDatabase } from "./syncDatabase";
+import { sharedCore } from "@contracts/core-runtime";
+import { hashObjectBytes } from "@contracts/core-field-objects";
 import type {
   Association,
   Book,
@@ -22,7 +24,7 @@ import {
 } from "./citations";
 
 export const SHUFANG_DB_NAME = "shufang";
-export const SHUFANG_DB_VERSION = 10;
+export const SHUFANG_DB_VERSION = 11;
 
 const SEED_MARKER_KEY = "example-library-v1";
 
@@ -88,6 +90,11 @@ function db() {
         }
         // Repair incomplete historical schemas by presence, preserving all records.
         upgradeSyncDatabase(d);
+        if (oldVersion < 11)
+          tx.objectStore("syncMeta").put({
+            id: "field-outbox-format-v1",
+            version: 1,
+          });
         if (!d.objectStoreNames.contains("books")) {
           d.createObjectStore("books", { keyPath: "id" });
         }
@@ -634,20 +641,49 @@ export interface StoredFile {
   /** 新导入使用 Blob 避免导入阶段再次读取整文件；兼容旧 ArrayBuffer。 */
   data: ArrayBuffer | Blob;
 }
+async function prepareSource(file: StoredFile, bookId = file.id) {
+  const isBlob = Object.prototype.toString.call(file.data) === "[object Blob]";
+  const size = isBlob
+    ? (file.data as Blob).size
+    : (file.data as ArrayBuffer).byteLength;
+  const name = file.name ?? `${file.id}.${file.type}`;
+  const type = isBlob ? (file.data as Blob).type : "application/octet-stream";
+  sharedCore().execute("validateSourceLink", {
+    bookId,
+    fileId: file.id,
+    size,
+    nameJson: JSON.stringify(name),
+    typeJson: JSON.stringify(type),
+  });
+  const bytes = isBlob
+    ? await (file.data as Blob).arrayBuffer()
+    : (file.data as ArrayBuffer);
+  return {
+    id: file.id,
+    sha256: hashObjectBytes(new Uint8Array(bytes)),
+    size,
+    name,
+    type,
+    format: file.type,
+  };
+}
 
 /** Commit an imported book and its optional source file as one atomic unit. */
 export async function putImportedBook(book: Book, file?: StoredFile) {
+  const source = file ? await prepareSource(file, book.id) : undefined;
   const database = await db();
-  const tx = database.transaction(["books", "files"], "readwrite");
+  const tx = database.transaction(["books", "files", "sources"], "readwrite");
   await tx.objectStore("books").put(book);
   if (file) await tx.objectStore("files").put(file);
+  if (source) await tx.objectStore("sources").put(source);
   await tx.done;
 }
 
 /** Merge server data and unsent edits under the same lock as reader writes. */
 export async function cacheServerBook(book: Book, file?: StoredFile) {
+  const source = file ? await prepareSource(file, book.id) : undefined;
   const tx = (await db()).transaction(
-    ["books", "files", "metadata"],
+    ["books", "files", "sources", "metadata"],
     "readwrite"
   );
   const pending = (await tx
@@ -664,11 +700,16 @@ export async function cacheServerBook(book: Book, file?: StoredFile) {
   if (merged.typeSettings === null) delete merged.typeSettings;
   await tx.objectStore("books").put(merged);
   if (file) await tx.objectStore("files").put(file);
+  if (source) await tx.objectStore("sources").put(source);
   await tx.done;
 }
 
 export async function putFile(f: StoredFile) {
-  await (await db()).put("files", f);
+  const source = await prepareSource(f);
+  const tx = (await db()).transaction(["files", "sources"], "readwrite");
+  await tx.objectStore("files").put(f);
+  await tx.objectStore("sources").put(source);
+  await tx.done;
 }
 
 export async function getFile(id: string): Promise<StoredFile | undefined> {
@@ -724,11 +765,21 @@ export async function patchFolderName(
 export async function deleteFolder(id: string) {
   const d = await db();
   const tx = d.transaction(["folders", "books"], "readwrite");
-  await tx.objectStore("folders").delete(id);
   const bookStore = tx.objectStore("books");
   const books = (await bookStore.getAll()) as Book[];
+  const detach = new Set(
+    JSON.parse(
+      sharedCore().execute<string>("planFolderDeletion", {
+        folderJson: JSON.stringify(id),
+        booksJson: JSON.stringify(
+          books.map(book => ({ id: book.id, folderId: book.folderId }))
+        ),
+      })
+    ) as string[]
+  );
+  await tx.objectStore("folders").delete(id);
   for (const b of books) {
-    if (b.folderId === id) {
+    if (detach.has(b.id)) {
       const updated = { ...b };
       delete updated.folderId;
       await bookStore.put(updated);

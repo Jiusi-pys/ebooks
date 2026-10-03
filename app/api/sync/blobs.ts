@@ -43,10 +43,22 @@ export class BlobStore {
     return join(this.root, "uploads", id);
   }
   async has(hash: string) {
-    return stat(this.path(hash)).then(
-      () => true,
-      () => false
-    );
+    const path = this.path(hash);
+    try {
+      const info = await stat(path);
+      if (!info.isFile() || info.size > 256 * 1024 * 1024) return false;
+      const actual = createHash("sha256");
+      let size = 0;
+      for await (const chunk of createReadStream(path)) {
+        size += chunk.length;
+        if (size > 256 * 1024 * 1024) return false;
+        actual.update(chunk);
+      }
+      return size === info.size && actual.digest("hex") === hash;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
   }
   private legacyPath(bookId: string, hash: string) {
     this.path(hash);

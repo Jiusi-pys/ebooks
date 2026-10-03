@@ -1,3 +1,5 @@
+> 当前状态（2026-10-03）：见[工程状态与验收门槛](../../../docs/current-status.md)。本文件中的日期/版本记录保留其历史范围；当前迁移为 MySQL 0014 / SQLite 0003 / IndexedDB 11，生产尚未正式切换。
+
 # 验收标准 v1 —— 書房对齐 MarginNote 4
 
 调研来源：MarginNote 4 官方手册（manual.marginnote.com.cn）、官网功能页（marginnote.com/features）、少数派 MN4 上手系列、官方论坛 4.2.x 更新日志（2026-08-30 检索）。

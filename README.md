@@ -1,3 +1,5 @@
+> 当前状态（2026-10-03）：见[工程状态与验收门槛](docs/current-status.md)。本文件中的日期/版本记录保留其历史范围；当前迁移为 MySQL 0014 / SQLite 0003 / IndexedDB 11，生产尚未正式切换。
+
 # Shufang (書房)
 
 [简体中文](README_zh.md)
@@ -10,6 +12,18 @@ mind maps, spaced review, and AI-assisted reading in one web application.
 This is not a pixel-for-pixel MarginNote clone. Apple Pencil handwriting,
 video timeline annotations, iCloud sync, native OCR, and Apple-platform
 extensions are outside the current web scope.
+
+## Shared core and branch layout
+
+`base` contains the shared Rust core, standalone service and Web/Node adapters.
+`windows` builds on `base` and adds the WinUI client, C# bridge and Windows
+installation/update tools. Domain/application do not depend on presentation.
+The full Web business migration remains incomplete.
+
+Current storage versions: MySQL 0014, SQLite 0003, IndexedDB 11. Native v2
+HTTPS restore has passed on separate Windows/Linux workspaces; production
+cutover, clean Windows and production signing/update feeds remain unverified.
+See [current status](docs/current-status.md) for evidence and open gates.
 
 ## Implemented Features
 
@@ -218,6 +232,13 @@ it from the earlier synchronization acceptance release. See the
 [deployment instructions](deploy/README.md) and [latest acceptance record](docs/deployment-acceptance-20260927.md).
 
 ## Requirements
+
+Source development and builds also require Rust 1.93.1 and
+`rustup target add wasm32-unknown-unknown`. The npm development, check, test and
+build commands generate the shared WASM core automatically. Production images
+do not require Rust at runtime. See the [migration contract](docs/native-core-migration.md)
+for current gates; the Windows project is an offline notes architecture preview,
+not yet the full native application.
 
 | Dependency | Requirement                                                 |
 | ---------- | ----------------------------------------------------------- |
@@ -801,7 +822,7 @@ in place.
 The image deliberately does not contain `.env` or Codex credentials:
 
 ```bash
-docker build -t shufang ./app
+docker build -t shufang -f app/Dockerfile .
 docker run --rm --name shufang \
   -p 127.0.0.1:3000:3000 \
   --env-file app/.env \
@@ -904,3 +925,11 @@ See [`AGENTS.md`](AGENTS.md) for contributor conventions.
   `PUBLIC_ORIGIN` and restart Shufang.
 - **Port 3000 is occupied:** stop the existing process or set another `PORT` for
   the production server. For development, use `npm run dev -- --port 3001`.
+
+### Windows native implementation
+
+The WinUI desktop, Rust/SQLite use cases, AI adapters and independent service are
+available under `platforms/windows` and `base`. See the [Windows guide](platforms/windows/README.md)
+and [verification/remaining parity gates](docs/windows-delivery.md). Native replication and Windows configuration are now under implementation;
+see [isolated sync evidence and remaining migration gates](docs/native-sync-acceptance-20261003.md).
+The full Web business cutover and real HTTPS acceptance remain incomplete.

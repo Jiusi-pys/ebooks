@@ -1,0 +1,16 @@
+.git
+.tools
+base/target
+**/node_modules
+**/dist
+**/generated
+**/.runtime
+**/.env
+**/.env.*
+!**/.env.example
+**/coverage
+**/bin
+**/obj
+*.tar.gz
+!app/db/migration-history/*.tar.gz
+*.jpg

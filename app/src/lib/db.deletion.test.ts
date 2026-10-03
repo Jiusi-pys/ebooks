@@ -1,5 +1,6 @@
 import "fake-indexeddb/auto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sharedCore } from "@contracts/core-runtime";
 import type {
   Association,
   Book,
@@ -12,6 +13,9 @@ import type {
 import {
   closeDatabaseConnection,
   deleteBook,
+  deleteFolder,
+  getAllFolders,
+  putFolder,
   deleteHighlightsWithCitationCleanup,
   deleteNote,
   getAllAssociations,
@@ -31,6 +35,7 @@ import {
   putNote,
   putStudySet,
   SHUFANG_DB_NAME,
+  syncDatabase,
   translationId,
 } from "./db";
 import { citationBlock } from "./citations";
@@ -70,6 +75,85 @@ function highlight(id: string, bookId: string): Highlight {
     createdAt: 1,
   };
 }
+
+describe("shared folder deletion planning", () => {
+  beforeEach(resetDatabase);
+  afterEach(resetDatabase);
+  it("keeps all rows when planning fails and preserves book payloads during the cascade", async () => {
+    const folder = { id: "folder", name: "\ud800", createdAt: 1 };
+    const original = {
+      ...book("member"),
+      folderId: folder.id,
+      title: "\udfff",
+    };
+    const other = { ...book("other"), folderId: "different" };
+    await putFolder(folder);
+    await putBook(original);
+    await putBook(other);
+    const execute = vi
+      .spyOn(sharedCore(), "execute")
+      .mockImplementationOnce(() => {
+        throw new Error("injected_planning_failure");
+      });
+    try {
+      await expect(deleteFolder(folder.id)).rejects.toThrow(
+        "injected_planning_failure"
+      );
+    } finally {
+      execute.mockRestore();
+    }
+    expect(await getAllFolders()).toContainEqual(folder);
+    expect(await getAllBooks()).toContainEqual(original);
+    await deleteFolder(folder.id);
+    expect(await getAllFolders()).toEqual([]);
+    const detached: Book = { ...original };
+    delete detached.folderId;
+    expect(await getAllBooks()).toContainEqual(detached);
+    expect(await getAllBooks()).toContainEqual(other);
+  });
+});
+
+describe("atomic book source import", () => {
+  beforeEach(resetDatabase);
+  afterEach(resetDatabase);
+  it("commits the source manifest, bytes and book operations together", async () => {
+    const imported = book("imported");
+    await putImportedBook(imported, {
+      id: imported.id,
+      type: "pdf",
+      name: "original.pdf",
+      data: new Uint8Array([1, 2, 3]).buffer,
+    });
+    const db = await syncDatabase();
+    expect(await db.get("sources", imported.id)).toMatchObject({
+      id: imported.id,
+      size: 3,
+      name: "original.pdf",
+      format: "pdf",
+    });
+    expect(
+      (await db.getAll("syncOutbox")).map(row => row.operation.kind).sort()
+    ).toEqual(["books", "sources"]);
+    await expect(
+      putImportedBook(book("wrong"), {
+        id: "other",
+        type: "pdf",
+        data: new ArrayBuffer(1),
+      })
+    ).rejects.toThrow("source_identity_mismatch");
+    expect(await db.get("books", "wrong")).toBeUndefined();
+    expect(await db.get("files", "other")).toBeUndefined();
+    await expect(
+      putImportedBook(book("long-name"), {
+        id: "long-name",
+        name: "😀".repeat(128),
+        type: "pdf",
+        data: new ArrayBuffer(1),
+      })
+    ).rejects.toThrow("invalid_source_metadata");
+    expect(await db.get("books", "long-name")).toBeUndefined();
+  });
+});
 
 function association(
   id: string,

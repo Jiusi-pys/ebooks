@@ -1,0 +1,154 @@
+{
+  "baseCommit": "f6879718dbc2333b3d39dcfafadb6b8318e0047e",
+  "workingTree": "uncommitted",
+  "date": "2026-10-03",
+  "artifacts": [
+    {
+      "path": ".tools/shared-core-040-check.log",
+      "sha256": "ca3e0d23a7b1057ffd1308b2640e0ae477424134f65ab60f7fc288184c38f78b"
+    },
+    {
+      "path": ".tools/shared-core-040-lint.log",
+      "sha256": "20913582ee678278c1c0311cb53509ce9f1fb891f016e6be539b4459dbee77e9"
+    },
+    {
+      "path": ".tools/shared-core-040-web-tests.log",
+      "sha256": "4c2847eb4d43cb1066d6f72c751df6c412e500b9365625e5b3a46ec135e0445a"
+    },
+    {
+      "path": ".tools/shared-core-040-build.log",
+      "sha256": "059ed04fb49e568dff023ade720b8c38cae8163132ee17dcd2fe87a4b7632484"
+    },
+    {
+      "path": ".tools/shared-core-040-rust.log",
+      "sha256": "9a4f6549d9feedd93da9806d4979dcba08d8408ba1a42fade571d6d8496fb8d6"
+    },
+    {
+      "path": ".tools/shared-core-040-clippy.log",
+      "sha256": "fcd61f00e2a73dbb3f2ab0a8a178494417e158f19c1194b682956ddcf7686bb1"
+    },
+    {
+      "path": ".tools/shared-core-040-linux-tests.log",
+      "sha256": "22600531fe612f1f6816df7dbec8b0cc61a91e0fea8850e33804e8d2f15e7eae"
+    },
+    {
+      "path": ".tools/shared-core-040-mysql.log",
+      "sha256": "100dec17c07a9a91bd54544b287e6ffac29126d5f11f39bd3b357231a35fa3f7"
+    },
+    {
+      "path": ".tools/shared-core-040-three-nodes.log",
+      "sha256": "34cc5284a583cf77f728dc6c6e18eb8ca66f71d2bcbf5ccb847a7a292626b954"
+    },
+    {
+      "path": ".tools/shared-core-040-bridge.log",
+      "sha256": "2012c32fe97417ef33c71a0bea6ca0edc321d24dc21f9542c4a5f07ccd457a1b"
+    },
+    {
+      "path": ".tools/shared-core-040-updates.log",
+      "sha256": "a3fa2755ba68eb8942ed0c99731797fd5c91783209c7a5bf3956b4699e09f77d"
+    },
+    {
+      "path": ".tools/shared-core-040-winui-build.log",
+      "sha256": "7d8460658ec4feacec48b8447670aba24d7ad9b74cf0639a55f079ee8b791e59"
+    },
+    {
+      "path": ".tools/shared-core-040-deploy.log",
+      "sha256": "cd6fe46c5a6f59473d7768c7c5be1b2e9cbdffff4399aa8080b81051e0170351"
+    },
+    {
+      "path": "base/Cargo.lock",
+      "sha256": "565d04947a20664178da51e437ed92a6ba18b735042512e404a4ef0b3353e638"
+    },
+    {
+      "path": "base/crates/domain/src/lossless_json.rs",
+      "sha256": "eb256d451676aef053d7b30bb3ae786f6213459974e81143195395cb6a54fc7a"
+    },
+    {
+      "path": "base/crates/domain/src/lossless_sync.rs",
+      "sha256": "d6f1edc7c6f2015fa8f9938dde269e5f700bfb7aeded8b1f1796d9aee5e18ba7"
+    },
+    {
+      "path": "base/crates/application/src/replica.rs",
+      "sha256": "9dbce9e346663e3626ae98c619c7b6f1234da47b0ed9e4bcac642e6008bdebfa"
+    },
+    {
+      "path": "base/crates/application/src/externalize.rs",
+      "sha256": "fac9445e7d67b7ca0191a16220e7c46cf398f6adc665d19079ce790e15965839"
+    },
+    {
+      "path": "base/crates/application/src/record_drafts.rs",
+      "sha256": "0f1fe9ce40b6ba056d3a31270e954d0152cdcca23ff7d89dbeadd25171cea27d"
+    },
+    {
+      "path": "base/crates/application/src/folder_deletion.rs",
+      "sha256": "58ee2deb6d1639e53966ad8259f6df7671cf2a60b83f84101c611e8d2909ffe2"
+    },
+    {
+      "path": "base/crates/application/src/sync_receipts.rs",
+      "sha256": "6e1d184a626963412a9a593ca3a89fb5efbf8ab21048f363001404b4e4220733"
+    },
+    {
+      "path": "base/crates/application/src/incoming_snapshot.rs",
+      "sha256": "6fba4722ea5e0fcb763f71fa5376aa8b9ae0e99daeeffdbe0847aa7470fd5a04"
+    },
+    {
+      "path": "base/crates/sqlite/src/replica.rs",
+      "sha256": "06db439be7e5f873b69483fe4847931e9a51f605de510ca071e0cb1b6f44a820"
+    },
+    {
+      "path": "base/crates/sqlite/src/incoming_snapshot.rs",
+      "sha256": "af0eedf0c4a7b7aa9180343d3fcbcb6e9bf53aa650e5e2aabaf385c3fada1957"
+    },
+    {
+      "path": "base/crates/bindings/src/lib.rs",
+      "sha256": "17ac88cf3ace8cc0ea37d576b5fbb83bb546b4b2dddf294d7b2299041456a76a"
+    },
+    {
+      "path": "app/contracts/core-wasm.test.ts",
+      "sha256": "8ab5871c231d486e2b707493e5752a4894c5c8caecd8bc3577df3ba5793a0336"
+    },
+    {
+      "path": "app/contracts/core-library.ts",
+      "sha256": "c93311919bf9cf13242e8f3e8d3e858d3a9256f524d1ee3a13911f297bdfdc8b"
+    },
+    {
+      "path": "app/contracts/sync.ts",
+      "sha256": "94549f6a29b40f6b17fc14a3ed27b96674720b5e6c053bb4f8e6ddc0a5b2bee1"
+    },
+    {
+      "path": "app/src/lib/workspaceSync.ts",
+      "sha256": "de2b7980386d906f648aee912fb02e59d4af52fd38166ccc52f5dea85d22f089"
+    },
+    {
+      "path": "app/src/lib/workspaceSync.test.ts",
+      "sha256": "37aeabd9d5a6388ab81cbceb90fc0ff69938eb7b76a36686a5899f5ca7614965"
+    },
+    {
+      "path": "app/src/lib/db.ts",
+      "sha256": "81c75f87b1ed5a6351507bf954de3eef92d62cdbb45c53f2cd88e32f45c586d4"
+    },
+    {
+      "path": "app/src/lib/db.deletion.test.ts",
+      "sha256": "94ac8d6850d139140aaa6a8bd55170a3421e25fef11ef7b5edadd8aa38f5f68e"
+    },
+    {
+      "path": "docs/shared-core-040-execution.md",
+      "sha256": "dab7032fec586e127544e643a80d9f0fe2f83a7ee854bfe596fb60410bd7384b"
+    }
+  ],
+  "verified": {
+    "rustIgnored": 6,
+    "networkSnapshotRecovery": false,
+    "productionCutover": false,
+    "windowsRustPassed": 95,
+    "fullWebMigration": false,
+    "linuxRustPassed": 96,
+    "webSkipped": 46,
+    "webPassed": 581,
+    "productionHttpsReadOnly": true,
+    "releasePublished": false,
+    "threeNodeHttp": true
+  },
+  "scope": "partial shared-core 0.4.0 implementation",
+  "version": 1
+}

@@ -1,3 +1,5 @@
+> 当前状态（2026-10-03）：见[工程状态与验收门槛](../../docs/current-status.md)。本文件中的日期/版本记录保留其历史范围；当前迁移为 MySQL 0014 / SQLite 0003 / IndexedDB 11，生产尚未正式切换。
+
 # Windows / Linux 工作区同步 v2
 
 ## 架构与边界
@@ -143,11 +145,13 @@ AUTO_UPDATE_ENABLED=false
 自己的 `SYNC_PEERS_JSON=[{"id":"linux-personal","url":"http://127.0.0.1:3102","token":"…"}]`。
 正式 URL 使用 HTTPS。环回 HTTP 仅保留给本机或 SSH 隧道测试。
 
-Windows 原生 Git 检出：`npm ci`、`npm run build` 后运行
+Windows Git 检出的 Node 服务：安装 Rust 1.93.1 并添加
+`wasm32-unknown-unknown` target，在 `app/` 执行 `npm ci`、`npm run build` 后运行
 `powershell -File scripts/start-sync-windows.ps1 -EnvFile .env.sync`。
 常驻运行应由服务管理器守护这个进程；实验中的后台进程不是开机自启服务。
 
-Linux Docker：在资源充裕的机器执行 `docker build -t shufang-sync:local .`，
+Linux Docker：在仓库根目录执行
+`docker build -t shufang-sync:local -f app/Dockerfile .`，
 然后 `docker save` / `docker load` 搬运镜像。配置 `.env.sync` 后使用
 `docker compose -f compose.sync-linux.yml up -d`。该模板使用 Linux host 网络，
 MySQL 由 `DATABASE_URL` 指定，可以是已有实例里的独立库及专用账号。
@@ -215,3 +219,13 @@ node scripts/sync-lab-verify.mjs
 `sync-lab-partition.py` 在断开隧道后分别运行；`sync-lab-verify.mjs` 验证实际服务。
 这些实验脚本固定使用本机 3101、隧道 3102、专用 lab 数据库，不能用于生产账号。
 验收记录见 `sync-acceptance.md`。iOS / SwiftUI 构建与模拟器测试留到 Mac 阶段。
+
+## 原生适配器当前门槛（2026-10-03）
+
+Rust v2 与旧 Hono/MySQL 节点已通过隔离操作/文件互通，另有 Windows
+原生 SQLite、MySQL v2、Linux 原生服务三节点 HTTP 试验。SQLite 0003
+仅追加世代/固定快照，完整迁移归档独立保留。Windows 设置页支持节点配置、
+暂停/恢复、手动请求与状态。详细证据、Linux 凭据和所有者配置接口见
+`docs/native-sync-acceptance-20261003.md`（仓库根）。这不等同于完整原生 v2
+一致性或全业务迁移验收：无损 UTF-16、全部旧投影/校验、超大原生字段、
+快照恢复、整库切换和真实 HTTPS 仍有后续门槛。

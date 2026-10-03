@@ -9,7 +9,7 @@ import {
   renameCitationBookTitles,
   rewriteCitationBlock,
   type CitationDescriptor,
-} from "../../src/lib/citations";
+} from "../../contracts/citations";
 import { getDb } from "../queries/connection";
 import { parseStoredCitationLevel } from "./highlight-citation";
 

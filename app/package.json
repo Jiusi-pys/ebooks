@@ -16,7 +16,12 @@
     "test:mysql": "cross-env RUN_MYSQL_INTEGRATION=1 vitest run api/v1.mysql.integration.test.ts api/library.mysql.integration.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "core:build": "node scripts/build-core.mjs",
+    "predev": "npm run core:build",
+    "pretest": "npm run core:build",
+    "precheck": "npm run core:build",
+    "prebuild": "npm run core:build"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.3",

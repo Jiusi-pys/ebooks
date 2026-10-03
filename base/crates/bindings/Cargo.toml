@@ -1,0 +1,19 @@
+[package]
+name = "shufang-bindings"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+sha2 = "0.10"
+shufang-domain = { path = "../domain" }
+shufang-application = { path = "../application" }
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+shufang-sqlite = { path = "../sqlite" }
+shufang-native = { path = "../native" }
+uuid = { version = "1.21", features = ["v4"] }

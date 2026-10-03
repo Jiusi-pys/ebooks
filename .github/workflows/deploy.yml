@@ -28,6 +28,11 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - name: Test deployment supervisor
         run: python3 -m unittest discover -s deploy -p 'test_*.py'
+      - uses: dtolnay/rust-toolchain@1.93.1
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Test shared core
+        run: cargo test --manifest-path base/Cargo.toml --workspace --locked
       - name: Install application dependencies
         working-directory: app
         run: npm ci --no-audit --no-fund

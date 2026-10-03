@@ -1,0 +1,270 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- IDB's dynamic store names are adapted at this single boundary. */
+import type { IDBPDatabase } from "idb";
+import {
+  applyOperation,
+  compareClock,
+  entityKinds,
+  flattenFields,
+  makeOperation,
+  materialize,
+  mergeStates,
+  nextClock,
+  projectable,
+  type EntityState,
+  type Operation,
+} from "@contracts/sync";
+
+export const syncStores = ["syncOutbox", "syncEntities", "syncMeta"];
+const kinds = new Set<string>(entityKinds);
+export function upgradeSyncDatabase(db: IDBPDatabase) {
+  for (const name of syncStores)
+    if (!db.objectStoreNames.contains(name))
+      db.createObjectStore(name, { keyPath: "id" });
+  for (const name of ["sources", "reviews", "preferences"])
+    if (!db.objectStoreNames.contains(name))
+      db.createObjectStore(name, { keyPath: "id" });
+}
+export function trackDatabase(database: IDBPDatabase): IDBPDatabase {
+  function transaction(
+    names: string | string[],
+    mode?: IDBTransactionMode,
+    options?: IDBTransactionOptions
+  ) {
+    const original = typeof names === "string" ? [names] : [...names];
+    const tracked =
+      mode === "readwrite" &&
+      original.some(name => kinds.has(name) || name === "files");
+    const tx: any = database.transaction(
+      tracked
+        ? [
+            ...new Set([
+              ...original,
+              ...syncStores,
+              ...(original.includes("files") ? ["sources"] : []),
+              ...(original.includes("highlights") ? ["reviews"] : []),
+            ]),
+          ]
+        : names,
+      mode,
+      options
+    );
+    if (!tracked) return tx;
+    let writes: Promise<unknown> = Promise.resolve();
+    async function mutate(name: string, property: string, value: any) {
+      const store = tx.objectStore(name);
+      try {
+        const id = property === "delete" ? value : value.id;
+        const before = await store.get(id);
+        const result = await (store[property as "put"] as any).call(
+          store,
+          value
+        );
+        if (name === "files") {
+          if (property !== "delete")
+            await tx
+              .objectStore("syncMeta")
+              .put({
+                id: `file:${id}`,
+                pending: true,
+                revision: crypto.randomUUID(),
+              });
+          else {
+            await mutate("sources", "delete", id);
+            await tx.objectStore("syncMeta").delete(`file:${id}`);
+          }
+          return result;
+        }
+        const meta = tx.objectStore("syncMeta");
+        let identity = await meta.get("identity");
+        if (!identity)
+          identity = {
+            id: "identity",
+            replica: crypto.randomUUID(),
+            clock: "0:0",
+            workspace: "unpaired",
+          };
+        const patch: Record<string, unknown> = {};
+        const unset: string[] = [];
+        if (property !== "delete") {
+          const nextFields = flattenFields(name as Operation["kind"], value);
+          const oldFields = flattenFields(
+            name as Operation["kind"],
+            before ?? {}
+          );
+          for (const key of Object.keys(nextFields))
+            if (
+              key !== "id" &&
+              nextFields[key] !== undefined &&
+              JSON.stringify(nextFields[key]) !== JSON.stringify(oldFields[key])
+            )
+              patch[key] = JSON.parse(JSON.stringify(nextFields[key]));
+          for (const key of Object.keys(oldFields))
+            if (key !== "id" && nextFields[key] === undefined) unset.push(key);
+          if (!Object.keys(patch).length && !unset.length) return result;
+        }
+        identity.clock = nextClock(identity.clock);
+        const op: Operation = {
+          ...makeOperation(
+            identity.workspace,
+            identity.replica,
+            name as Operation["kind"],
+            String(id),
+            patch
+          ),
+          clock: identity.clock,
+          deleted: property === "delete",
+          unset,
+        };
+        const key = `${name}:${id}`;
+        const prior = await tx.objectStore("syncEntities").get(key);
+        if (name === "reviews") op.operationId = String(id);
+        const state = applyOperation(prior?.state, op);
+        await tx.objectStore("syncEntities").put({ id: key, state });
+        await tx
+          .objectStore("syncOutbox")
+          .put({ id: op.operationId, operation: op });
+        await meta.put(identity);
+        if (
+          name === "highlights" &&
+          property !== "delete" &&
+          JSON.stringify(value.review) !== JSON.stringify(before?.review)
+        ) {
+          await mutate("reviews", "add", {
+            id: crypto.randomUUID(),
+            highlightId: id,
+            event: value.review ? "review" : "leave",
+            state: value.review ?? null,
+            createdAt: Date.now(),
+            deviceId: identity.replica,
+          });
+        }
+        return result;
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {
+          /* Already aborted by IndexedDB. */
+        }
+        await tx.done.catch(() => undefined);
+        throw error;
+      }
+    }
+    const wrapStore = (name: string) => {
+      const target = tx.objectStore(name);
+      if (!kinds.has(name) && name !== "files") return target;
+      return new Proxy(target, {
+        get(store, property) {
+          if (["put", "add", "delete"].includes(String(property)))
+            return (value: any) => {
+              const result = writes.then(() =>
+                mutate(name, String(property), value)
+              );
+              writes = result.catch(() => undefined);
+              return result;
+            };
+          const value = Reflect.get(store, property);
+          return typeof value === "function" ? value.bind(store) : value;
+        },
+      });
+    };
+    return new Proxy(tx, {
+      get(target, property) {
+        if (property === "objectStore") return wrapStore;
+        if (property === "store")
+          return original.length === 1 ? wrapStore(original[0]) : undefined;
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  }
+  return new Proxy(database, {
+    get(target, property) {
+      if (property === "transaction") return transaction;
+      if (["put", "add", "delete"].includes(String(property)))
+        return async (name: string, value: any) => {
+          const tx = transaction(name, "readwrite");
+          const result = await (tx.objectStore(name) as any)[property](value);
+          await tx.done;
+          return result;
+        };
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
+export async function receiveOperations(
+  db: IDBPDatabase,
+  operations: Operation[],
+  cursorKey: string,
+  cursor: string
+) {
+  const names = [
+    ...new Set([
+      ...entityKinds.filter(k => db.objectStoreNames.contains(k)),
+      ...syncStores,
+      ...(db.objectStoreNames.contains("files") ? ["files"] : []),
+    ]),
+  ];
+  const tx = db.transaction(names, "readwrite");
+  const identity = await tx.objectStore("syncMeta").get("identity");
+  for (const op of operations) {
+    const key = `${op.kind}:${op.entityId}`;
+    const prior = await tx.objectStore("syncEntities").get(key);
+    const state: EntityState = applyOperation(prior?.state, op);
+    if (
+      op.kind === "sources" &&
+      db.objectStoreNames.contains("files") &&
+      (state.deleted ||
+        prior?.state.fields.sha256?.value !== state.fields.sha256?.value)
+    ) {
+      if (
+        !(await tx.objectStore("syncMeta").get(`file:${op.entityId}`))?.pending
+      )
+        await tx.objectStore("files").delete(op.entityId);
+    }
+    await tx.objectStore("syncEntities").put({ id: key, state });
+    if (db.objectStoreNames.contains(op.kind)) {
+      const data = materialize(state);
+      if (!data) await tx.objectStore(op.kind).delete(op.entityId);
+      else if (projectable(op.kind, data))
+        await tx.objectStore(op.kind).put(data);
+    }
+    if (identity && compareClock(op.clock, identity.clock) >= 0)
+      identity.clock = nextClock(op.clock);
+  }
+  if (identity) await tx.objectStore("syncMeta").put(identity);
+  await tx.objectStore("syncMeta").put({ id: cursorKey, cursor });
+  await tx.done;
+}
+
+export async function receiveSnapshot(
+  db: IDBPDatabase,
+  states: EntityState[],
+  checkpoint: { id: string; snapshotId: string; after: string }
+) {
+  const names = [
+    ...new Set([...states.map(state => state.kind), ...syncStores]),
+  ];
+  const tx = db.transaction(names, "readwrite");
+  const identity = await tx.objectStore("syncMeta").get("identity");
+  for (const incoming of states) {
+    const key = `${incoming.kind}:${incoming.id}`;
+    const prior = await tx.objectStore("syncEntities").get(key);
+    const state = mergeStates(prior?.state, incoming);
+    await tx.objectStore("syncEntities").put({ id: key, state });
+    const data = materialize(state);
+    if (!data) await tx.objectStore(state.kind).delete(state.id);
+    else if (projectable(state.kind, data))
+      await tx.objectStore(state.kind).put(data);
+    for (const field of Object.values(state.fields)) {
+      const [wall, count] = field.version.split(":");
+      const clock = `${BigInt(wall)}:${BigInt(count)}`;
+      if (identity && compareClock(clock, identity.clock) >= 0)
+        identity.clock = nextClock(clock);
+    }
+  }
+  if (identity) await tx.objectStore("syncMeta").put(identity);
+  await tx.objectStore("syncMeta").put(checkpoint);
+  await tx.done;
+}

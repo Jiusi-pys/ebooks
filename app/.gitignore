@@ -43,3 +43,4 @@ coverage/
 .nyc_output/
 # Project-local service runtimes (for example the portable MySQL test server).
 .runtime/
+generated/

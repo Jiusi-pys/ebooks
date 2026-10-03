@@ -14,7 +14,7 @@ afterEach(async () => {
   await deleteDB("shufang");
 });
 
-it.each([8, 9])(
+it.each([8, 9, 10])(
   "repairs incomplete v%i stores without losing drafts or outbox",
   async version => {
     const old = await openDB("shufang", version, {
@@ -50,8 +50,18 @@ it.each([8, 9])(
     await old.put("syncOutbox", pending);
     old.close();
     expect(await getAllNotes()).toEqual([note]);
-    const db = await syncDatabase();
+    let db = await syncDatabase();
     expect(await db.get("syncOutbox", "pending")).toEqual(pending);
+    expect(db.version).toBe(11);
+    expect(await db.get("syncMeta", "field-outbox-format-v1")).toEqual({
+      id: "field-outbox-format-v1",
+      version: 1,
+    });
+    closeDatabaseConnection();
+    db = await syncDatabase();
+    expect(await (await syncDatabase()).get("syncOutbox", "pending")).toEqual(
+      pending
+    );
     for (const name of [
       "files",
       "sources",
@@ -79,9 +89,45 @@ it.each([8, 9])(
       { id: "epub", type: "epub", data: new ArrayBuffer(8) }
     );
     expect(await db.get("files", "epub")).toBeDefined();
-    expect(await db.count("syncOutbox")).toBe(2);
+    expect(await db.count("syncOutbox")).toBe(3);
   }
 );
+
+it("recovers an aborted 10-to-11 upgrade without losing records", async () => {
+  const old = await openDB("shufang", 10, {
+    upgrade(db) {
+      db.createObjectStore("notes", { keyPath: "id" });
+    },
+  });
+  const note = {
+    id: "saved",
+    title: "Keep",
+    content: "\ud800",
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  await old.put("notes", note);
+  old.close();
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open("shufang", 11);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore("injected-incomplete");
+      request.transaction!.abort();
+    };
+    request.onerror = event => {
+      event.preventDefault();
+      resolve();
+    };
+    request.onsuccess = () => {
+      request.result.close();
+      reject(new Error("failure injection did not abort"));
+    };
+  });
+  expect(await getAllNotes()).toEqual([note]);
+  const current = await syncDatabase();
+  expect(current.version).toBe(11);
+  expect(current.objectStoreNames.contains("injected-incomplete")).toBe(false);
+});
 
 it("upgrades a populated v7 database without replacing local records", async () => {
   const old = await openDB("shufang", 7, {

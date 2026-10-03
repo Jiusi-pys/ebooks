@@ -1,3 +1,5 @@
+> 当前状态（2026-10-03）：见[工程状态与验收门槛](docs/current-status.md)。本文件中的日期/版本记录保留其历史范围；当前迁移为 MySQL 0014 / SQLite 0003 / IndexedDB 11，生产尚未正式切换。
+
 # 書房（Shufang）
 
 [English](README.md)
@@ -5,6 +7,16 @@
 書房是一款以 MySQL 保存书库的深度阅读与书籍管理 Web 应用，工作流参考 MarginNote 4。它把多格式阅读、划线批注、分级引用、文段关联、学习集、脑图、间隔复习和 AI 伴读整合在同一工作区中。
 
 本项目不是 MarginNote 的逐像素复刻。Apple Pencil 手写、视频时间轴批注、iCloud 同步、原生 OCR 与 Apple 平台扩展不在当前 Web 版本范围内。
+
+## 共享核心与分支
+
+`base` 包含共享 Rust 核心、独立服务及 Web/Node 适配；`windows` 在其上增加
+WinUI、C# 桥接和 Windows 安装/更新工具。domain/application 不依赖视图层，
+全 Web 业务迁移仍未完成。
+
+当前存储版本为 MySQL 0014、SQLite 0003、IndexedDB 11。Windows/Linux
+独立原生工作区真实 HTTPS 恢复已通过；生产切换、干净 Windows 和生产签名/
+更新源尚未验收。完整证据与剩余门槛见[当前状态](docs/current-status.md)。
 
 ## 已实现功能
 
@@ -90,6 +102,14 @@ MySQL 保存书籍元数据、章节正文（含注释）、封面、自定义�
 跨浏览器、跨网络使用时，把前端和 Node 服务部署在同一 HTTPS 域名下，配置 `PUBLIC_ORIGIN` 和安全会话 Cookie，并连接同一个持久化 MySQL 数据库。升级启动前运行 `npm run db:migrate`。仅部署静态前端不能保存服务端书库。备份 MySQL 时须包含 `mirror_books` 和 `library_source_chunks`，原文件直接存入数据库，不依赖网站服务器本地磁盘。多个部署只有连接同一数据库才会共享书库。
 
 ## 环境要求
+
+源码开发和构建现在还需要 Rust 1.93.1 及
+`rustup target add wasm32-unknown-unknown`。npm 的开发、检查、测试和构建
+入口会自动生成共享 WASM 核心。使用已构建的生产镜像无需安装 Rust。
+当前原生整改进度和兼容门槛见 [迁移说明](docs/native-core-migration.md)，
+Windows 已提供 WinUI 阅读/管理、AI 和独立 Rust 服务实现；安装与使用见
+[Windows 指南](platforms/windows/README.md)，实测结果和未完成的完整功能验收项见
+[Windows 交付记录](docs/windows-delivery.md)。原生同步、Windows 配置交互及隔离 Windows/MySQL/Linux 三节点测试的当前结果见 [同步实施验收](docs/native-sync-acceptance-20261003.md)。全业务迁移、无损旧数据兼容与真实 HTTPS 验收尚未完成，尚不能整体切换真实书库。
 
 | 依赖      | 要求                                                    |
 | --------- | ------------------------------------------------------- |
@@ -396,7 +416,7 @@ AUTO_UPDATE_RESTART_SUPERVISED=true
 镜像不会包含 `.env` 或 Codex 凭据：
 
 ```bash
-docker build -t shufang ./app
+docker build -t shufang -f app/Dockerfile .
 docker run --rm --name shufang \
   -p 127.0.0.1:3000:3000 \
   --env-file app/.env \

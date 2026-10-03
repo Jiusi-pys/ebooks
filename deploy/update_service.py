@@ -154,7 +154,7 @@ def deploy(job, jobs):
                 if head != job['sha']:
                     raise RuntimeError('Requested SHA is no longer the head of main; deploy the latest push')
                 run(['docker', 'build', '--label', 'org.opencontainers.image.revision=' + head,
-                     '-t', 'shufang:' + head, '-f', directory + '/app/Dockerfile', directory + '/app'])
+                     '-t', 'shufang:' + head, '-f', directory + '/app/Dockerfile', directory])
                 Rollout(run).switch(head)
         jobs.finish(job['id'], 'succeeded')
     except Exception as error:

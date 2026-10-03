@@ -9,6 +9,65 @@ import {
 import { makeOperation } from "@contracts/sync";
 
 describe("durable browser operations", () => {
+  it("rolls back field objects together with the aborted business operation", async () => {
+    const name = crypto.randomUUID();
+    const raw = await openDB(name, 1, {
+      upgrade(db) {
+        db.createObjectStore("notes", { keyPath: "id" });
+        upgradeSyncDatabase(db);
+      },
+    });
+    try {
+      const tx = trackDatabase(raw).transaction("notes", "readwrite");
+      await tx.store.put({ id: "abort", content: "x".repeat(200000) });
+      tx.abort();
+      await expect(tx.done).rejects.toThrow();
+      expect(await raw.count("notes")).toBe(0);
+      expect(await raw.count("syncOutbox")).toBe(0);
+      expect(await raw.count("syncEntities")).toBe(0);
+      expect(
+        (await raw.getAll("syncMeta")).filter(row =>
+          row.id.startsWith("field:")
+        )
+      ).toEqual([]);
+    } finally {
+      raw.close();
+      await deleteDB(name);
+    }
+  });
+  it("externalizes before the first operation commit and atomically retains field bytes", async () => {
+    const name = crypto.randomUUID();
+    const raw = await openDB(name, 1, {
+      upgrade(db) {
+        db.createObjectStore("notes", { keyPath: "id" });
+        upgradeSyncDatabase(db);
+      },
+    });
+    try {
+      const note = { id: "large", content: "\ud800".repeat(30000) };
+      await trackDatabase(raw).put("notes", note);
+      const pending = await raw.getAll("syncOutbox");
+      expect(pending).toHaveLength(1);
+      const reference = pending[0].operation.patch.content;
+      expect(reference).toHaveProperty("$blob.sha256");
+      const field = await raw.get(
+        "syncMeta",
+        `field:${reference.$blob.sha256}`
+      );
+      expect(JSON.parse(new TextDecoder().decode(field.bytes))).toBe(
+        note.content
+      );
+      expect(field.manifest).toEqual(reference.$blob);
+      expect(await raw.get("notes", "large")).toEqual(note);
+      expect(
+        (await raw.get("syncEntities", "notes:large")).state.fields.content
+          .value
+      ).toEqual(reference);
+    } finally {
+      raw.close();
+      await deleteDB(name);
+    }
+  });
   it("allocates one identity and distinct clocks for concurrent writes in a transaction", async () => {
     const name = crypto.randomUUID();
     const raw = await openDB(name, 1, {

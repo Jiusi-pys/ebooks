@@ -1,0 +1,10 @@
+[package]
+name = "shufang-application"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shufang-domain = { path = "../domain" }
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"

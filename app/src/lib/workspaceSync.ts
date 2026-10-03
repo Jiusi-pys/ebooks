@@ -1,11 +1,18 @@
 import { applyPreferences, preferenceKeys } from "./syncPreferences";
 import { syncDatabase, type StoredFile } from "./db";
+import { sharedCore } from "@contracts/core-runtime";
 import {
   receiveOperations,
-  receiveSnapshot,
   trackDatabase,
   syncStores,
+  stageOperationFields,
 } from "./syncDatabase";
+import {
+  abandonSnapshot,
+  beginSnapshot,
+  stageSnapshot,
+  finishSnapshot,
+} from "./syncSnapshots";
 import {
   applyOperation,
   entityKinds,
@@ -44,6 +51,10 @@ export async function syncRequest(path: string, init: RequestInit = {}) {
       const db = await syncDatabase();
       await db.delete(
         "syncMeta",
+        `cursor:${capabilities.nodeId}:${capabilities.epoch}`
+      );
+      await abandonSnapshot(
+        db,
         `cursor:${capabilities.nodeId}:${capabilities.epoch}`
       );
       capabilities = undefined;
@@ -101,8 +112,13 @@ async function initialize() {
     await meta.put({ id: "projection-v1", complete: true });
   }
   for (const row of await tx.objectStore("syncOutbox").getAll()) {
-    row.operation.workspaceId = identity.workspace;
-    await tx.objectStore("syncOutbox").put(row);
+    if (row.operation.workspaceId !== identity.workspace) {
+      tx.abort();
+      await tx.done.catch(() => undefined);
+      throw new Error(
+        "历史待发操作所属工作区不同，已保留原 ID 和内容；必须先完成显式增量迁移"
+      );
+    }
   }
   if (!(await meta.get("seeded"))) {
     for (const kind of stores) {
@@ -115,7 +131,7 @@ async function initialize() {
           identity.replica,
           kind,
           id,
-          JSON.parse(JSON.stringify(patch)),
+          await stageOperationFields(meta, JSON.parse(JSON.stringify(patch))),
           0
         );
         await tx
@@ -168,6 +184,43 @@ const sha = async (bytes: ArrayBuffer) =>
   Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), b =>
     b.toString(16).padStart(2, "0")
   ).join("");
+interface UploadManifest {
+  sha256: string;
+  size: number;
+  name: string;
+  type: string;
+}
+function uploadId(input: unknown): string {
+  const id = (input as { id?: unknown } | null)?.id;
+  if (typeof id !== "string" || !/^[\w.:-]{1,128}$/.test(id))
+    throw new Error("invalid_upload_session");
+  return id;
+}
+function sameUpload(input: unknown, expected: UploadManifest) {
+  const manifest = input as Partial<UploadManifest> | null;
+  return (
+    manifest?.sha256 === expected.sha256 && manifest.size === expected.size
+  );
+}
+function missingChunks(input: unknown, expected: UploadManifest): number[] {
+  const status = input as { manifest?: unknown; missing?: unknown } | null;
+  if (
+    !sameUpload(status?.manifest, expected) ||
+    !Array.isArray(status?.missing)
+  )
+    throw new Error("invalid_upload_progress");
+  const count = Math.ceil(expected.size / 262144);
+  const missing = status.missing;
+  if (
+    missing.length > count ||
+    new Set(missing).size !== missing.length ||
+    missing.some(
+      index => !Number.isInteger(index) || index < 0 || index >= count
+    )
+  )
+    throw new Error("invalid_upload_progress");
+  return missing as number[];
+}
 async function uploadPayload(bytes: ArrayBuffer, name: string, type: string) {
   const hash = await sha(bytes);
   const manifest = { sha256: hash, size: bytes.byteLength, name, type };
@@ -181,13 +234,13 @@ async function uploadPayload(bytes: ArrayBuffer, name: string, type: string) {
         body: JSON.stringify(manifest),
       })
     ).json();
-    session = { id: key, uploadId: upload.id };
+    session = { id: key, uploadId: uploadId(upload) };
     await db.put("syncMeta", session);
   }
   const status = await (
     await syncRequest(`/blobs/uploads/${session.uploadId}`)
   ).json();
-  for (const index of status.missing as number[]) {
+  for (const index of missingChunks(status, manifest)) {
     const part = bytes.slice(index * 262144, (index + 1) * 262144);
     await syncRequest(`/blobs/uploads/${session.uploadId}/${index}`, {
       method: "PUT",
@@ -198,15 +251,23 @@ async function uploadPayload(bytes: ArrayBuffer, name: string, type: string) {
       body: part,
     });
   }
-  await syncRequest(`/blobs/uploads/${session.uploadId}/commit`, {
-    method: "POST",
-  });
+  const committed = await (
+    await syncRequest(`/blobs/uploads/${session.uploadId}/commit`, {
+      method: "POST",
+    })
+  ).json();
+  if (!sameUpload(committed, manifest))
+    throw new Error("invalid_upload_acknowledgement");
   return manifest;
 }
 async function hydratePending() {
   const db = await syncDatabase();
   let changed = false;
   for (const row of await db.getAll("syncEntities")) {
+    const hydrated = new Map<
+      string,
+      { version: string; value: unknown; hash: string }
+    >();
     for (const [key, field] of Object.entries(row.state.fields) as [
       string,
       { value: unknown; version: string },
@@ -221,25 +282,37 @@ async function hydratePending() {
         ).arrayBuffer();
         if (bytes.byteLength !== ref.size || (await sha(bytes)) !== ref.sha256)
           throw new Error("Content checksum mismatch");
-        const value = JSON.parse(new TextDecoder().decode(bytes));
-        const tx = db.transaction(
-          ["syncEntities", row.state.kind],
-          "readwrite"
+        const value = JSON.parse(
+          new TextDecoder("utf-8", { fatal: true }).decode(bytes)
         );
-        const current = await tx.objectStore("syncEntities").get(row.id);
-        if (current?.state.fields[key]?.version === field.version) {
-          current.state.fields[key].value = value;
-          await tx.objectStore("syncEntities").put(current);
-          const data = materialize(current.state);
-          if (data && projectable(current.state.kind, data))
-            await tx.objectStore(current.state.kind).put(data);
-          changed = true;
-        }
-        await tx.done;
+        hydrated.set(key, { version: field.version, value, hash: ref.sha256 });
       } catch {
         /* Metadata and local outbox continue; retry missing payloads next cycle. */
       }
     }
+    if (!hydrated.size || !db.objectStoreNames.contains(row.state.kind))
+      continue;
+    const tx = db.transaction(["syncEntities", row.state.kind], "readwrite");
+    const current = await tx.objectStore("syncEntities").get(row.id);
+    if (current) {
+      const projection = structuredClone(current.state);
+      for (const [key, payload] of hydrated) {
+        const field = projection.fields[key];
+        if (
+          field?.version === payload.version &&
+          isBlobReference(field.value) &&
+          field.value.$blob.sha256 === payload.hash
+        )
+          field.value = payload.value;
+      }
+      const data = materialize(projection);
+      if (data && projectable(current.state.kind, data)) {
+        await tx.objectStore(current.state.kind).put(data);
+        changed = true;
+      }
+    }
+    // Hydration updates only the view projection, never same-version sync metadata.
+    await tx.done;
   }
   return changed;
 }
@@ -274,13 +347,13 @@ async function uploadFiles() {
           body: JSON.stringify(manifest),
         })
       ).json();
-      session = { id: resumeKey, uploadId: created.id };
+      session = { id: resumeKey, uploadId: uploadId(created) };
       await db.put("syncMeta", session);
     }
     const status = await (
       await syncRequest(`/blobs/uploads/${session.uploadId}`)
     ).json();
-    for (const index of status.missing as number[]) {
+    for (const index of missingChunks(status, manifest)) {
       const part = bytes.slice(index * 262144, (index + 1) * 262144);
       await syncRequest(`/blobs/uploads/${session.uploadId}/${index}`, {
         method: "PUT",
@@ -291,9 +364,13 @@ async function uploadFiles() {
         body: part,
       });
     }
-    await syncRequest(`/blobs/uploads/${session.uploadId}/commit`, {
-      method: "POST",
-    });
+    const committed = await (
+      await syncRequest(`/blobs/uploads/${session.uploadId}/commit`, {
+        method: "POST",
+      })
+    ).json();
+    if (!sameUpload(committed, manifest))
+      throw new Error("invalid_upload_acknowledgement");
     await trackDatabase(db).put("sources", { id, ...manifest });
     const done = db.transaction("syncMeta", "readwrite");
     const current = await done.store.get(pending.id);
@@ -302,48 +379,78 @@ async function uploadFiles() {
     await done.done;
   }
 }
-async function exchange() {
+async function exchange(recovering = false) {
+  if (!capabilities && !(await enabled())) return;
   await initialize();
   const db = await syncDatabase();
   const key = `cursor:${capabilities!.nodeId}:${capabilities!.epoch}`;
   let received = false;
-  if (!(await db.get("syncMeta", key))) {
+  const position = await db.get("syncMeta", key);
+  if (
+    !position ||
+    Date.now() - (position.snapshotAt ?? 0) >= 300_000 ||
+    (await db.get("syncMeta", `snapshot:${key}`))
+  ) {
     const snapshotKey = `snapshot:${key}`;
     let checkpoint = await db.get("syncMeta", snapshotKey);
+    if (checkpoint && checkpoint.version !== 1) {
+      await abandonSnapshot(db, key);
+      checkpoint = undefined;
+    }
     if (!checkpoint) {
       const snapshot = await (
         await syncRequest("/sync/snapshots", { method: "POST" })
       ).json();
-      checkpoint = { id: snapshotKey, snapshotId: snapshot.id, after: "" };
-      await db.put("syncMeta", checkpoint);
+      await beginSnapshot(db, key, snapshot);
+      checkpoint = await db.get("syncMeta", snapshotKey);
     }
     while (true) {
-      const page = await (
-        await syncRequest(
-          `/sync/snapshots/${checkpoint.snapshotId}?after=${encodeURIComponent(checkpoint.after)}`
-        )
-      ).json();
-      checkpoint.after = page.next ?? "";
-      await receiveSnapshot(db, page.entities, checkpoint);
-      received ||= page.entities.length > 0;
-      if (!page.entities.length) {
-        const done = db.transaction("syncMeta", "readwrite");
-        await done.store.put({ id: key, cursor: page.cursor });
-        await done.store.delete(snapshotKey);
-        await done.done;
+      if (checkpoint.after === null) {
+        await finishSnapshot(db, key, Date.now());
+        received = true;
         break;
       }
+      let response: Response;
+      try {
+        response = await syncRequest(
+          `/sync/snapshots/${checkpoint.snapshotId}?after=${encodeURIComponent(checkpoint.after)}`
+        );
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          /Sync request failed \((404|410)\)/.test(error.message)
+        )
+          await abandonSnapshot(db, key);
+        throw error;
+      }
+      const page = await response.json();
+      await stageSnapshot(db, key, page, {
+        after: checkpoint.after,
+        pages: checkpoint.pages,
+      });
+      checkpoint = await db.get("syncMeta", snapshotKey);
+      received ||= page.entities.length > 0;
     }
   }
   // Pull first: field versions merge remote changes with pending local edits.
   let more = true;
   while (more) {
     const cursor = (await db.get("syncMeta", key))?.cursor;
-    const page = await (
-      await syncRequest(
+    let response: Response;
+    try {
+      response = await syncRequest(
         `/sync/changes${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`
+      );
+    } catch (error) {
+      if (
+        !recovering &&
+        error instanceof Error &&
+        /Sync request failed \((400|409)\).*cursor/.test(error.message)
       )
-    ).json();
+        return exchange(true);
+      throw error;
+    }
+    const page = await response.json();
     received ||= page.operations.length > 0;
     await receiveOperations(db, page.operations, key, page.cursor);
     more = page.hasMore;
@@ -352,21 +459,35 @@ async function exchange() {
   await uploadFiles();
   const pending = await db.getAll("syncOutbox");
   for (const item of pending) {
-    for (const [key, value] of Object.entries(item.operation.patch)) {
-      const serialized = new TextEncoder().encode(JSON.stringify(value));
-      if (serialized.byteLength > 128 * 1024) {
-        const ref = await uploadPayload(
-          serialized.buffer as ArrayBuffer,
-          "field.json",
-          "application/json"
-        );
-        item.operation.patch[key] = { $blob: ref };
-      }
+    for (const value of Object.values(item.operation.patch)) {
+      if (!isBlobReference(value)) continue;
+      const ref = value.$blob;
+      const object = await db.get("syncMeta", `field:${ref.sha256}`);
+      if (!object) continue; // A received reference may already exist remotely.
+      if (
+        object.version !== 1 ||
+        Object.prototype.toString.call(object.bytes) !==
+          "[object ArrayBuffer]" ||
+        object.bytes.byteLength !== ref.size ||
+        (await sha(object.bytes)) !== ref.sha256
+      )
+        throw new Error("本地字段对象校验失败，原操作已保留");
+      const uploaded = await uploadPayload(
+        object.bytes,
+        "field.json",
+        "application/json"
+      );
+      if (uploaded.sha256 !== ref.sha256 || uploaded.size !== ref.size)
+        throw new Error("上传字段对象与原操作引用不一致");
     }
-    await db.put("syncOutbox", item);
-    await syncRequest("/sync/push", {
+    const response = await syncRequest("/sync/push", {
       method: "POST",
       body: JSON.stringify({ operations: [item.operation] }),
+    });
+    const result: { receipts?: unknown } = await response.json();
+    sharedCore().execute("validateSyncReceipts", {
+      operationIds: [item.operation.operationId],
+      receipts: result.receipts ?? null,
     });
     await db.delete("syncOutbox", item.id);
   }

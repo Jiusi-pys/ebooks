@@ -1,0 +1,995 @@
+import { openDB, type IDBPDatabase } from "idb";
+import { trackDatabase, upgradeSyncDatabase } from "./syncDatabase";
+import { sharedCore } from "@contracts/core-runtime";
+import type {
+  Association,
+  Book,
+  BookMetadata,
+  ChapterTranslation,
+  Folder,
+  FolderIconKey,
+  Highlight,
+  MindMap,
+  Note,
+  OutlineItem,
+  ReadingSession,
+  StudySet,
+} from "@/types";
+import {
+  appendCitationBlock,
+  citationDescriptorForHighlight,
+  isCitationOnlyHighlight,
+  removeCitationBlocks,
+} from "./citations";
+
+export const SHUFANG_DB_NAME = "shufang";
+export const SHUFANG_DB_VERSION = 10;
+
+const SEED_MARKER_KEY = "example-library-v1";
+
+let dbp: Promise<IDBPDatabase> | null = null;
+let openedDatabase: IDBPDatabase | null = null;
+
+export type DatabaseConnectionIssueKind =
+  "upgrade-blocked" | "connection-closed" | "open-failed";
+
+export interface DatabaseConnectionIssue {
+  kind: DatabaseConnectionIssueKind;
+  message: string;
+}
+
+let databaseIssue: DatabaseConnectionIssue | null = null;
+const databaseIssueListeners = new Set<
+  (issue: DatabaseConnectionIssue | null) => void
+>();
+
+function publishDatabaseIssue(issue: DatabaseConnectionIssue | null) {
+  databaseIssue = issue;
+  for (const listener of databaseIssueListeners) listener(issue);
+}
+
+/**
+ * Observe IndexedDB lifecycle failures that would otherwise leave the app on
+ * an unexplained loading screen. The current value is delivered immediately.
+ */
+export function subscribeDatabaseConnectionIssue(
+  listener: (issue: DatabaseConnectionIssue | null) => void
+) {
+  databaseIssueListeners.add(listener);
+  listener(databaseIssue);
+  return () => {
+    databaseIssueListeners.delete(listener);
+  };
+}
+
+export function getDatabaseConnectionIssue() {
+  return databaseIssue;
+}
+
+/** Close this tab's handle so another tab can complete a schema upgrade. */
+export function closeDatabaseConnection() {
+  openedDatabase?.close();
+  openedDatabase = null;
+  dbp = null;
+}
+
+function db() {
+  if (!dbp) {
+    const pending = openDB(SHUFANG_DB_NAME, SHUFANG_DB_VERSION, {
+      upgrade(d, oldVersion, _newVersion, tx) {
+        if (d.objectStoreNames.contains("associations")) {
+          const associations = tx.objectStore("associations");
+          if (
+            associations.indexNames.contains("by-pair") &&
+            associations.index("by-pair").unique
+          )
+            associations.deleteIndex("by-pair");
+          if (!associations.indexNames.contains("by-pair"))
+            associations.createIndex("by-pair", "pairKey");
+        }
+        // Repair incomplete historical schemas by presence, preserving all records.
+        upgradeSyncDatabase(d);
+        if (!d.objectStoreNames.contains("books")) {
+          d.createObjectStore("books", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("notes")) {
+          d.createObjectStore("notes", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("highlights")) {
+          const hl = d.createObjectStore("highlights", { keyPath: "id" });
+          hl.createIndex("by-book", "bookId");
+        }
+        if (!d.objectStoreNames.contains("folders")) {
+          d.createObjectStore("folders", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("translations")) {
+          d.createObjectStore("translations", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("mindMaps")) {
+          d.createObjectStore("mindMaps", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("files")) {
+          // 原始 PDF 文件（ArrayBuffer 或 Blob），原版阅读模式按需加载渲染
+          d.createObjectStore("files", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("studySets")) {
+          d.createObjectStore("studySets", { keyPath: "id" });
+        }
+        if (!d.objectStoreNames.contains("associations")) {
+          const associations = d.createObjectStore("associations", {
+            keyPath: "id",
+          });
+          associations.createIndex("by-source-book", "source.bookId");
+          associations.createIndex("by-target-book", "target.bookId");
+          associations.createIndex("by-pair", "pairKey");
+        }
+        if (!d.objectStoreNames.contains("metadata")) {
+          const metadata = d.createObjectStore("metadata", {
+            keyPath: "key",
+          });
+          if (oldVersion > 0) {
+            // Any pre-existing database may once have contained user data.
+            // Mark it initialized during upgrade so deleting every book never
+            // causes demo records to reappear on the next launch.
+            metadata.put({
+              key: SEED_MARKER_KEY,
+              initializedAt: Date.now(),
+              reason: "existing-database",
+            });
+          }
+        }
+      },
+      blocked() {
+        publishDatabaseIssue({
+          kind: "upgrade-blocked",
+          message:
+            "数据库升级被其他书房标签页阻止。请关闭其他标签页，然后返回此页重试。",
+        });
+      },
+      blocking() {
+        // Cooperate with a newer tab instead of holding its upgrade request
+        // forever. A reload is still required before this tab can read again.
+        openedDatabase?.close();
+        openedDatabase = null;
+        if (dbp === pending) dbp = null;
+        publishDatabaseIssue({
+          kind: "connection-closed",
+          message: "书房数据结构已在另一标签页升级，请重新加载此页面。",
+        });
+      },
+      terminated() {
+        openedDatabase = null;
+        if (dbp === pending) dbp = null;
+        publishDatabaseIssue({
+          kind: "connection-closed",
+          message: "浏览器意外关闭了本地数据库连接，请重新加载此页面。",
+        });
+      },
+    })
+      .then(database => {
+        openedDatabase = database;
+        publishDatabaseIssue(null);
+        return trackDatabase(database);
+      })
+      .catch(reason => {
+        if (dbp === pending) dbp = null;
+        publishDatabaseIssue({
+          kind: "open-failed",
+          message:
+            reason instanceof Error
+              ? `无法打开本地书库：${reason.message}`
+              : "无法打开本地书库，请重新加载后再试。",
+        });
+        throw reason;
+      });
+    dbp = pending;
+  }
+  return dbp;
+}
+
+/** Raw handle only for applying acknowledged replication data without re-emitting it. */
+export async function syncDatabase() {
+  await db();
+  return openedDatabase!;
+}
+
+export const uid = () =>
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+export async function getAllBooks(): Promise<Book[]> {
+  const all = (await (await db()).getAll("books")) as Book[];
+  return all.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function putBook(book: Book) {
+  await (await db()).put("books", book);
+}
+
+export interface PendingReaderState {
+  key: string;
+  bookId: string;
+  revision: string;
+  patch: Record<string, unknown>;
+}
+
+export async function pendingReaderStates(): Promise<PendingReaderState[]> {
+  const rows = await (await db()).getAll("metadata");
+  return rows.filter(
+    row => typeof row.key === "string" && row.key.startsWith("reader-state:")
+  ) as PendingReaderState[];
+}
+
+export async function acknowledgeReaderState(item: PendingReaderState) {
+  const tx = (await db()).transaction("metadata", "readwrite");
+  const current = (await tx.store.get(item.key)) as
+    PendingReaderState | undefined;
+  if (current?.revision === item.revision) await tx.store.delete(item.key);
+  await tx.done;
+}
+
+export interface LibrarySeedPayload {
+  book: Book;
+  notes: Note[];
+  highlights: Highlight[];
+}
+
+/**
+ * Seed a truly new library exactly once.
+ *
+ * The marker check, empty-library check and inserts share one transaction, so
+ * two tabs starting together cannot both seed. Existing content in any user
+ * store permanently suppresses the examples; seed IDs are added, never put,
+ * so this path cannot replace a user's record.
+ */
+export async function seedLibraryIfUnused(
+  seed: LibrarySeedPayload
+): Promise<boolean> {
+  const database = await db();
+  const userStores = [
+    "books",
+    "notes",
+    "highlights",
+    "folders",
+    "translations",
+    "mindMaps",
+    "files",
+    "studySets",
+    "associations",
+  ] as const;
+  const tx = database.transaction([...userStores, "metadata"], "readwrite");
+  const metadata = tx.objectStore("metadata");
+  if (await metadata.get(SEED_MARKER_KEY)) {
+    await tx.done;
+    return false;
+  }
+
+  let hasUserData = false;
+  for (const storeName of userStores) {
+    if ((await tx.objectStore(storeName).count()) > 0) {
+      hasUserData = true;
+      break;
+    }
+  }
+
+  if (!hasUserData) {
+    await tx.objectStore("books").add(seed.book);
+    for (const note of seed.notes) await tx.objectStore("notes").add(note);
+    for (const highlight of seed.highlights)
+      await tx.objectStore("highlights").add(highlight);
+  }
+  await metadata.put({
+    key: SEED_MARKER_KEY,
+    initializedAt: Date.now(),
+    reason: hasUserData ? "existing-data" : "seeded",
+  });
+  await tx.done;
+  return !hasUserData;
+}
+
+async function patchStoredBook(
+  bookId: string,
+  update: (current: Book) => Book
+): Promise<Book | undefined> {
+  const database = await db();
+  const tx = database.transaction(["books", "metadata"], "readwrite");
+  const current = (await tx.objectStore("books").get(bookId)) as
+    Book | undefined;
+  if (!current) {
+    await tx.done;
+    return undefined;
+  }
+  const updated = update(current);
+  await tx.objectStore("books").put(updated);
+  const patch: Record<string, unknown> = {};
+  for (const field of [
+    "progress",
+    "cover",
+    "customCover",
+    "outline",
+    "readerMode",
+    "typeSettings",
+    "lastOpenedAt",
+    "readingSessions",
+  ] as const) {
+    if (JSON.stringify(current[field]) !== JSON.stringify(updated[field]))
+      patch[field] = updated[field] ?? null;
+  }
+  if (Object.keys(patch).length) {
+    const key = `reader-state:${bookId}`;
+    const previous = (await tx.objectStore("metadata").get(key)) as
+      PendingReaderState | undefined;
+    await tx.objectStore("metadata").put({
+      key,
+      bookId,
+      revision: uid(),
+      patch: { ...previous?.patch, ...patch },
+    });
+  }
+  await tx.done;
+  return updated;
+}
+
+/** Store one idempotent reader interval, merging duplicate checkpoints by ID. */
+export async function patchBookReadingSession(
+  bookId: string,
+  session: ReadingSession
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => ({
+    ...current,
+    readingSessions: mergeSessionsById(current.readingSessions ?? [], [
+      session,
+    ]),
+  }));
+}
+
+function mergeSessionsById(
+  current: ReadingSession[],
+  incoming: ReadingSession[]
+): ReadingSession[] {
+  const sessions = new Map(current.map(item => [item.id, item]));
+  for (const item of incoming) {
+    const previous = sessions.get(item.id);
+    sessions.set(
+      item.id,
+      previous
+        ? {
+            ...previous,
+            startedAt: Math.min(previous.startedAt, item.startedAt),
+            endedAt: Math.max(previous.endedAt, item.endedAt),
+          }
+        : item
+    );
+  }
+  return [...sessions.values()].sort(
+    (a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id)
+  );
+}
+
+/**
+ * Persist only reading progress against the newest stored Book value.
+ *
+ * A scroll callback is deliberately not allowed to write its captured Book
+ * snapshot: outline, cover, folder and reader-setting edits may have landed
+ * while the debounced callback was waiting.
+ */
+export async function patchBookProgress(
+  bookId: string,
+  chapterId: string,
+  ratio: number
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => ({
+    ...current,
+    progress: {
+      chapterId,
+      ratio: Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0,
+    },
+  }));
+}
+
+export async function patchBookCustomCover(
+  bookId: string,
+  dataUrl?: string
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => {
+    const updated: Book = { ...current };
+    if (dataUrl) updated.customCover = dataUrl;
+    else delete updated.customCover;
+    return updated;
+  });
+}
+
+export async function patchBookReaderMode(
+  bookId: string,
+  readerMode: "reflow" | "original"
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => ({ ...current, readerMode }));
+}
+
+export async function patchBookTypeSettings(
+  bookId: string,
+  typeSettings: Book["typeSettings"]
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => {
+    const updated = { ...current };
+    if (typeSettings) updated.typeSettings = typeSettings;
+    else delete updated.typeSettings;
+    return updated;
+  });
+}
+
+export async function patchBookTitle(
+  bookId: string,
+  title: string
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => ({ ...current, title }));
+}
+
+export async function patchBookMetadata(
+  bookId: string,
+  values: { title: string; author: string; metadata: BookMetadata }
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => ({
+    ...current,
+    title: values.title,
+    author: values.author,
+    metadata: values.metadata,
+  }));
+}
+
+/** Persist a catalogue edit and its generated citation-note rewrites atomically. */
+export async function patchBookMetadataWithNotes(
+  bookId: string,
+  values: { title: string; author: string; metadata: BookMetadata },
+  notes: Note[]
+): Promise<Book | undefined> {
+  const database = await db();
+  const tx = database.transaction(["books", "notes"], "readwrite");
+  const bookStore = tx.objectStore("books");
+  const current = (await bookStore.get(bookId)) as Book | undefined;
+  if (!current) {
+    await tx.done;
+    return undefined;
+  }
+  const updated: Book = {
+    ...current,
+    title: values.title,
+    author: values.author,
+    metadata: values.metadata,
+  };
+  await bookStore.put(updated);
+  for (const note of notes) await tx.objectStore("notes").put(note);
+  await tx.done;
+  return updated;
+}
+
+export async function patchBookLastOpenedAt(
+  bookId: string,
+  openedAt = Date.now()
+): Promise<Book | undefined> {
+  if (!Number.isFinite(openedAt) || openedAt < 0) return undefined;
+  return patchStoredBook(bookId, current => ({
+    ...current,
+    // A delayed write from an older tab must not move a book backwards.
+    lastOpenedAt: Math.max(current.lastOpenedAt ?? 0, openedAt),
+  }));
+}
+
+export async function patchBookOutline(
+  bookId: string,
+  outline: OutlineItem[]
+): Promise<Book | undefined> {
+  return patchStoredBook(bookId, current => ({ ...current, outline }));
+}
+
+export async function patchBookFolder(
+  bookId: string,
+  folderId: string | undefined
+): Promise<Book | undefined> {
+  const database = await db();
+  // Share the same store scope as deleteFolder. IndexedDB then serializes the
+  // two operations across tabs, and a move can never recreate a deleted ID.
+  const tx = database.transaction(["books", "folders"], "readwrite");
+  if (folderId && !(await tx.objectStore("folders").get(folderId))) {
+    await tx.done;
+    return undefined;
+  }
+  const bookStore = tx.objectStore("books");
+  const current = (await bookStore.get(bookId)) as Book | undefined;
+  if (!current) {
+    await tx.done;
+    return undefined;
+  }
+  const updated: Book = { ...current };
+  if (folderId) updated.folderId = folderId;
+  else delete updated.folderId;
+  await bookStore.put(updated);
+  await tx.done;
+  return updated;
+}
+
+export async function deleteBook(id: string): Promise<Note[]> {
+  const d = await db();
+  const tx = d.transaction(
+    [
+      "books",
+      "notes",
+      "files",
+      "highlights",
+      "studySets",
+      "associations",
+      "translations",
+      "mindMaps",
+      "metadata",
+    ],
+    "readwrite"
+  );
+  const bookStore = tx.objectStore("books");
+  await tx.objectStore("metadata").delete(`reader-state:${id}`);
+  const book = (await bookStore.get(id)) as Book | undefined;
+  if (!book) {
+    await tx.done;
+    return [];
+  }
+  const highlightStore = tx.objectStore("highlights");
+  const linkedHighlights = (await highlightStore
+    .index("by-book")
+    .getAll(id)) as Highlight[];
+  const allHighlights = (await highlightStore.getAll()) as Highlight[];
+  const linkedByNote = new Map<string, Highlight[]>();
+  for (const highlight of linkedHighlights) {
+    if (!highlight.noteId) continue;
+    const linked = linkedByNote.get(highlight.noteId) ?? [];
+    linked.push(highlight);
+    linkedByNote.set(highlight.noteId, linked);
+  }
+  const updatedNotes: Note[] = [];
+  const noteStore = tx.objectStore("notes");
+  for (const [noteId, highlights] of linkedByNote) {
+    const note = (await noteStore.get(noteId)) as Note | undefined;
+    if (!note) continue;
+    const survivors = allHighlights.filter(
+      highlight => highlight.noteId === noteId && highlight.bookId !== id
+    );
+    const hasBookCitation = highlights.some(highlight => {
+      const markerId = encodeURIComponent(highlight.id).replace(/-/g, "%2D");
+      return note.content.includes(`shufang-citation-id:${markerId}`);
+    });
+    // Delete only a still-linked, book-only note. A user may have edited a
+    // former citation into independent writing, in which case its reference
+    // marker is gone and it must survive the book deletion.
+    if (survivors.length === 0 && hasBookCitation) {
+      await noteStore.delete(noteId);
+      continue;
+    }
+    let content = removeCitationBlocks(
+      note.content,
+      highlights.map(highlight =>
+        citationDescriptorForHighlight(highlight, book.title)
+      )
+    );
+    for (const survivor of survivors) {
+      const survivorBook = (await bookStore.get(survivor.bookId)) as
+        Book | undefined;
+      if (survivorBook) {
+        content = appendCitationBlock(
+          content,
+          citationDescriptorForHighlight(survivor, survivorBook.title)
+        );
+      }
+    }
+    if (content === note.content) continue;
+    const updated = { ...note, content, updatedAt: Date.now() };
+    await noteStore.put(updated);
+    updatedNotes.push(updated);
+  }
+  await tx.objectStore("books").delete(id);
+  await tx.objectStore("files").delete(id);
+
+  const highlightKeys = (await highlightStore
+    .index("by-book")
+    .getAllKeys(id)) as string[];
+  for (const key of highlightKeys) await highlightStore.delete(key);
+
+  const associationStore = tx.objectStore("associations");
+  const [sourceKeys, targetKeys] = await Promise.all([
+    associationStore.index("by-source-book").getAllKeys(id),
+    associationStore.index("by-target-book").getAllKeys(id),
+  ]);
+  for (const key of new Set([...sourceKeys, ...targetKeys]))
+    await associationStore.delete(key);
+
+  const translationStore = tx.objectStore("translations");
+  const translations =
+    (await translationStore.getAll()) as ChapterTranslation[];
+  for (const translation of translations) {
+    if (translation.bookId === id)
+      await translationStore.delete(translation.id);
+  }
+
+  const mindMapStore = tx.objectStore("mindMaps");
+  const mindMaps = (await mindMapStore.getAll()) as MindMap[];
+  for (const mindMap of mindMaps) {
+    if (mindMap.bookId === id) await mindMapStore.delete(mindMap.id);
+  }
+
+  const sets = (await tx.objectStore("studySets").getAll()) as StudySet[];
+  for (const set of sets) {
+    if (set.bookIds.includes(id)) {
+      await tx.objectStore("studySets").put({
+        ...set,
+        bookIds: set.bookIds.filter(bookId => bookId !== id),
+        updatedAt: Date.now(),
+      });
+    }
+  }
+  await tx.done;
+  return updatedNotes;
+}
+
+/* ---------- 原始书籍文件缓存 ---------- */
+
+export interface StoredFile {
+  id: string; // 与 book.id 相同
+  type: Book["format"];
+  name?: string;
+  /** 新导入使用 Blob 避免导入阶段再次读取整文件；兼容旧 ArrayBuffer。 */
+  data: ArrayBuffer | Blob;
+}
+
+/** Commit an imported book and its optional source file as one atomic unit. */
+export async function putImportedBook(book: Book, file?: StoredFile) {
+  const database = await db();
+  const tx = database.transaction(["books", "files"], "readwrite");
+  await tx.objectStore("books").put(book);
+  if (file) await tx.objectStore("files").put(file);
+  await tx.done;
+}
+
+/** Merge server data and unsent edits under the same lock as reader writes. */
+export async function cacheServerBook(book: Book, file?: StoredFile) {
+  const tx = (await db()).transaction(
+    ["books", "files", "metadata"],
+    "readwrite"
+  );
+  const pending = (await tx
+    .objectStore("metadata")
+    .get(`reader-state:${book.id}`)) as PendingReaderState | undefined;
+  const merged = { ...book, ...pending?.patch };
+  if (book.readingSessions?.length || pending?.patch.readingSessions)
+    merged.readingSessions = mergeSessionsById(
+      book.readingSessions ?? [],
+      (pending?.patch.readingSessions as ReadingSession[] | undefined) ?? []
+    );
+  if (merged.cover === null) delete merged.cover;
+  if (merged.customCover === null) delete merged.customCover;
+  if (merged.typeSettings === null) delete merged.typeSettings;
+  await tx.objectStore("books").put(merged);
+  if (file) await tx.objectStore("files").put(file);
+  await tx.done;
+}
+
+export async function putFile(f: StoredFile) {
+  await (await db()).put("files", f);
+}
+
+export async function getFile(id: string): Promise<StoredFile | undefined> {
+  const local = (await (await db()).get("files", id)) as StoredFile | undefined;
+  return local ?? (await import("./workspaceSync")).downloadSource(id);
+}
+
+export async function deleteFile(id: string) {
+  await (await db()).delete("files", id).catch(() => undefined);
+}
+
+export async function getAllFolders(): Promise<Folder[]> {
+  const all = (await (await db()).getAll("folders")) as Folder[];
+  return all.sort((a, b) => a.createdAt - b.createdAt);
+}
+
+export async function putFolder(f: Folder) {
+  await (await db()).put("folders", f);
+}
+
+async function patchStoredFolder(
+  folderId: string,
+  update: (current: Folder) => Folder
+): Promise<Folder | undefined> {
+  const database = await db();
+  const tx = database.transaction("folders", "readwrite");
+  const current = (await tx.store.get(folderId)) as Folder | undefined;
+  if (!current) {
+    await tx.done;
+    return undefined;
+  }
+  const updated = update(current);
+  await tx.store.put(updated);
+  await tx.done;
+  return updated;
+}
+
+export async function patchFolderIcon(
+  folderId: string,
+  icon: FolderIconKey
+): Promise<Folder | undefined> {
+  return patchStoredFolder(folderId, current => ({ ...current, icon }));
+}
+
+export async function patchFolderName(
+  folderId: string,
+  name: string
+): Promise<Folder | undefined> {
+  return patchStoredFolder(folderId, current => ({ ...current, name }));
+}
+
+/** 删除文件夹：其中书籍移回未分类 */
+export async function deleteFolder(id: string) {
+  const d = await db();
+  const tx = d.transaction(["folders", "books"], "readwrite");
+  const bookStore = tx.objectStore("books");
+  const books = (await bookStore.getAll()) as Book[];
+  const detach = new Set(
+    JSON.parse(
+      sharedCore().execute<string>("planFolderDeletion", {
+        folderJson: JSON.stringify(id),
+        booksJson: JSON.stringify(
+          books.map(book => ({ id: book.id, folderId: book.folderId }))
+        ),
+      })
+    ) as string[]
+  );
+  await tx.objectStore("folders").delete(id);
+  for (const b of books) {
+    if (detach.has(b.id)) {
+      const updated = { ...b };
+      delete updated.folderId;
+      await bookStore.put(updated);
+    }
+  }
+  await tx.done;
+}
+
+/* ---------- 独立学习集（与文件夹无关） ---------- */
+
+export async function getAllStudySets(): Promise<StudySet[]> {
+  const all = (await (await db()).getAll("studySets")) as StudySet[];
+  return all.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export async function putStudySet(set: StudySet) {
+  await (await db()).put("studySets", set);
+}
+
+export async function deleteStudySet(id: string) {
+  await (await db()).delete("studySets", id);
+}
+
+export async function getAllNotes(): Promise<Note[]> {
+  const all = (await (await db()).getAll("notes")) as Note[];
+  return all.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export async function putNote(note: Note) {
+  await (await db()).put("notes", note);
+}
+
+export interface LocalNoteDeletionResult {
+  deletedHighlightIds: string[];
+  unlinkedHighlights: Highlight[];
+}
+
+/** Delete a note and update every local citation relation in one transaction. */
+export async function deleteNote(id: string): Promise<LocalNoteDeletionResult> {
+  const database = await db();
+  const tx = database.transaction(["notes", "highlights"], "readwrite");
+  const highlightStore = tx.objectStore("highlights");
+  const linked = ((await highlightStore.getAll()) as Highlight[]).filter(
+    highlight => highlight.noteId === id
+  );
+  const deletedHighlightIds: string[] = [];
+  const unlinkedHighlights: Highlight[] = [];
+  for (const highlight of linked) {
+    if (isCitationOnlyHighlight(highlight)) {
+      await highlightStore.delete(highlight.id);
+      deletedHighlightIds.push(highlight.id);
+      continue;
+    }
+    const unlinked = { ...highlight };
+    delete unlinked.noteId;
+    delete unlinked.citation;
+    await highlightStore.put(unlinked);
+    unlinkedHighlights.push(unlinked);
+  }
+  await tx.objectStore("notes").delete(id);
+  await tx.done;
+  return { deletedHighlightIds, unlinkedHighlights };
+}
+
+export async function getHighlights(bookId?: string): Promise<Highlight[]> {
+  const d = await db();
+  const all = bookId
+    ? ((await d.getAllFromIndex(
+        "highlights",
+        "by-book",
+        bookId
+      )) as Highlight[])
+    : ((await d.getAll("highlights")) as Highlight[]);
+  return all.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function putHighlight(h: Highlight) {
+  await (await db()).put("highlights", h);
+}
+
+export async function deleteHighlight(id: string) {
+  await (await db()).delete("highlights", id);
+}
+
+export interface LocalHighlightDeletionResult {
+  deletedHighlightIds: string[];
+  updatedNotes: Note[];
+}
+
+/**
+ * Delete highlights and their generated citation blocks in one IndexedDB
+ * transaction. Book titles and current note bodies are read inside the same
+ * transaction so a stale React snapshot cannot overwrite a newer local edit.
+ */
+export async function deleteHighlightsWithCitationCleanup(
+  ids: readonly string[]
+): Promise<LocalHighlightDeletionResult> {
+  const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length === 0) {
+    return { deletedHighlightIds: [], updatedNotes: [] };
+  }
+
+  const database = await db();
+  const tx = database.transaction(
+    ["books", "notes", "highlights"],
+    "readwrite"
+  );
+  const bookStore = tx.objectStore("books");
+  const noteStore = tx.objectStore("notes");
+  const highlightStore = tx.objectStore("highlights");
+  const highlights = (
+    await Promise.all(uniqueIds.map(id => highlightStore.get(id)))
+  ).filter((item): item is Highlight => item !== undefined);
+
+  const byNote = new Map<string, Highlight[]>();
+  for (const highlight of highlights) {
+    if (!highlight.noteId) continue;
+    const linked = byNote.get(highlight.noteId) ?? [];
+    linked.push(highlight);
+    byNote.set(highlight.noteId, linked);
+  }
+
+  const updatedNotes: Note[] = [];
+  for (const [noteId, linked] of byNote) {
+    const note = (await noteStore.get(noteId)) as Note | undefined;
+    if (!note) continue;
+    const descriptors = [];
+    for (const highlight of linked) {
+      const book = (await bookStore.get(highlight.bookId)) as Book | undefined;
+      descriptors.push(
+        citationDescriptorForHighlight(highlight, book?.title ?? "")
+      );
+    }
+    const content = removeCitationBlocks(note.content, descriptors);
+    if (content === note.content) continue;
+    const updated = {
+      ...note,
+      content,
+      updatedAt: Math.max(Date.now(), note.updatedAt + 1),
+    };
+    await noteStore.put(updated);
+    updatedNotes.push(updated);
+  }
+
+  for (const id of uniqueIds) await highlightStore.delete(id);
+  await tx.done;
+  return {
+    deletedHighlightIds: highlights.map(highlight => highlight.id),
+    updatedNotes,
+  };
+}
+
+/* ---------- 文段关联（独立于书摘与引用） ---------- */
+
+export async function getAllAssociations(
+  bookId?: string
+): Promise<Association[]> {
+  const d = await db();
+  let all: Association[];
+  if (bookId) {
+    const [source, target] = await Promise.all([
+      d.getAllFromIndex("associations", "by-source-book", bookId),
+      d.getAllFromIndex("associations", "by-target-book", bookId),
+    ]);
+    all = [
+      ...new Map(
+        ([...source, ...target] as Association[]).map(item => [item.id, item])
+      ).values(),
+    ];
+  } else {
+    all = (await d.getAll("associations")) as Association[];
+  }
+  return all.sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
+export async function putAssociation(association: Association) {
+  await (await db()).put("associations", association);
+}
+
+export interface AddAssociationIfAbsentResult {
+  association: Association;
+  created: boolean;
+}
+
+/**
+ * Return the association already owning this pair, or create the candidate.
+ *
+ * IndexedDB serializes readwrite transactions which overlap the same object
+ * store. Keeping the unique-index lookup and add in this transaction therefore
+ * makes concurrent callers converge on the record that was actually persisted.
+ */
+export async function addAssociationIfAbsent(
+  candidate: Association
+): Promise<AddAssociationIfAbsentResult> {
+  const database = await db();
+  const tx = database.transaction("associations", "readwrite");
+  const store = tx.objectStore("associations");
+  const existing = (await store.index("by-pair").get(candidate.pairKey)) as
+    Association | undefined;
+
+  if (existing) {
+    await tx.done;
+    return { association: existing, created: false };
+  }
+
+  await store.add(candidate);
+  await tx.done;
+  return { association: candidate, created: true };
+}
+
+export async function deleteAssociation(id: string) {
+  await (await db()).delete("associations", id);
+}
+
+/* ---------- 章节译文缓存 ---------- */
+
+export function translationId(
+  bookId: string,
+  chapterId: string,
+  targetLang: string
+) {
+  return `${bookId}:${chapterId}:${targetLang}`;
+}
+
+export async function getChapterTranslation(
+  bookId: string,
+  chapterId: string,
+  targetLang: string
+): Promise<ChapterTranslation | undefined> {
+  return (await (
+    await db()
+  ).get("translations", translationId(bookId, chapterId, targetLang))) as
+    ChapterTranslation | undefined;
+}
+
+export async function putChapterTranslation(t: ChapterTranslation) {
+  await (await db()).put("translations", t);
+}
+
+/* ---------- 脑图 ---------- */
+
+export async function getAllMindMaps(): Promise<MindMap[]> {
+  const all = (await (await db()).getAll("mindMaps")) as MindMap[];
+  return all.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export async function putMindMap(map: MindMap) {
+  await (await db()).put("mindMaps", map);
+}
+
+export async function deleteMindMap(id: string) {
+  await (await db()).delete("mindMaps", id);
+}

@@ -1,3 +1,5 @@
+> 当前状态（2026-10-03）：见[工程状态与验收门槛](../docs/current-status.md)。本文件中的日期/版本记录保留其历史范围；当前迁移为 MySQL 0014 / SQLite 0003 / IndexedDB 11，生产尚未正式切换。
+
 # GitHub 自动部署
 
 `main` 推送 → GitHub Actions 检查、测试、构建 → HTTPS 更新 API → 服务器从

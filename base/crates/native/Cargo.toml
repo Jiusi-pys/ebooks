@@ -1,0 +1,31 @@
+[package]
+name = "shufang-native"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shufang-application = { path = "../application" }
+shufang-domain = { path = "../domain" }
+shufang-sqlite = { path = "../sqlite" }
+serde.workspace = true
+serde_json.workspace = true
+uuid = { version = "1.21", features = ["v4"] }
+sha2 = "0.10"
+zip = { version = "2.4", default-features = false, features = ["deflate"] }
+quick-xml = "0.38"
+scraper = "0.24"
+encoding_rs = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "process", "io-util", "fs", "macros"] }
+futures-util = "0.3"
+libloading = "0.8"
+tempfile = "3.26"
+fs2 = "0.4"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+base64 = "0.22"
+
+[dev-dependencies]
+tempfile = "3.26"
+
+[target.'cfg(not(windows))'.dependencies]
+ring = "0.17.14"

@@ -93,7 +93,10 @@ export class SyncStore {
       throw new SyncError("immutable_review_requires_unique_event_id", 409);
     if (op.workspaceId !== this.workspace)
       throw new SyncError("workspace_mismatch", 403);
-    if (Buffer.byteLength(stableJson(op)) > 1024 * 1024)
+    // JSON.stringify already formats primitive values; canonical key ordering
+    // changes no bytes in the size. Reject before copying an oversized request
+    // through the bounded WASM ABI.
+    if (Buffer.byteLength(JSON.stringify(op)) > 1024 * 1024)
       throw new SyncError("operation_too_large", 413);
     const persist = async (db: PoolConnection) => {
       const head = (

@@ -1,0 +1,176 @@
+{
+  "sourceCommit": "f6879718dbc2333b3d39dcfafadb6b8318e0047e",
+  "source": "Working tree source; immutable prior migrations plus appended native migrations",
+  "files": [
+    {
+      "path": "app/db/indexeddb-migrations/0010-db.ts.source",
+      "sha256": "81c75f87b1ed5a6351507bf954de3eef92d62cdbb45c53f2cd88e32f45c586d4"
+    },
+    {
+      "path": "app/db/indexeddb-migrations/0010-syncDatabase.ts.source",
+      "sha256": "470180760d1dc1086cf9720918108ddf46ab8a54f64c3301ebd1dc1499653256"
+    },
+    {
+      "path": "app/db/indexeddb-migrations/0011-core-field-objects.ts.source",
+      "sha256": "c3e812642747a13aeb1568856c903e5720c305e78b0563d5fba75c112340cc13"
+    },
+    {
+      "path": "app/db/indexeddb-migrations/0011-db.ts.source",
+      "sha256": "e09611b354154fa347715f8deae36b2e3196495120498fb165a4957411a3788a"
+    },
+    {
+      "path": "app/db/indexeddb-migrations/0011-syncDatabase.ts.source",
+      "sha256": "b30bf920417ab6afd3e143e3dfc5eb61530ac72156e9fdc9485d140cdc6e1038"
+    },
+    {
+      "path": "app/db/indexeddb-migrations/0011-syncSnapshots.ts.source",
+      "sha256": "348268e3db6cf7c82b2f8f2be217eebd1f8f7782f70b370c8c59133773cccf1c"
+    },
+    {
+      "path": "app/db/indexeddb-migrations/0011.md",
+      "sha256": "4d3fb1fb2f4204ac8bf3e88d907a82e9491610cace53c457b0002d3dfc4cf844"
+    },
+    {
+      "path": "app/db/migrations/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app/db/migrations/0000_highlight_citation_hierarchy.sql",
+      "sha256": "5c4662e476c97d6de3ec6b4b216814d4df7baa5f818b242e94f9b498e9153d31"
+    },
+    {
+      "path": "app/db/migrations/0001_mirror_associations.sql",
+      "sha256": "ad8d4015e1aa12e26d3073c829f525a26d4516c06a213cee03205670d36f3fc5"
+    },
+    {
+      "path": "app/db/migrations/0002_reconcile_schema.sql",
+      "sha256": "6b514ce9164a9e0c534886f7ce25c0b62e1bf12e1e1a27d37be0e925bd35e7c6"
+    },
+    {
+      "path": "app/db/migrations/0003_many_solo.sql",
+      "sha256": "350390585438e39561de205f8d3eee14464975b2f2f2a53030217fb4df3ead40"
+    },
+    {
+      "path": "app/db/migrations/0004_redundant_phil_sheldon.sql",
+      "sha256": "fca30b3f72fc9c07d072f87164e1c7716c34ff5bfc619a731621f4a92524ddeb"
+    },
+    {
+      "path": "app/db/migrations/0005_remarkable_piledriver.sql",
+      "sha256": "ce9c441edda042862e5ce4ba377b2996fcbff9c503493b48cfa8abef3739c1d9"
+    },
+    {
+      "path": "app/db/migrations/0006_worthless_the_hood.sql",
+      "sha256": "dff31cfb9b6628f95ff07e0f7577477a5db4028d99d2ac24f7f6e618ba460206"
+    },
+    {
+      "path": "app/db/migrations/0007_mushy_miss_america.sql",
+      "sha256": "6835d4bd547f2de40207baaae43cafd3e301cc2e231e222a2487c1a667006e72"
+    },
+    {
+      "path": "app/db/migrations/0008_funny_pandemic.sql",
+      "sha256": "c2d47c606efddc7f65bc025f75ef2ec44681361e2b658824e46dfb44c9739405"
+    },
+    {
+      "path": "app/db/migrations/0009_lyrical_thena.sql",
+      "sha256": "a65627feeafe58103ba7e5ec82ca238be7b218ddb45f4963415fa66f915a0415"
+    },
+    {
+      "path": "app/db/migrations/0010_reconcile_migration_drift.sql",
+      "sha256": "40f7cbb22db4067e836b1597645040aad7af6ff57253d0733a4b5f3b8f63d86e"
+    },
+    {
+      "path": "app/db/migrations/0011_cleanup_false_note_quarantine.sql",
+      "sha256": "b55392188528e04268dbefac2ad0e15be19fe35ec12c2827df468720e5a32ec6"
+    },
+    {
+      "path": "app/db/migrations/0012_add_highlight_name.sql",
+      "sha256": "b35d6664f0c6e3e73a6fffcc0496c9cbb031136cf7b7dbfebd833be7039d6d3f"
+    },
+    {
+      "path": "app/db/migrations/0013_confused_amphibian.sql",
+      "sha256": "4f5eca0dfa981d79ee96cc0cd830859ed19b5aa7d081683bc3ceb79c41848323"
+    },
+    {
+      "path": "app/db/migrations/0014_workspace_sync.sql",
+      "sha256": "0d33a43b95cc793c398193ac609bb0db2c88118a27db925c2be820884f6438d1"
+    },
+    {
+      "path": "app/db/migrations/meta/0000_snapshot.json",
+      "sha256": "4f56793692c39c36ba2805cc7b4d2b9fe1d2df86a87579635c576412ad446980"
+    },
+    {
+      "path": "app/db/migrations/meta/0001_snapshot.json",
+      "sha256": "5d391e2013c7681952c3612c0cdcc17f699f14e9581ec3325e7062a1164ac36a"
+    },
+    {
+      "path": "app/db/migrations/meta/0002_snapshot.json",
+      "sha256": "30971da838ae21004342f6bdd0c6624fdc70573509b8add5d4504c09bec1c051"
+    },
+    {
+      "path": "app/db/migrations/meta/0003_snapshot.json",
+      "sha256": "9fff863d97767bd593fc8ef536e855e336274501f12de3cad94354875d222661"
+    },
+    {
+      "path": "app/db/migrations/meta/0004_snapshot.json",
+      "sha256": "d9c2ee9299c6fcbe75d8a209a10cc0b167d7319fd5ed36a43d377d876dca8c8b"
+    },
+    {
+      "path": "app/db/migrations/meta/0005_snapshot.json",
+      "sha256": "0165cb13b562f9fbb50724a3635b8f4459412d547e3f6971d2c95e319ad7c084"
+    },
+    {
+      "path": "app/db/migrations/meta/0006_snapshot.json",
+      "sha256": "ffd42562a18bd8bcae7c37844c71effdc92ea01de5db47de9d8dabc36e2c2682"
+    },
+    {
+      "path": "app/db/migrations/meta/0007_snapshot.json",
+      "sha256": "9b41f77c112749cdc2e0a2dfb551e95383f02c774dd813fb1a3d363ba11249d8"
+    },
+    {
+      "path": "app/db/migrations/meta/0008_snapshot.json",
+      "sha256": "b6f339c283f7954b6d4e69aaee0c1d4d957611150fc5d0c150a4f6c7c90f8dd1"
+    },
+    {
+      "path": "app/db/migrations/meta/0009_snapshot.json",
+      "sha256": "70415fdfb72fcc96f5f5afb18ee854666fbc3f7a9e49aecc7ef056f5bbb71a02"
+    },
+    {
+      "path": "app/db/migrations/meta/0010_snapshot.json",
+      "sha256": "0460bce9a06cdccf33f3eae6909fd398911466d85b463369f7c7ece5b618be57"
+    },
+    {
+      "path": "app/db/migrations/meta/0011_snapshot.json",
+      "sha256": "ea217953937d3544fb58a2574ee793aa352b433d8036a53f19b4c6ed4ccc2ddb"
+    },
+    {
+      "path": "app/db/migrations/meta/0012_snapshot.json",
+      "sha256": "ac85ed85cab0b7ddd3edcd79abdf298afc800b821d843fb42ce262c9eb63950c"
+    },
+    {
+      "path": "app/db/migrations/meta/0013_snapshot.json",
+      "sha256": "2cd30e7c76a40caa42fc04cc85c71878b93e1c16d744f6dae1b66dd699366cf0"
+    },
+    {
+      "path": "app/db/migrations/meta/0014_snapshot.json",
+      "sha256": "9a67d4032b65663c9560e2777b6a0110a40bd82faf9a8e95af94f37c9440f0ee"
+    },
+    {
+      "path": "app/db/migrations/meta/_journal.json",
+      "sha256": "17aa855275fe72b66133ca334c46302ad68a8d49a861be17941fe4309f1edf5b"
+    },
+    {
+      "path": "base/crates/sqlite/migrations/0001.sql",
+      "sha256": "e2d7f4b5bb656f8d77599bd2529c51b71a6cb4d8bc797b3fd0edd734a61a6492"
+    },
+    {
+      "path": "base/crates/sqlite/migrations/0002.sql",
+      "sha256": "8f703e53bb6f8f6c158773429c8b990aa1c05b9f71d4ee43a8ee232b94bd4a53"
+    },
+    {
+      "path": "base/crates/sqlite/migrations/0003.sql",
+      "sha256": "4dd9464f6ce5cd045a9e4987f831c748aa797c9fe77a9b33581444e093e2f3e2"
+    }
+  ],
+  "archiveSha256": "b91edf88c99c50beaf6bc013237884bc5470159b8a681a7c884db7543216d6db",
+  "recovery": "Extract separately and verify checksums. This archive restores migration source only; restore user data from an independent database and original-file backup with all writers stopped."
+}
