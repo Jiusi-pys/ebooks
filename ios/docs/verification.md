@@ -1,5 +1,28 @@
 # iOS 验证记录
 
+## 2026-10-02：默认主线适配更新 1.4.2（build 10）
+
+- `git ls-remote --symref` 确认远端默认分支为 `main`，最新提交 `40bac54c075ae4467fb2df31fd6083f63db7dad6`；本地 `main` 与 `origin/main` 均为该提交。已执行 fetch，无需合并。按本轮确认使用默认分支，未切换到另外存在的 `base` 分支。
+- 对照该提交的 reader-auth、v2 entities 分页及 readingSession 字段契约：保留账户 Cookie／Origin 认证；阅读时长上传期间固定路由，读取时跳过已删除字段、错误书籍／会话标识和无效区间，遇重复分页游标报错退出。新增 4 项回归测试。
+- 无 MySQL、IndexedDB 或 iOS 持久化格式变更，不需要新增迁移；既有迁移与数据未改写。原文件修改前备份于 `~/Library/Application Support/Shufang/Recovery/update-20261002-2345/`，含 SHA-256 清单。
+- 原仓库 `.git` 多个文件带 iCloud `dataless` 标记。下载请求及重启用户级 bird 后可读取分支引用并完成 fetch，但完整 status/diff 和 Web 依赖读取仍有阻塞；不能据此宣称工作区干净。保留既有本地改动与未跟踪 iOS 源码，未执行 reset、stash 或覆盖合并。
+- 构建使用 `/tmp/shufang-update-20261002/ios` 本机副本。55 个源码、资源及测试文件逐一 SHA-256 匹配原仓库，Package 与工程文件逐字节一致；原本机 Xcode 入口生成器执行成功。仅清理可重建的书房临时 SwiftPM／Xcode 编译缓存，未清理设备、书籍或用户文档。
+
+| 验证 | 本次结果 |
+| --- | --- |
+| Swift 与 HTTP 联调 | 73 项全部通过，0 跳过；包含路由固定、分页合并、重复游标、失败回执以及登录、离线重启、冲突、回执丢失、附件同步 |
+| 模拟器／真机构建 | 均 `BUILD SUCCEEDED`；真机 `codesign --verify --deep --strict` 通过 |
+| iPad 模拟器 | 覆盖安装后恢复原会话；样本书下载、正文、脚注打开／关闭、无障碍下一页进入“为政”；样本服务返回 503 后重启，下载的正文仍可打开；随后恢复服务 |
+| iPhone 模拟器 | 覆盖安装并启动、恢复会话、书架与样本正文展示；阅读时长写入隔离样本服务 |
+| iPhone 真机 Jiusi001 | 覆盖安装并启动成功，设备回读版本 1.4.2（10） |
+| iPad Pro M2 真机 | 覆盖安装成功，设备回读版本 1.4.2（10）；首次启动被设备锁屏拒绝，待解锁后验证 |
+| 部署监督器 | 在相同远端提交的本机副本执行，11 项全部通过 |
+| Web check／lint／test／build | 各运行 45 秒仍停留启动阶段并被停止，未通过；未修改 Web／服务端代码 |
+
+本轮模拟器使用 127.0.0.1 的隔离样本服务，不等同生产、飞行模式或跨真机同步验收；真机安装／进程启动不等同触摸、Apple Pencil 或业务交互验收。未部署服务器或发布 TestFlight／App Store。
+
+证据：[Swift 测试](evidence/update-1.4.2-swift.log)、[模拟器构建](evidence/update-1.4.2-simulator.log)、[真机构建](evidence/update-1.4.2-device.log)、[设备版本](evidence/update-1.4.2-installed.json)、[源码哈希](evidence/update-1.4.2-source-sha256.json)、[iPad 正文](evidence/update-1.4.2-ipad.png)、[iPhone 正文](evidence/update-1.4.2-iphone.png)。
+
 ## 2026-10-02：书内脚注浮窗 1.2.1（build 4）
 
 - 根因：服务端章节接口已返回 `footnotes`（paraIndex/start/end/content），原生 Chapter 的 CodingKeys/解码与阅读器遗漏此字段。已对照部署服务器的 `types/index.ts`、`reader/EpubText.tsx` 和 v1 章节接口修复；不改服务器数据或 API。

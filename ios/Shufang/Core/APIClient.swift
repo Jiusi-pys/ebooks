@@ -236,6 +236,7 @@ final class APIClient {
             body: ProgressPatch(progress: ReadingProgress(chapterId: chapter, ratio: 0)))
     }
     func pushReadingSession(_ item: ReadingSession, replicaID: String) async throws {
+        beginRouteLease(); defer { endRouteLease() }
         guard let caps = try await detectSync() else { return }
         let operation = ReadingSessionOperation(workspaceId: caps.workspaceId,
             operationId: UUID().uuidString.lowercased(), replicaId: replicaID,
@@ -251,6 +252,7 @@ final class APIClient {
         beginRouteLease(); defer { endRouteLease() }
         guard try await detectSync() != nil else { return [] }
         var after: String?
+        var seenCursors = Set<String>()
         var result: [ReadingSession] = []
         repeat {
             let bytes = try await data(["entities"], version: 2,
@@ -263,14 +265,21 @@ final class APIClient {
             for entity in entities where entity["deleted"] as? Bool != true {
                 guard let fields = entity["fields"] as? [String: [String: Any]] else { continue }
                 for (key, field) in fields where key.hasPrefix("@readingSession:") {
-                    guard let value = field["value"],
+                    guard field["removed"] as? Bool != true,
+                          let value = field["value"],
                           let bytes = try? JSONSerialization.data(withJSONObject: value),
-                          let session = try? JSONDecoder().decode(ReadingSession.self, from: bytes)
+                          let session = try? JSONDecoder().decode(ReadingSession.self, from: bytes),
+                          key == "@readingSession:\(session.id)",
+                          entity["id"] as? String == session.bookId,
+                          session.startedAt >= 0, session.endedAt >= session.startedAt
                     else { continue }
                     result.append(session)
                 }
             }
             after = page["next"] as? String
+            if let after, !seenCursors.insert(after).inserted {
+                throw APIError.invalidResponse
+            }
         } while after != nil
         return ReadingTime.merge(result)
     }
