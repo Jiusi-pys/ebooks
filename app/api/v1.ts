@@ -67,7 +67,7 @@ import {
   mirrorTranslations,
   mirrorMindmaps,
 } from "@db/mirror-schema";
-import { requireApiKey } from "./lib/openapi-auth";
+import { requireReaderOrMachine } from "./lib/reader-auth";
 import { fanout, EVENT_TYPES, type ShufangEvent } from "./lib/webhooks";
 import { askCodex } from "./lib/codex";
 import {
@@ -86,7 +86,6 @@ import {
   serializeBookMetadata,
   type ValidatedBookMetadata,
 } from "./lib/book-metadata";
-import { requireBrowserMutation } from "./auth";
 import { readerStateSchema } from "./lib/library-state";
 import {
   BookMirrorUploadError,
@@ -147,7 +146,7 @@ v1.get("/", c =>
   c.json({
     name: "書房开放 API",
     version: "1.0",
-    auth: "请求头 X-API-Key: <OPEN_API_KEY>（未配置时机器接口禁用）",
+    auth: "账户登录会话；服务器间及 MCP 使用 X-API-Key: <OPEN_API_KEY>",
     eventTypes: EVENT_TYPES,
     webhookSignature: "X-Shufang-Signature: sha256=<hmac(secret, body)>",
     endpoints: [
@@ -182,16 +181,7 @@ v1.get("/", c =>
 
 v1.use("/*", async (c, next) => {
   if (c.req.path === "/api/v1" || c.req.path === "/api/v1/") return next();
-  // 阅读端使用签名会话；机器客户端继续使用 API key/Bearer。
-  if (c.req.path === "/api/v1/events") {
-    const key = c.req.header("x-api-key")?.trim();
-    const authorization = c.req.header("authorization");
-    if (key || authorization?.toLowerCase().startsWith("bearer ")) {
-      return requireApiKey(c, next);
-    }
-    return requireBrowserMutation(c, next);
-  }
-  return requireApiKey(c, next);
+  return requireReaderOrMachine(c, next);
 });
 
 /* ---------- 书籍 ---------- */
