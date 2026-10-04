@@ -26,15 +26,31 @@ pub struct Host {
     pub token: String,
     pub base_url: String,
     pub stop: tokio::sync::Notify,
+    read_only: bool,
 }
 impl Host {
     pub fn new(workspace: Arc<Workspace>, token: String, base_url: String) -> Arc<Self> {
+        Self::new_mode(workspace, token, base_url, false)
+    }
+    pub fn new_read_only(workspace: Arc<Workspace>, token: String, base_url: String) -> Arc<Self> {
+        Self::new_mode(workspace, token, base_url, true)
+    }
+    fn new_mode(
+        workspace: Arc<Workspace>,
+        token: String,
+        base_url: String,
+        read_only: bool,
+    ) -> Arc<Self> {
         Arc::new(Self {
             workspace,
             token,
             base_url: base_url.trim_end_matches('/').into(),
             stop: tokio::sync::Notify::new(),
+            read_only,
         })
+    }
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
     }
 }
 pub fn same_secret(left: &str, right: &str) -> bool {
@@ -137,9 +153,33 @@ pub fn router(host: Arc<Host>) -> Router {
         .merge(oauth::router())
         .route("/api/v1/", get(legacy::directory))
         .route("/api/v1", get(legacy::directory))
-        .route("/health", get(|| async { Json(json!({"ok":true})) }))
+        .route(
+            "/health",
+            get(|State(host): State<Arc<Host>>| async move {
+                Json(json!({"ok":true,"readOnly":host.is_read_only()}))
+            }),
+        )
         .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
+        .layer(middleware::from_fn_with_state(host.clone(), write_fence))
         .with_state(host)
+}
+async fn write_fence(State(host): State<Arc<Host>>, request: Request, next: Next) -> Response {
+    let safe = matches!(
+        *request.method(),
+        axum::http::Method::GET | axum::http::Method::HEAD | axum::http::Method::OPTIONS
+    );
+    let read_only_mcp =
+        request.method() == axum::http::Method::POST && request.uri().path() == "/mcp";
+    if host.is_read_only()
+        && ((!safe && !read_only_mcp) || request.uri().path().starts_with("/oauth/"))
+    {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"error":"read_only_replica"})),
+        )
+            .into_response();
+    }
+    next.run(request).await
 }
 async fn authorize(State(host): State<Arc<Host>>, request: Request, next: Next) -> Response {
     if request.uri().path() == "/mcp" {

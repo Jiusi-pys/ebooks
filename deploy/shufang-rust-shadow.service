@@ -1,0 +1,26 @@
+[Unit]
+Description=Shufang Rust read-only migration candidate
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+User=shufang-rust
+Group=shufang-rust
+WorkingDirectory=/opt/shufang/rust-shadow
+EnvironmentFile=/etc/shufang/rust-shadow.env
+ExecStart=/opt/shufang/rust-shadow/bin/shufang-service --workspace /opt/shufang/rust-shadow/workspace --workspace-id personal-workspace --node-id linux-rust-shadow --listen 127.0.0.1 --port 31418 --public-url https://us.jiusi.org --read-only --replica-source https://us.jiusi.org --replica-node linux-personal
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/shufang/rust-shadow/workspace
+UMask=0077
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

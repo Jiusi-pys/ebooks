@@ -100,7 +100,11 @@ pub async fn transfer(
     let mut pending = 0usize;
     for m in seen.values() {
         let result = if store.has(&m.sha256)? {
-            upload(host, peer, client, workspace, identity, &store, m).await
+            if host.is_read_only() {
+                Ok(())
+            } else {
+                upload(host, peer, client, workspace, identity, &store, m).await
+            }
         } else {
             download(host, peer, client, workspace, &store, m).await
         };

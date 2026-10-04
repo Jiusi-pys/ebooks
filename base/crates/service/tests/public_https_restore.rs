@@ -36,6 +36,7 @@ async fn restores_operations_and_books_from_public_https_peer() {
     let mut received = 0;
     for _ in 0..2 {
         tick_peer(&host, &peer).await.unwrap();
+        received = 0;
         let mut after = 0;
         loop {
             let batch = workspace

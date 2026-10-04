@@ -47,7 +47,34 @@ async fn run() -> Result<(), String> {
             return Err("public_url_requires_https_origin".into());
         }
     }
-    let host = Host::new(workspace, token, public_url);
+    let read_only = args.iter().any(|a| a == "--read-only");
+    if let Some(source) = value("--replica-source") {
+        if !read_only {
+            return Err("replica_source_requires_read_only".into());
+        }
+        let node = value("--replica-node").ok_or("replica_node_required")?;
+        let credential =
+            std::env::var("SHUFANG_REPLICA_TOKEN").map_err(|_| "replica_token_required")?;
+        if credential.len() < 32 || credential.len() > 4096 {
+            return Err("invalid_replica_token".into());
+        }
+        let config = shufang_native::sync_config::public_config(&workspace)?;
+        let updated = shufang_native::sync_config::save_peer(
+            &workspace,
+            &serde_json::json!({
+                "id":node,"url":source,"tokenEnvironment":"SHUFANG_REPLICA_TOKEN","expected":config["revision"]
+            }),
+        )?;
+        shufang_native::sync_config::pause(
+            &workspace,
+            &serde_json::json!({"paused":false,"expected":updated["revision"]}),
+        )?;
+    }
+    let host = if read_only {
+        Host::new_read_only(workspace, token, public_url)
+    } else {
+        Host::new(workspace, token, public_url)
+    };
     if args.iter().any(|a| a == "--stdio") {
         return stdio(host).await;
     }
@@ -68,6 +95,9 @@ async fn run() -> Result<(), String> {
         .map_err(|e| format!("listen_failed: {e}"))?;
     let worker_host = host.clone();
     let worker = tokio::spawn(async move {
+        if worker_host.is_read_only() {
+            return;
+        }
         loop {
             if let Err(error) = webhooks::tick(&worker_host).await {
                 eprintln!("webhook worker: {error}");

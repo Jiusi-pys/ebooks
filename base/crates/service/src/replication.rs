@@ -92,7 +92,7 @@ pub async fn tick_peer(host: &Arc<Host>, peer: &Peer) -> Result<(), String> {
         .await?;
     pull_history(host, peer, &client, &workspace, &identity).await?;
     let mut recovered = false;
-    for _ in 0..100 {
+    for _ in 0..if host.is_read_only() { 0 } else { 100 } {
         let (expected, mut rows) = {
             let c = host.workspace.core.lock().map_err(|_| "core_lock_failed")?;
             let (revision, position) = c.sync_checkpoint(&send_key)?;
