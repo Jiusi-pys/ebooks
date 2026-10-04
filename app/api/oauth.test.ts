@@ -281,6 +281,33 @@ describe("MCP OAuth authorization boundary", () => {
     writeFileSync(join(directory, "oauth.json"), '{"version":999}');
     expect((await register()).status).toBe(503);
   });
+  it("reclaims expired unused dynamic registrations without evicting grants", async () => {
+    const flow = await begin();
+    const approved = await consent(flow);
+    const code = new URL(approved.headers.get("location")!).searchParams.get(
+      "code"
+    )!;
+    const tokens = (await (
+      await token(flow.client.client_id, {
+        grant_type: "authorization_code",
+        code,
+        code_verifier: verifier,
+        redirect_uri: redirect,
+      })
+    ).json()) as { refresh_token: string };
+    for (let index = 1; index < 128; index++) {
+      if (index === 100) now += 60_000;
+      expect((await register()).status).toBe(201);
+    }
+    expect((await register()).status).toBe(429);
+    now += 25 * 60 * 60_000;
+    expect((await register()).status).toBe(201);
+    const rotated = await token(flow.client.client_id, {
+      grant_type: "refresh_token",
+      refresh_token: tokens.refresh_token,
+    });
+    expect(rotated.status).toBe(200);
+  });
   it("does not issue credentials when the atomic state write fails", async () => {
     const flow = await begin();
     mkdirSync(join(directory, "oauth.json.tmp"));

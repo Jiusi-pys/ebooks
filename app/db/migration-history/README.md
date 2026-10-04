@@ -85,3 +85,15 @@ upgrade branches remain intact. Take an independent browser export before
 upgrade; this migration-source archive is not a book/data backup. An unpaired
 legacy workspace is rejected without clearing its pending outbox and still
 requires an explicit export/import transition before production release.
+
+## Canonical-source repair archive (2026-10-05)
+
+`20261005-through-mysql0014-sqlite0003-indexeddb0011-canonical.tar.gz` is a
+new 42-file source archive. It does not alter or replace any previous archive or
+database migration. Its manifest and tar entries match the committed Git blobs
+byte-for-byte, including the LF-encoded MySQL 0014 SQL, snapshot and journal.
+The archive SHA-256 and all 42 entry hashes were independently checked against
+the manifest and `git show HEAD:<path>`. The archive script now stages those
+canonical bytes before packaging, avoiding a Windows checkout's CRLF drift.
+MySQL remains 0014, SQLite remains 0003 and IndexedDB remains 11. This is a
+migration-source recovery repair, not a data backup or upgrade acceptance run.

@@ -33,6 +33,15 @@ impl ReplicationRepository for SqliteRepository {
         if head != expected_sequence {
             return Err("snapshot_head_changed".into());
         }
+        // Network snapshots are resumable for one day. Named version snapshots
+        // are operator-owned and are removed only by an explicit delete.
+        let cutoff = i64::try_from(now.saturating_sub(86_400_000)).map_err(failure)?;
+        tx.execute("DELETE FROM sync_snapshot_entities WHERE snapshot_id IN (SELECT id FROM sync_snapshots WHERE id NOT LIKE 'version-%' AND created_at < ?)", [cutoff]).map_err(failure)?;
+        tx.execute(
+            "DELETE FROM sync_snapshots WHERE id NOT LIKE 'version-%' AND created_at < ?",
+            [cutoff],
+        )
+        .map_err(failure)?;
         tx.execute(
             "INSERT INTO sync_snapshots VALUES(?,?,?)",
             params![id, checkpoint, i64::try_from(now).map_err(failure)?],

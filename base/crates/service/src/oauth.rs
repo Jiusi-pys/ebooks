@@ -9,7 +9,10 @@ use axum::{
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use url::Url;
 
 pub fn router() -> Router<Arc<Host>> {
@@ -39,7 +42,7 @@ fn hash(token: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(token.as_bytes()))
 }
 fn empty() -> Value {
-    json!({"clients":{},"pending":{},"codes":{},"access":{},"refresh":{}})
+    json!({"clients":{},"pending":{},"codes":{},"access":{},"refresh":{},"used_refresh":{}})
 }
 fn mutate<F, T>(host: &Host, action: F) -> Result<T, String>
 where
@@ -47,7 +50,7 @@ where
 {
     let mut core = host.workspace.core.lock().map_err(|_| "core_lock_failed")?;
     let (revision, mut value) = core.local_value("oauth-store")?.unwrap_or((0, empty()));
-    for key in ["pending", "codes", "access", "refresh"] {
+    for key in ["pending", "codes", "access", "refresh", "used_refresh"] {
         if let Some(values) = value[key].as_object_mut() {
             values.retain(|_, v| v["expires"].as_u64().unwrap_or(0) > now());
         }
@@ -105,19 +108,35 @@ async fn register(State(h): State<Arc<Host>>, Json(request): Json<Value>) -> Api
         return Err(error("invalid_redirect_uri".into()));
     }
     let id = random();
-    let client = json!({"client_id":id,"client_name":request["client_name"].as_str().unwrap_or("MCP client").chars().take(100).collect::<String>(),"redirect_uris":redirects,"token_endpoint_auth_method":"none","grant_types":["authorization_code","refresh_token"],"response_types":["code"]});
+    let client = json!({"client_id":id,"client_id_issued_at":now(),"client_name":request["client_name"].as_str().unwrap_or("MCP client").chars().take(100).collect::<String>(),"redirect_uris":redirects,"token_endpoint_auth_method":"none","grant_types":["authorization_code","refresh_token"],"response_types":["code"]});
     mutate(&h, |store| {
-        if store["clients"]
-            .as_object()
-            .ok_or("invalid_oauth_store")?
-            .len()
-            >= 200
-        {
-            return Err("client_limit".into());
+        let active: HashSet<String> = ["pending", "codes", "access", "refresh"]
+            .iter()
+            .filter_map(|key| store[*key].as_object())
+            .flat_map(|records| records.values())
+            .filter_map(|record| record["client"].as_str().map(str::to_owned))
+            .collect();
+        let clients = store["clients"]
+            .as_object_mut()
+            .ok_or("invalid_oauth_store")?;
+        // Older registrations have no timestamp. Give them a full grace period on
+        // first registration attempt instead of dropping potentially live clients.
+        for old in clients.values_mut() {
+            if old["client_id_issued_at"].as_u64().is_none() {
+                old["client_id_issued_at"] = now().into();
+            }
         }
-        store["clients"][&id] = client.clone();
-        Ok(())
+        clients.retain(|id, record| {
+            active.contains(id)
+                || record["client_id_issued_at"].as_u64().unwrap_or(0) + 86400 > now()
+        });
+        if clients.len() >= 200 {
+            return Ok(Err("client_limit".to_owned()));
+        }
+        clients.insert(id.clone(), client.clone());
+        Ok(Ok(()))
     })
+    .map_err(error)?
     .map_err(error)?;
     Ok(Json(client))
 }
@@ -225,6 +244,30 @@ async fn token(State(h): State<Arc<Host>>, Form(form): Form<HashMap<String, Stri
         if resource != &format!("{}/mcp", h.base_url) {
             return Err("invalid_target".into());
         }
+        if form.get("grant_type").map(String::as_str) == Some("refresh_token") {
+            let key = hash(form.get("refresh_token").ok_or("invalid_grant")?);
+            if let Some(used) = store["used_refresh"].get(&key) {
+                let grant = used["grant"].clone();
+                for kind in ["access", "refresh"] {
+                    store[kind]
+                        .as_object_mut()
+                        .ok_or("invalid_oauth_store")?
+                        .retain(|_, v| v["grant"] != grant);
+                }
+                // A replay must be committed even if normal issuance is at capacity.
+                return Ok(json!({"error":"invalid_grant"}));
+            }
+        }
+        // Check capacity before consuming a code or a refresh token. mutate() does not
+        // persist changes when its action returns Err.
+        if store["access"]
+            .as_object()
+            .ok_or("invalid_oauth_store")?
+            .len()
+            >= 5000
+        {
+            return Err("token_limit".into());
+        }
         let identity = match form.get("grant_type").map(String::as_str) {
             Some("authorization_code") => {
                 let key = hash(form.get("code").ok_or("invalid_grant")?);
@@ -259,31 +302,37 @@ async fn token(State(h): State<Arc<Host>>, Form(form): Form<HashMap<String, Stri
                     .as_object_mut()
                     .ok_or("invalid_oauth_store")?
                     .remove(&key);
+                let lifetime = record["grant_expires"]
+                    .as_u64()
+                    .unwrap_or_else(|| record["expires"].as_u64().unwrap_or(0));
+                store["used_refresh"][&key] = json!({"grant":record["grant"],"expires":lifetime});
                 record
             }
             _ => return Err("unsupported_grant_type".into()),
         };
-        if store["access"]
-            .as_object()
-            .ok_or("invalid_oauth_store")?
-            .len()
-            >= 5000
-        {
-            return Err("token_limit".into());
-        }
         let access = random();
         let refresh = random();
         let grant = identity["grant"]
             .as_str()
             .map(str::to_owned)
             .unwrap_or_else(random);
-        store["access"][hash(&access)] = json!({"client":client,"resource":resource,"scope":"library:read","expires":now()+3600,"grant":grant});
-        store["refresh"][hash(&refresh)] = json!({"client":client,"resource":resource,"scope":"library:read","expires":now()+30*86400,"grant":grant});
+        let grant_expires = if form.get("grant_type").map(String::as_str) == Some("refresh_token") {
+            identity["grant_expires"]
+                .as_u64()
+                .unwrap_or_else(|| identity["expires"].as_u64().unwrap_or(0))
+        } else {
+            now() + 30 * 86400
+        };
+        store["access"][hash(&access)] = json!({"client":client,"resource":resource,"scope":"library:read","expires":(now()+3600).min(grant_expires),"grant":grant});
+        store["refresh"][hash(&refresh)] = json!({"client":client,"resource":resource,"scope":"library:read","expires":grant_expires,"grant_expires":grant_expires,"grant":grant});
         Ok(
-            json!({"access_token":access,"token_type":"Bearer","expires_in":3600,"refresh_token":refresh,"scope":"library:read"}),
+            json!({"access_token":access,"token_type":"Bearer","expires_in":3600u64.min(grant_expires.saturating_sub(now())),"refresh_token":refresh,"scope":"library:read"}),
         )
     });
     match result {
+        Ok(value) if value.get("error").is_some() => {
+            (StatusCode::BAD_REQUEST, Json(value)).into_response()
+        }
         Ok(value) => (
             [("Cache-Control", "no-store"), ("Pragma", "no-cache")],
             Json(value),

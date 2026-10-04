@@ -330,13 +330,56 @@ async fn snapshot(
         Json(json!({"id":id,"cursor":checkpoint})),
     ))
 }
-fn page(states: Vec<shufang_domain::sync::EntityState>, checkpoint: Option<String>) -> Json<Value> {
-    let next = states.last().map(|s| format!("{}:{}", s.kind, s.id));
+fn page(states: Vec<shufang_domain::sync::EntityState>, checkpoint: Option<String>) -> Api {
+    let states = states
+        .into_iter()
+        .map(|state| serde_json::to_value(state).map_err(|e| error(e.to_string())))
+        .collect::<Result<Vec<_>, _>>()?;
+    let states = bounded_page(states, checkpoint.as_deref(), 15 * 1024 * 1024)?;
+    let next = states.last().map(|s| {
+        format!(
+            "{}:{}",
+            s["kind"].as_str().unwrap_or(""),
+            s["id"].as_str().unwrap_or("")
+        )
+    });
     let mut value = json!({"entities":states,"next":next});
     if let Some(c) = checkpoint {
         value["cursor"] = json!(c)
     }
-    Json(value)
+    Ok(Json(value))
+}
+fn bounded_page(
+    states: Vec<Value>,
+    checkpoint: Option<&str>,
+    limit: usize,
+) -> Result<Vec<Value>, (StatusCode, Json<Value>)> {
+    let mut page = Vec::new();
+    for state in states {
+        let mut proposed = page.clone();
+        proposed.push(state.clone());
+        let next = format!(
+            "{}:{}",
+            state["kind"].as_str().unwrap_or(""),
+            state["id"].as_str().unwrap_or("")
+        );
+        let payload = json!({"entities":proposed,"next":next,"cursor":checkpoint});
+        if serde_json::to_vec(&payload)
+            .map_err(|e| error(e.to_string()))?
+            .len()
+            > limit
+        {
+            if page.is_empty() {
+                return Err((
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    Json(json!({"error":"snapshot_entity_too_large"})),
+                ));
+            }
+            break;
+        }
+        page.push(state);
+    }
+    Ok(page)
 }
 async fn snapshot_page(
     State(h): State<Arc<Host>>,
@@ -351,7 +394,7 @@ async fn snapshot_page(
     let (cursor, states) = c
         .sync_snapshot_page(&id, q.get("after").map_or("", String::as_str))
         .map_err(error)?;
-    Ok(page(states, Some(cursor)))
+    page(states, Some(cursor))
 }
 async fn entities(State(h): State<Arc<Host>>, Query(q): Query<HashMap<String, String>>) -> Api {
     let c = h
@@ -359,15 +402,16 @@ async fn entities(State(h): State<Arc<Host>>, Query(q): Query<HashMap<String, St
         .core
         .lock()
         .map_err(|_| error("core_lock_failed".into()))?;
-    Ok(page(
+    page(
         c.replication_entities(
             q.get("kind").map(String::as_str),
             q.get("after").map_or("", String::as_str),
         )
         .map_err(error)?,
         None,
-    ))
+    )
 }
+
 async fn status(State(h): State<Arc<Host>>) -> Api {
     let c = h
         .workspace
@@ -415,4 +459,25 @@ async fn restore(
     Ok(Json(
         json!({"entityId":id,"receipt":{"operationId":operation,"duplicate":duplicate,"seq":sequence.to_string()}}),
     ))
+}
+
+#[cfg(test)]
+mod page_tests {
+    use super::*;
+    #[test]
+    fn bounds_snapshot_response_by_serialized_bytes() {
+        let states = (0..3)
+            .map(
+                |i| json!({"kind":"notes","id":i.to_string(),"fields":{"content":"x".repeat(500)}}),
+            )
+            .collect();
+        let first = bounded_page(states, Some("checkpoint"), 900).unwrap();
+        assert_eq!(first.len(), 1);
+        assert!(
+            serde_json::to_vec(&json!({"entities":first,"next":"notes:0","cursor":"checkpoint"}))
+                .unwrap()
+                .len()
+                <= 900
+        );
+    }
 }

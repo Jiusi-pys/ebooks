@@ -32,6 +32,7 @@ const clientSchema = z.object({
   client_id: z.string(),
   client_name: z.string(),
   redirect_uris: z.array(z.string()).max(5),
+  issuedAt: z.number().int().nonnegative().optional(),
 });
 const authorizationSchema = z.object({
   client_id: z.string().min(1).max(256),
@@ -274,20 +275,36 @@ export function createOAuthServer(options: {
       "invalid_redirect_uri"
     );
     const client = store.update(state => {
-      capacity(state.clients, 128);
+      prune(state, now());
+      const active = new Set([
+        ...Object.values(state.pending).map(item => item.request.client_id),
+        ...Object.values(state.codes).map(item => item.request.client_id),
+        ...Object.values(state.grants).map(item => item.clientId),
+      ]);
+      for (const [id, client] of Object.entries(state.clients)) {
+        client.issuedAt ??= now();
+        if (!active.has(id) && client.issuedAt + 24 * 60 * 60_000 <= now())
+          delete state.clients[id];
+      }
+      // Persist pruning even when capacity is still exhausted.
+      if (Object.keys(state.clients).length >= 128) return null;
       const client_id = random();
       const created = {
         client_id,
         client_name: input.client_name,
         redirect_uris: input.redirect_uris,
+        issuedAt: now(),
       };
       state.clients[client_id] = created;
       return created;
     });
+    requireValue(client, "temporarily_unavailable", 429);
     return c.json(
       {
-        ...client,
-        client_id_issued_at: Math.floor(now() / 1000),
+        client_id: client.client_id,
+        client_name: client.client_name,
+        redirect_uris: client.redirect_uris,
+        client_id_issued_at: Math.floor(client.issuedAt / 1000),
         token_endpoint_auth_method: "none",
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],

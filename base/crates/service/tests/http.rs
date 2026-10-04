@@ -9,6 +9,141 @@ use shufang_service::{router, Host};
 use tower::ServiceExt;
 
 #[tokio::test]
+async fn modern_mcp_requires_matching_routing_headers() {
+    let dir = tempfile::tempdir().unwrap();
+    let workspace = Workspace::open(&dir.path().join("library.db"), "w", "r").unwrap();
+    let app = router(Host::new(
+        workspace,
+        "token".into(),
+        "http://127.0.0.1:31417".into(),
+    ));
+    let body = json!({"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}).to_string();
+    for (method_header, expected) in [
+        ("server/discover", StatusCode::OK),
+        ("tools/list", StatusCode::BAD_REQUEST),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/mcp")
+                    .header("x-api-key", "token")
+                    .header("content-type", "application/json")
+                    .header("MCP-Protocol-Version", "2026-07-28")
+                    .header("Mcp-Method", method_header)
+                    .body(Body::from(body.clone()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), expected);
+    }
+    let missing_envelope = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/mcp")
+                .header("x-api-key", "token")
+                .header("content-type", "application/json")
+                .header("MCP-Protocol-Version", "2026-07-28")
+                .header("Mcp-Method", "server/discover")
+                .body(Body::from(
+                    json!({"jsonrpc":"2.0","id":2,"method":"server/discover"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(missing_envelope.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn version_endpoints_require_owner_and_restore_selected_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let workspace = Workspace::open(&dir.path().join("db/library.sqlite3"), "w", "r").unwrap();
+    workspace
+        .execute(
+            "save",
+            json!({"kind":"notes","id":"n","expected":0,"patch":{"title":"old","content":"old"}}),
+        )
+        .unwrap();
+    let app = router(Host::new(
+        workspace.clone(),
+        "owner".into(),
+        "http://127.0.0.1:31417".into(),
+    ));
+    let denied = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/native/v1/versions")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), StatusCode::UNAUTHORIZED);
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/native/v1/versions")
+                .header("x-api-key", "owner")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::OK);
+    let version: Value =
+        serde_json::from_slice(&created.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let id = version["id"].as_str().unwrap();
+    workspace
+        .execute(
+            "save",
+            json!({"kind":"notes","id":"n","expected":1,"patch":{"title":"new","content":"new"}}),
+        )
+        .unwrap();
+    let restored = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/native/v1/versions/{id}/entities/notes/n/restore"
+                ))
+                .header("x-api-key", "owner")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"operationId":"restore-n"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.status(), StatusCode::OK);
+    assert_eq!(
+        workspace
+            .execute("get", json!({"kind":"notes","id":"n"}))
+            .unwrap()["value"]["title"],
+        "old"
+    );
+    let deleted = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/native/v1/versions/{id}"))
+                .header("x-api-key", "owner")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), StatusCode::OK);
+}
+
+#[tokio::test]
 async fn review_enrollment_and_due_queue_use_shared_core_and_revision_checks() {
     let dir = tempfile::tempdir().unwrap();
     let workspace = Workspace::open(&dir.path().join("library.db"), "w", "r").unwrap();

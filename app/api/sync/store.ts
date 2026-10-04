@@ -6,6 +6,7 @@ import mysql, {
   type PoolConnection,
   type RowDataPacket,
 } from "mysql2/promise";
+import { boundedSnapshotEntities } from "./snapshot-page";
 import {
   applyOperation,
   materialize,
@@ -336,6 +337,14 @@ export class SyncStore {
       const id = randomUUID();
       const cursor = this.cursor(head.epoch, String(head.seq));
       await db.query(
+        "DELETE e FROM sync_snapshot_entities e JOIN sync_snapshots s ON s.id=e.snapshot_id WHERE s.workspace=? AND s.id NOT LIKE 'version-%' AND s.created_at < NOW() - INTERVAL 1 DAY",
+        [this.workspace]
+      );
+      await db.query(
+        "DELETE FROM sync_snapshots WHERE workspace=? AND id NOT LIKE 'version-%' AND created_at < NOW() - INTERVAL 1 DAY",
+        [this.workspace]
+      );
+      await db.query(
         "INSERT INTO sync_snapshots(id,workspace,checkpoint) VALUES (?,?,?)",
         [id, this.workspace, cursor]
       );
@@ -360,13 +369,22 @@ export class SyncStore {
       "SELECT kind,entity_id,state FROM sync_snapshot_entities WHERE snapshot_id=? AND CONCAT(kind,':',entity_id)>? ORDER BY kind,entity_id LIMIT 100",
       [id, after]
     );
-    return {
-      cursor: snap.checkpoint,
-      entities: result.map(row => JSON.parse(row.state)),
-      next: result.length
-        ? `${result.at(-1)!.kind}:${result.at(-1)!.entity_id}`
-        : null,
-    };
+    try {
+      return {
+        cursor: snap.checkpoint,
+        ...boundedSnapshotEntities(
+          result.map(row => JSON.parse(row.state) as EntityState),
+          snap.checkpoint
+        ),
+      };
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "snapshot_entity_too_large"
+      )
+        throw new SyncError("snapshot_entity_too_large", 413);
+      throw error;
+    }
   }
   async history(kind: string, id: string) {
     return (

@@ -1,7 +1,9 @@
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use shufang_application::{CoreSession, Runtime};
+use shufang_domain::sync::{valid_identifier, Operation, ENTITY_KINDS};
 use shufang_sqlite::SqliteRepository;
 use std::{
     collections::BTreeMap,
@@ -179,6 +181,11 @@ impl Workspace {
             "saveAiResult"=>crate::ai::save_result(self,&args),
             "backup"=>{let destination=PathBuf::from(string(&args,"path")?);let database=self.database.clone();self.start("backup",move|job|{job.check()?;crate::backup::create(&database,&destination)?;Ok(json!({"path":destination}))})},
             "restore"=>{let archive=PathBuf::from(string(&args,"path")?);let destination=PathBuf::from(string(&args,"destination")?);self.start("restore",move|job|{job.check()?;crate::backup::restore(&archive,&destination)?;Ok(json!({"path":destination}))})},
+            "createVersion"=>self.create_version(),
+            "listVersions"=>self.list_versions(),
+            "deleteVersion"=>self.delete_version(string(&args,"id")?),
+            "restoreVersion"=>self.restore_version(string(&args,"id")?),
+            "restoreVersionEntity"=>self.restore_version_entity(&args),
             "checkpoint"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.checkpoint(string(&args,"id")?,string(&args,"session")?,args["progress"].clone(),number(&args,"activeSeconds")?)?).map_err(|e|e.to_string()),
             "bookResource"=>Ok(json!({"path":self.book_file(string(&args,"id")?)?})),
             "serviceToken"=>Ok(json!({"token":self.service_token()?})),
@@ -201,6 +208,163 @@ impl Workspace {
             "ai"=>{let workspace=self.clone();self.start("ai",move|job|crate::ai::run(&workspace,args,&job))},
             _=>Err("unknown_workspace_command".into()),
         }
+    }
+    fn version_path(&self, id: &str) -> Result<PathBuf> {
+        if !(id.starts_with("version-") || id.starts_with("safety-"))
+            || !valid_identifier(id)
+            || id.len() > 80
+        {
+            return Err("invalid_version_id".into());
+        }
+        Ok(self.root.join("versions").join(format!("{id}.zip")))
+    }
+    fn create_version(&self) -> Result<Value> {
+        let id = format!("version-{}", uuid::Uuid::new_v4());
+        let archive = self.version_path(&id)?;
+        std::fs::create_dir_all(archive.parent().ok_or("invalid_version_path")?)
+            .map_err(|e| e.to_string())?;
+        let mut core = self.core.lock().map_err(|_| "core_lock_failed")?;
+        let head = core.replication_head()?;
+        let sequence = head.sequence.parse::<u64>().map_err(|_| "invalid_head")?;
+        let checkpoint = URL_SAFE_NO_PAD.encode(json!({"workspace":head.workspace_id,"node":head.node_id,"epoch":head.epoch,"seq":head.sequence}).to_string());
+        core.create_sync_snapshot(&id, &checkpoint, sequence)?;
+        if let Err(error) = crate::backup::create(&self.database, &archive) {
+            shufang_sqlite::SqliteRepository::delete_version_snapshot(&self.database, &id)?;
+            return Err(error);
+        }
+        Ok(json!({"id":id,"archive":archive,"checkpoint":checkpoint}))
+    }
+    fn list_versions(&self) -> Result<Value> {
+        let mut values = Vec::new();
+        for (id, created_at) in
+            shufang_sqlite::SqliteRepository::list_version_snapshots(&self.database)?
+        {
+            let path = self.version_path(&id)?;
+            if path.is_file() {
+                values
+                    .push(json!({"id":id,"kind":"version","createdAt":created_at,"archive":path}));
+            }
+        }
+        let directory = self.root.join("versions");
+        if directory.is_dir() {
+            for entry in std::fs::read_dir(directory).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                if !entry.file_type().map_err(|e| e.to_string())?.is_file() {
+                    continue;
+                }
+                let name = entry
+                    .file_name()
+                    .into_string()
+                    .map_err(|_| "invalid_version_path")?;
+                let Some(id) = name.strip_suffix(".zip") else {
+                    continue;
+                };
+                if id.starts_with("safety-") && self.version_path(id).is_ok() {
+                    values.push(json!({"id":id,"kind":"safety","archive":entry.path()}));
+                }
+            }
+        }
+        Ok(Value::Array(values))
+    }
+    fn delete_version(&self, id: &str) -> Result<Value> {
+        let archive = self.version_path(id)?;
+        if !archive.is_file() {
+            return Err("version_not_found".into());
+        }
+        if id.starts_with("safety-") {
+            std::fs::remove_file(archive).map_err(|e| e.to_string())?;
+            return Ok(Value::Null);
+        }
+        let deleting = archive.with_extension("deleting");
+        std::fs::rename(&archive, &deleting).map_err(|e| e.to_string())?;
+        if let Err(error) =
+            shufang_sqlite::SqliteRepository::delete_version_snapshot(&self.database, id)
+        {
+            std::fs::rename(&deleting, &archive).map_err(|e| e.to_string())?;
+            return Err(error);
+        }
+        std::fs::remove_file(deleting).map_err(|e| e.to_string())?;
+        Ok(Value::Null)
+    }
+    fn restore_version(&self, id: &str) -> Result<Value> {
+        let archive = self.version_path(id)?;
+        if !id.starts_with("version-") || !archive.is_file() {
+            return Err("version_not_found".into());
+        }
+        let safety = self.version_path(&format!("safety-{}", uuid::Uuid::new_v4()))?;
+        crate::backup::create(&self.database, &safety)?;
+        let destination = self
+            .root
+            .parent()
+            .ok_or("invalid_workspace")?
+            .join(format!("restored-{}", uuid::Uuid::new_v4()));
+        crate::backup::restore(&archive, &destination)?;
+        Ok(json!({"path":destination,"safetyBackup":safety,"activationRequired":true}))
+    }
+    fn restore_version_entity(&self, args: &Value) -> Result<Value> {
+        let version = string(args, "version")?;
+        let kind = string(args, "kind")?;
+        let source = string(args, "id")?;
+        let target = args["newEntityId"].as_str().unwrap_or(source);
+        let operation_id = string(args, "operationId")?;
+        if !ENTITY_KINDS.contains(&kind)
+            || kind == "reviews"
+            || !valid_identifier(source)
+            || !valid_identifier(target)
+            || !valid_identifier(operation_id)
+        {
+            return Err("invalid_restore_target".into());
+        }
+        if !self.version_path(version)?.is_file() {
+            return Err("version_not_found".into());
+        }
+        let state = shufang_sqlite::SqliteRepository::version_entity(
+            &self.database,
+            version,
+            kind,
+            source,
+        )?;
+        if state.deleted {
+            return Err("snapshot_entity_deleted".into());
+        }
+        let patch: serde_json::Map<String, Value> = state
+            .fields
+            .into_iter()
+            .filter(|(_, field)| !field.removed)
+            .filter_map(|(key, field)| field.value.map(|value| (key, value)))
+            .collect();
+        let mut core = self.core.lock().map_err(|_| "core_lock_failed")?;
+        let head = core.replication_head()?;
+        let current = match core.entity(kind, target) {
+            Ok(record) => Some(record),
+            Err(error) if error == "not_found" || error == "entity_deleted" => None,
+            Err(error) => return Err(error),
+        };
+        let unset = current
+            .and_then(|record| record.value.as_object().cloned())
+            .map(|record| {
+                record
+                    .keys()
+                    .filter(|key| *key != "id" && !patch.contains_key(*key))
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+        let operation = Operation {
+            workspace_id: head.workspace_id,
+            replica_id: head.node_id,
+            operation_id: operation_id.to_owned(),
+            kind: kind.to_owned(),
+            entity_id: target.to_owned(),
+            clock: core.mutation_clock(operation_id)?,
+            patch,
+            unset,
+            deleted: false,
+        };
+        let (duplicate, sequence) = core.mutate_replica_entity(operation)?;
+        Ok(
+            json!({"entityId":target,"receipt":{"operationId":operation_id,"duplicate":duplicate,"seq":sequence.to_string()}}),
+        )
     }
     fn save_ai_config(&self, args: &Value) -> Result<Value> {
         let config: crate::ai::Config =
@@ -238,6 +402,19 @@ impl Workspace {
         F: FnOnce(Arc<Job>) -> Result<Value> + Send + 'static,
     {
         let mut jobs = self.jobs.lock().map_err(|_| "jobs_lock_failed")?;
+        // Terminal results are persisted in local_values and remain readable via
+        // job_state after eviction. Reserve the in-memory table for active work.
+        if jobs.len() >= 128 {
+            let terminal: Vec<String> = jobs
+                .iter()
+                .filter(|(_, job)| job.state.lock().is_ok_and(|s| s.status != "running"))
+                .map(|(id, _)| id.clone())
+                .take(jobs.len().saturating_sub(64))
+                .collect();
+            for id in terminal {
+                jobs.remove(&id);
+            }
+        }
         if jobs.len() >= 128
             || jobs
                 .values()

@@ -1,24 +1,53 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import {
+  createMcpHandler,
+  isLegacyRequest,
+  WebStandardStreamableHTTPServerTransport,
+} from "@modelcontextprotocol/server";
 import { createLibraryMcpServer } from "../mcp/library-tools";
 import { oauth } from "./oauth-runtime";
 
 export function createMcpRouter(oauthServer: typeof oauth = oauth) {
   const mcp = new Hono();
+  mcp.use("*", async (c, next) => {
+    const origin = c.req.header("origin");
+    if (origin === undefined) return next();
+    const configured =
+      process.env.MCP_PUBLIC_ORIGIN?.trim() ||
+      process.env.PUBLIC_ORIGIN?.trim();
+    try {
+      if (
+        configured &&
+        new URL(origin).origin === origin &&
+        new URL(configured).origin === configured &&
+        new URL(configured).origin === origin
+      )
+        return next();
+    } catch {
+      // Malformed and opaque origins are never trusted.
+    }
+    return c.json({ error: "invalid_origin" }, 403);
+  });
   mcp.use("*", (c, next) => requireMcpApiKey(c, next, oauthServer));
 
-  mcp.all("/", async c => {
+  const buildServer = () => {
     const apiKey = process.env.OPEN_API_KEY?.trim() ?? "";
     const baseUrl =
       process.env.MCP_API_BASE_URL?.trim() ||
       `http://127.0.0.1:${process.env.PORT || "3000"}`;
-    const server = createLibraryMcpServer({
+    return createLibraryMcpServer({
       baseUrl,
       apiKey,
       oauth: Boolean(oauthServer),
     });
+  };
+  const handler = createMcpHandler(buildServer, { legacy: "reject" });
+  mcp.all("/", async c => {
+    if (!(await isLegacyRequest(c.req.raw))) return handler.fetch(c.req.raw);
+    // Preserve the deployed JSON response mode for 2025-era clients.
+    const server = buildServer();
     const transport = new WebStandardStreamableHTTPServerTransport({
       enableJsonResponse: true,
     });

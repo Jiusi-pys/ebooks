@@ -21,6 +21,7 @@ import { Readable } from "node:stream";
 import { ZodError } from "zod";
 import { localOperation } from "./local-operation";
 import { camelLegacyRow } from "./legacy-row";
+import { fanout } from "../lib/webhooks";
 import {
   assembleBookMirrorUpload,
   bookImportStartedSchema,
@@ -405,7 +406,9 @@ export function legacyBridge(
             clock,
             deleted: action === "deleted",
           };
-          await store.mutate(operation);
+          const receipt = await store.mutate(operation);
+          if (!receipt.duplicate)
+            fanout({ type: body.type, source: "reader", data: validated.data });
           c.res = c.json({ ok: true, mirrored: true });
         }
       );
@@ -589,7 +592,30 @@ export function legacyBridge(
         deleted: c.req.method === "DELETE",
         operationId,
       };
-      await store.mutate(op);
+      const receipt = await store.mutate(op);
+      if (!receipt.duplicate) {
+        const eventResource: Record<string, string> = {
+          books: "book",
+          notes: "note",
+          folders: "folder",
+          highlights: "highlight",
+          associations: "association",
+          translations: "translation",
+          mindMaps: "mindmap",
+          studySets: "studyset",
+        };
+        const eventAction =
+          c.req.method === "POST"
+            ? "created"
+            : c.req.method === "DELETE"
+              ? "deleted"
+              : "updated";
+        fanout({
+          type: `${eventResource[kind]}.${eventAction}`,
+          source: browserLibrary ? "reader" : "api",
+          data: { ...body, extId: entityId },
+        });
+      }
       c.res = c.json({ ok: true, extId: entityId });
     });
   });

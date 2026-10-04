@@ -98,6 +98,19 @@ pub fn router(host: Arc<Host>) -> Router {
         .route("/api/v1/ai", post(ai))
         .route("/api/v1/jobs/{id}", get(job).delete(cancel_job))
         .route(
+            "/api/native/v1/versions",
+            get(list_versions).post(create_version),
+        )
+        .route("/api/native/v1/versions/{id}", delete(delete_version))
+        .route(
+            "/api/native/v1/versions/{id}/restore",
+            post(restore_version),
+        )
+        .route(
+            "/api/native/v1/versions/{version}/entities/{kind}/{id}/restore",
+            post(restore_version_entity),
+        )
+        .route(
             "/api/native/v1/webhooks",
             get(webhooks::list).post(webhooks::save),
         )
@@ -129,6 +142,28 @@ pub fn router(host: Arc<Host>) -> Router {
         .with_state(host)
 }
 async fn authorize(State(host): State<Arc<Host>>, request: Request, next: Next) -> Response {
+    if request.uri().path() == "/mcp" {
+        if let Some(origin) = request.headers().get(axum::http::header::ORIGIN) {
+            let valid = origin.to_str().ok().is_some_and(|origin| {
+                let parsed = url::Url::parse(origin).ok();
+                let public = url::Url::parse(&host.base_url).ok();
+                match (parsed, public) {
+                    (Some(parsed), Some(public)) => {
+                        parsed.origin() == public.origin()
+                            && parsed.origin().ascii_serialization() == origin
+                    }
+                    _ => false,
+                }
+            });
+            if !valid {
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(json!({"error":"invalid_origin"})),
+                )
+                    .into_response();
+            }
+        }
+    }
     let key = request
         .headers()
         .get("x-api-key")
@@ -455,7 +490,63 @@ async fn job(State(h): State<Arc<Host>>, Path(id): Path<String>) -> ApiResult {
 async fn cancel_job(State(h): State<Arc<Host>>, Path(id): Path<String>) -> ApiResult {
     call(h, "cancelJob", json!({"id":id})).await
 }
-async fn mcp_http(State(h): State<Arc<Host>>, Json(request): Json<Value>) -> Response {
+async fn list_versions(State(h): State<Arc<Host>>) -> ApiResult {
+    call(h, "listVersions", json!({})).await
+}
+async fn create_version(State(h): State<Arc<Host>>) -> ApiResult {
+    call(h, "createVersion", json!({})).await
+}
+async fn delete_version(State(h): State<Arc<Host>>, Path(id): Path<String>) -> ApiResult {
+    call(h, "deleteVersion", json!({"id":id})).await
+}
+async fn restore_version(State(h): State<Arc<Host>>, Path(id): Path<String>) -> ApiResult {
+    call(h, "restoreVersion", json!({"id":id})).await
+}
+async fn restore_version_entity(
+    State(h): State<Arc<Host>>,
+    Path((version, kind, id)): Path<(String, String, String)>,
+    Json(mut input): Json<Value>,
+) -> ApiResult {
+    input["version"] = version.into();
+    input["kind"] = kind.into();
+    input["id"] = id.into();
+    call(h, "restoreVersionEntity", input).await
+}
+async fn mcp_http(
+    State(h): State<Arc<Host>>,
+    headers: HeaderMap,
+    Json(request): Json<Value>,
+) -> Response {
+    let envelope_version = &request["params"]["_meta"]["io.modelcontextprotocol/protocolVersion"];
+    let modern = request["method"] == "server/discover"
+        || envelope_version == "2026-07-28"
+        || headers
+            .get("MCP-Protocol-Version")
+            .is_some_and(|value| value == "2026-07-28");
+    if modern {
+        let method = request["method"].as_str().unwrap_or("");
+        let version_matches = headers
+            .get("MCP-Protocol-Version")
+            .is_some_and(|value| value == "2026-07-28");
+        let method_matches = headers
+            .get("Mcp-Method")
+            .is_some_and(|value| value == method);
+        let name_matches = if method == "tools/call" {
+            request["params"]["name"]
+                .as_str()
+                .is_some_and(|name| headers.get("Mcp-Name").is_some_and(|value| value == name))
+        } else {
+            true
+        };
+        if !version_matches || envelope_version != "2026-07-28" || !method_matches || !name_matches
+        {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"jsonrpc":"2.0","id":request.get("id"),"error":{"code":-32020,"message":"MCP routing header mismatch"}})),
+            )
+                .into_response();
+        }
+    }
     match tokio::task::spawn_blocking(move || mcp::dispatch(&h, request)).await {
         Ok(Ok(value)) if value.is_null() => StatusCode::ACCEPTED.into_response(),
         Ok(Ok(value)) => Json(value).into_response(),

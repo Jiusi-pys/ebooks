@@ -1,5 +1,5 @@
 use serde_json::json;
-use shufang_application::{CoreSession, LocalCommit, Repository, Runtime};
+use shufang_application::{CoreSession, LocalCommit, ReplicationRepository, Repository, Runtime};
 use shufang_domain::sync::Operation;
 use shufang_sqlite::SqliteRepository;
 struct TestRuntime;
@@ -13,6 +13,21 @@ impl Runtime for TestRuntime {
 }
 fn operation(id: &str, clock: &str, patch: serde_json::Value) -> Operation {
     serde_json::from_value(json!({"workspaceId":"w","replicaId":"remote","operationId":id,"kind":"notes","entityId":"n","clock":clock,"patch":patch})).unwrap()
+}
+
+#[test]
+fn transient_snapshots_expire_but_selected_versions_remain() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db");
+    let mut repo = SqliteRepository::open(&path, "w", "local").unwrap();
+    repo.create_snapshot("network-old", "cursor", 0, 1).unwrap();
+    repo.create_snapshot("version-kept", "cursor", 0, 1)
+        .unwrap();
+    repo.create_snapshot("network-new", "cursor", 0, 86_400_002)
+        .unwrap();
+    assert!(repo.snapshot_page("network-old", "").is_err());
+    assert!(repo.snapshot_page("version-kept", "").is_ok());
+    assert!(repo.snapshot_page("network-new", "").is_ok());
 }
 
 #[test]

@@ -65,7 +65,7 @@ async fn pkce_consent_rotation_revocation_and_read_only_scope() {
     let dir = tempfile::tempdir().unwrap();
     let workspace = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();
     let host = Host::new(
-        workspace,
+        workspace.clone(),
         "admin-key".into(),
         "http://127.0.0.1:31417".into(),
     );
@@ -205,13 +205,72 @@ async fn pkce_consent_rotation_revocation_and_read_only_scope() {
         ("client_id", id),
         ("resource", "http://127.0.0.1:31417/mcp"),
     ]);
+    let old_refresh_key = URL_SAFE_NO_PAD.encode(Sha256::digest(
+        tokens["refresh_token"].as_str().unwrap().as_bytes(),
+    ));
+    let deadline = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + 60;
+    {
+        let mut core = workspace.core.lock().unwrap();
+        let (revision, mut state) = core.local_value("oauth-store").unwrap().unwrap();
+        state["refresh"][&old_refresh_key]["expires"] = json!(deadline);
+        state["refresh"][&old_refresh_key]["grant_expires"] = json!(deadline);
+        // Earlier persisted OAuth stores did not contain replay markers.
+        state.as_object_mut().unwrap().remove("used_refresh");
+        core.set_local_value("oauth-store", revision, &state)
+            .unwrap();
+    }
     let (status, body, _) = send(&app, "POST", "/oauth/token", refresh.clone(), true, "").await;
     assert_eq!(status, 200);
     let rotated: Value = serde_json::from_str(&body).unwrap();
+    {
+        let core = workspace.core.lock().unwrap();
+        let (_, state) = core.local_value("oauth-store").unwrap().unwrap();
+        let rotated_key = URL_SAFE_NO_PAD.encode(Sha256::digest(
+            rotated["refresh_token"].as_str().unwrap().as_bytes(),
+        ));
+        assert_eq!(state["used_refresh"][&old_refresh_key]["expires"], deadline);
+        assert_eq!(state["refresh"][&rotated_key]["expires"], deadline);
+    }
     assert_eq!(
         send(&app, "POST", "/oauth/token", refresh, true, "")
             .await
             .0,
+        400
+    );
+    assert_eq!(
+        send(
+            &app,
+            "GET",
+            "/api/v1/notes",
+            String::new(),
+            false,
+            rotated["access_token"].as_str().unwrap()
+        )
+        .await
+        .0,
+        401,
+        "replaying a consumed refresh token must revoke its entire grant"
+    );
+    assert_eq!(
+        send(
+            &app,
+            "POST",
+            "/oauth/token",
+            form(&[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", rotated["refresh_token"].as_str().unwrap()),
+                ("client_id", id),
+                ("resource", "http://127.0.0.1:31417/mcp"),
+            ]),
+            true,
+            ""
+        )
+        .await
+        .0,
         400
     );
     assert_eq!(
@@ -238,4 +297,185 @@ async fn pkce_consent_rotation_revocation_and_read_only_scope() {
             401
         );
     }
+}
+
+#[tokio::test]
+async fn expired_unused_dynamic_clients_release_capacity() {
+    let dir = tempfile::tempdir().unwrap();
+    let workspace = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();
+    let host = Host::new(
+        workspace.clone(),
+        "admin-key".into(),
+        "http://127.0.0.1:31417".into(),
+    );
+    let app = router(host);
+    let registration = json!({"redirect_uris":["http://127.0.0.1:5555/callback"]}).to_string();
+    for _ in 0..200 {
+        assert_eq!(
+            send(
+                &app,
+                "POST",
+                "/oauth/register",
+                registration.clone(),
+                false,
+                ""
+            )
+            .await
+            .0,
+            200
+        );
+    }
+    assert_eq!(
+        send(
+            &app,
+            "POST",
+            "/oauth/register",
+            registration.clone(),
+            false,
+            ""
+        )
+        .await
+        .0,
+        400
+    );
+    {
+        let mut core = workspace.core.lock().unwrap();
+        let (revision, mut state) = core.local_value("oauth-store").unwrap().unwrap();
+        for client in state["clients"].as_object_mut().unwrap().values_mut() {
+            client["client_id_issued_at"] = json!(1);
+        }
+        core.set_local_value("oauth-store", revision, &state)
+            .unwrap();
+    }
+    assert_eq!(
+        send(&app, "POST", "/oauth/register", registration, false, "")
+            .await
+            .0,
+        200
+    );
+}
+
+#[tokio::test]
+async fn mcp_http_rejects_foreign_and_opaque_origins() {
+    let dir = tempfile::tempdir().unwrap();
+    let workspace = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();
+    let app = router(Host::new(
+        workspace,
+        "admin-key".into(),
+        "http://127.0.0.1:31417".into(),
+    ));
+    for origin in ["https://untrusted.example", "null", "not-an-origin"] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/mcp")
+                    .header("origin", origin)
+                    .header("x-api-key", "admin-key")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"jsonrpc":"2.0","id":1,"method":"ping"}).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status().as_u16(), 403, "origin={origin}");
+    }
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/mcp")
+                .header("origin", "http://127.0.0.1:31417")
+                .header("x-api-key", "admin-key")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"jsonrpc":"2.0","id":1,"method":"ping"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 200);
+}
+
+#[tokio::test]
+async fn replay_revokes_grant_even_when_access_store_is_full() {
+    let dir = tempfile::tempdir().unwrap();
+    let workspace = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();
+    let resource = "http://127.0.0.1:31417/mcp";
+    let expires = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + 3600;
+    let mut access = serde_json::Map::new();
+    let active_key = URL_SAFE_NO_PAD.encode(Sha256::digest(b"active-access"));
+    access.insert(active_key, json!({"client":"client","resource":resource,"scope":"library:read","expires":expires,"grant":"target"}));
+    for index in 0..4999 {
+        access.insert(format!("filler-{index}"), json!({"client":"other","resource":resource,"scope":"library:read","expires":expires,"grant":"other"}));
+    }
+    let old_key = URL_SAFE_NO_PAD.encode(Sha256::digest(b"old-refresh"));
+    let new_key = URL_SAFE_NO_PAD.encode(Sha256::digest(b"new-refresh"));
+    let mut used = serde_json::Map::new();
+    used.insert(old_key, json!({"grant":"target","expires":expires}));
+    let mut refresh = serde_json::Map::new();
+    refresh.insert(new_key, json!({"client":"client","resource":resource,"scope":"library:read","expires":expires,"grant":"target"}));
+    workspace.core.lock().unwrap().set_local_value("oauth-store", 0, &json!({"clients":{},"pending":{},"codes":{},"access":access,"refresh":refresh,"used_refresh":used})).unwrap();
+    let app = router(Host::new(
+        workspace,
+        "admin-key".into(),
+        "http://127.0.0.1:31417".into(),
+    ));
+    assert_eq!(
+        send(
+            &app,
+            "POST",
+            "/oauth/token",
+            form(&[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", "old-refresh"),
+                ("client_id", "client"),
+                ("resource", resource)
+            ]),
+            true,
+            ""
+        )
+        .await
+        .0,
+        400
+    );
+    assert_eq!(
+        send(
+            &app,
+            "GET",
+            "/api/v1/notes",
+            String::new(),
+            false,
+            "active-access"
+        )
+        .await
+        .0,
+        401
+    );
+    assert_eq!(
+        send(
+            &app,
+            "POST",
+            "/oauth/token",
+            form(&[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", "new-refresh"),
+                ("client_id", "client"),
+                ("resource", resource)
+            ]),
+            true,
+            ""
+        )
+        .await
+        .0,
+        400
+    );
 }

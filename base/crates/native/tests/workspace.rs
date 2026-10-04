@@ -158,6 +158,134 @@ fn completed_background_job_can_be_read_after_reopening() {
 }
 
 #[test]
+fn completed_jobs_do_not_exhaust_running_job_capacity() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();
+    let mut first = String::new();
+    for index in 0..129 {
+        let started = w.start("test", |_| Ok(json!({"done":true}))).unwrap();
+        let id = started["job"].as_str().unwrap().to_owned();
+        if index == 0 {
+            first = id.clone();
+        }
+        for _ in 0..100 {
+            if w.execute("job", json!({"id":id})).unwrap()["status"] == "completed" {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(
+            w.execute("job", json!({"id":id})).unwrap()["status"],
+            "completed"
+        );
+    }
+    assert_eq!(
+        w.execute("job", json!({"id":first})).unwrap()["status"],
+        "completed"
+    );
+}
+
+#[test]
+fn version_snapshot_restores_one_record_and_can_be_deleted() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = Workspace::open(&dir.path().join("db/library.sqlite3"), "w", "r").unwrap();
+    w.execute(
+        "save",
+        json!({"kind":"notes","id":"n","expected":0,"patch":{"title":"old","content":"old"}}),
+    )
+    .unwrap();
+    let version = w.execute("createVersion", json!({})).unwrap();
+    let id = version["id"].as_str().unwrap();
+    w.execute(
+        "save",
+        json!({"kind":"notes","id":"n","expected":1,"patch":{"title":"new","content":"new"}}),
+    )
+    .unwrap();
+    w.execute(
+        "restoreVersionEntity",
+        json!({"version":id,"kind":"notes","id":"n","operationId":"restore-note-one"}),
+    )
+    .unwrap();
+    assert_eq!(
+        w.execute("get", json!({"kind":"notes","id":"n"})).unwrap()["value"]["title"],
+        "old"
+    );
+    assert!(w
+        .execute("listVersions", json!({}))
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v["id"] == id));
+    w.execute("deleteVersion", json!({"id":id})).unwrap();
+    assert!(!w
+        .execute("listVersions", json!({}))
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v["id"] == id));
+}
+
+#[test]
+fn whole_version_restore_creates_a_separate_workspace_and_safety_backup() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = Workspace::open(&dir.path().join("live/library.sqlite3"), "w", "r").unwrap();
+    w.execute(
+        "save",
+        json!({"kind":"notes","id":"n","expected":0,"patch":{"title":"old","content":"old"}}),
+    )
+    .unwrap();
+    let version = w.execute("createVersion", json!({})).unwrap();
+    w.execute(
+        "save",
+        json!({"kind":"notes","id":"n","expected":1,"patch":{"title":"new","content":"new"}}),
+    )
+    .unwrap();
+    let result = w
+        .execute("restoreVersion", json!({"id":version["id"]}))
+        .unwrap();
+    assert!(std::path::Path::new(result["safetyBackup"].as_str().unwrap()).is_file());
+    let versions = w.execute("listVersions", json!({})).unwrap();
+    let safety = versions
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["kind"] == "safety")
+        .expect("restoration safety backup should be selectable");
+    assert_eq!(safety["archive"], result["safetyBackup"]);
+    let restored = Workspace::open(
+        &std::path::Path::new(result["path"].as_str().unwrap()).join("library.sqlite3"),
+        "w",
+        "r",
+    )
+    .unwrap();
+    assert_eq!(
+        restored
+            .execute("get", json!({"kind":"notes","id":"n"}))
+            .unwrap()["value"]["title"],
+        "old"
+    );
+    assert_eq!(
+        w.execute("get", json!({"kind":"notes","id":"n"})).unwrap()["value"]["title"],
+        "new"
+    );
+    assert_ne!(
+        w.core.lock().unwrap().replication_head().unwrap().epoch,
+        restored
+            .core
+            .lock()
+            .unwrap()
+            .replication_head()
+            .unwrap()
+            .epoch
+    );
+    let safety_id = safety["id"].as_str().unwrap();
+    w.execute("deleteVersion", json!({"id":safety_id})).unwrap();
+    assert!(!std::path::Path::new(result["safetyBackup"].as_str().unwrap()).exists());
+}
+
+#[test]
 fn invalid_cover_never_mutates_book_metadata() {
     let dir = tempfile::tempdir().unwrap();
     let w = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();

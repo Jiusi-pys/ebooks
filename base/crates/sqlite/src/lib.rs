@@ -45,6 +45,73 @@ impl SqliteRepository {
             .map_err(failure)?;
         source.backup("main", destination, None).map_err(failure)
     }
+    /// Restores are new replication generations even though their historical log is
+    /// preserved. Run this only on a verified, unpublished restore directory.
+    pub fn prepare_restored_database(path: &Path) -> Result<()> {
+        let mut connection = Connection::open(path).map_err(failure)?;
+        let tx = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(failure)?;
+        let updated = tx
+            .execute(
+                "UPDATE core_meta SET value=lower(hex(randomblob(16))) WHERE key='sync_epoch'",
+                [],
+            )
+            .map_err(failure)?;
+        if updated != 1 {
+            return Err("missing_sync_epoch".into());
+        }
+        tx.execute("DELETE FROM local_values WHERE key LIKE 'sync:receive:%' OR key LIKE 'sync:snapshot-at:%' OR key LIKE 'sync:incoming:%' OR key LIKE 'sync:incoming-page:%'", [])
+            .map_err(failure)?;
+        tx.commit().map_err(failure)
+    }
+    pub fn list_version_snapshots(path: &Path) -> Result<Vec<(String, i64)>> {
+        let connection = Connection::open(path).map_err(failure)?;
+        let mut query = connection.prepare("SELECT id,created_at FROM sync_snapshots WHERE id LIKE 'version-%' ORDER BY created_at DESC,id DESC").map_err(failure)?;
+        let versions = query
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })
+            .map_err(failure)?
+            .map(|row| row.map_err(failure))
+            .collect();
+        versions
+    }
+    pub fn delete_version_snapshot(path: &Path, id: &str) -> Result<()> {
+        if !id.starts_with("version-") || !shufang_domain::sync::valid_identifier(id) {
+            return Err("invalid_version_id".into());
+        }
+        let mut connection = Connection::open(path).map_err(failure)?;
+        let tx = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(failure)?;
+        tx.execute(
+            "DELETE FROM sync_snapshot_entities WHERE snapshot_id=?",
+            [id],
+        )
+        .map_err(failure)?;
+        if tx
+            .execute("DELETE FROM sync_snapshots WHERE id=?", [id])
+            .map_err(failure)?
+            != 1
+        {
+            return Err("version_not_found".into());
+        }
+        tx.commit().map_err(failure)
+    }
+    pub fn version_entity(
+        path: &Path,
+        version: &str,
+        kind: &str,
+        id: &str,
+    ) -> Result<shufang_domain::sync::EntityState> {
+        if !version.starts_with("version-") || !shufang_domain::sync::valid_identifier(version) {
+            return Err("invalid_version_id".into());
+        }
+        let connection = Connection::open(path).map_err(failure)?;
+        let raw: String = connection.query_row("SELECT state_json FROM sync_snapshot_entities WHERE snapshot_id=? AND kind=? AND entity_id=?", params![version,kind,id], |row| row.get(0)).map_err(failure)?;
+        serde_json::from_str(&raw).map_err(failure)
+    }
     pub fn open(path: &Path, workspace: &str, replica: &str) -> Result<Self> {
         if !shufang_domain::sync::valid_identifier(workspace)
             || !shufang_domain::sync::valid_identifier(replica)

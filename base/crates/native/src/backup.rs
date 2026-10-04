@@ -164,6 +164,9 @@ pub fn restore(archive: &Path, destination: &Path) -> Result<()> {
     if verified.len() + 1 != names.len() {
         return Err("incomplete_manifest".into());
     }
+    shufang_sqlite::SqliteRepository::prepare_restored_database(
+        &staging.path().join("library.sqlite3"),
+    )?;
     // No existing workspace is ever replaced. Directory rename is on the same volume.
     std::fs::rename(staging.path(), destination).map_err(|e| e.to_string())?;
     Ok(())

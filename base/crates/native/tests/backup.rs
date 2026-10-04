@@ -9,11 +9,29 @@ fn backup_restores_committed_wal_and_files_without_overwriting_a_workspace() {
     std::fs::create_dir(workspace.root.join("files")).unwrap();
     std::fs::write(workspace.root.join("files/book.txt"), "original").unwrap();
     let archive = dir.path().join("backup.zip");
+    let original_epoch = workspace
+        .core
+        .lock()
+        .unwrap()
+        .replication_head()
+        .unwrap()
+        .epoch;
     backup::create(&db, &archive).unwrap();
     let target = dir.path().join("restored");
     backup::restore(&archive, &target).unwrap();
     assert!(backup::restore(&archive, &target).is_err());
     let restored = Workspace::open(&target.join("library.sqlite3"), "w", "r").unwrap();
+    assert_ne!(
+        restored
+            .core
+            .lock()
+            .unwrap()
+            .replication_head()
+            .unwrap()
+            .epoch,
+        original_epoch,
+        "restored workspace must start a new replication generation"
+    );
     assert_eq!(
         restored
             .execute("get", json!({"kind":"notes","id":"n"}))

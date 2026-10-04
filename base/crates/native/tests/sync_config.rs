@@ -1,5 +1,16 @@
 use serde_json::json;
 use shufang_native::workspace::Workspace;
+
+#[test]
+fn peer_url_allows_a_safe_https_proxy_prefix() {
+    assert!(shufang_native::sync_config::validate_url(
+        "https://us.jiusi.org/__mcp_candidate_20261005__/"
+    )
+    .is_ok());
+    assert!(
+        shufang_native::sync_config::validate_url("https://us.jiusi.org/%2e%2e/private").is_err()
+    );
+}
 #[test]
 #[cfg(windows)]
 fn peer_credentials_are_private_and_config_revisions_are_checked() {

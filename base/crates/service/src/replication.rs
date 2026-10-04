@@ -15,27 +15,12 @@ pub struct Peer {
     pub token: String,
 }
 fn validate(peer: &Peer) -> Result<(), String> {
-    let url = url::Url::parse(&peer.url).map_err(|_| "invalid_peer_url")?;
-    if !shufang_domain::sync::valid_identifier(&peer.id)
-        || peer.token.is_empty()
-        || url.username() != ""
-        || url.password().is_some()
-        || url.query().is_some()
-        || url.fragment().is_some()
-        || url.path() != "/"
-    {
+    if !shufang_domain::sync::valid_identifier(&peer.id) || peer.token.is_empty() {
         return Err("invalid_peer".into());
     }
-    if url.scheme() != "https"
-        && !(url.scheme() == "http"
-            && url
-                .host_str()
-                .is_some_and(|h| h == "127.0.0.1" || h == "[::1]" || h == "localhost"))
-    {
-        return Err("peer_requires_https".into());
-    }
-    Ok(())
+    shufang_native::sync_config::validate_url(&peer.url)
 }
+
 pub(crate) async fn json_response(response: reqwest::Response) -> Result<Value, String> {
     let status = response.status();
     if !status.is_success() {
@@ -371,5 +356,20 @@ fn record_worker_status(host: &Host, error: Option<&str>) {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod peer_url_tests {
+    use super::{validate, Peer};
+
+    #[test]
+    fn accepts_a_https_reverse_proxy_prefix_for_an_isolated_peer() {
+        let peer = Peer {
+            id: "linux-personal".into(),
+            url: "https://us.jiusi.org/__mcp_candidate_20261005__/".into(),
+            token: "test-token".into(),
+        };
+        assert!(validate(&peer).is_ok());
     }
 }

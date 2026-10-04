@@ -8,7 +8,13 @@ pub fn validate_url(input: &str) -> Result<()> {
         || url.password().is_some()
         || url.query().is_some()
         || url.fragment().is_some()
-        || url.path() != "/"
+        || input.contains('%')
+        || url.path().len() > 256
+        || !url.path().split('/').all(|segment| {
+            segment
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+        })
         || url.host_str().is_none()
     {
         return Err("invalid_peer_url".into());
