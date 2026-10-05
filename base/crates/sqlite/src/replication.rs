@@ -1,6 +1,15 @@
 use super::*;
 use shufang_application::{LocalCommit, LogOperation, ReplicationHead, ReplicationRepository};
 impl ReplicationRepository for SqliteRepository {
+    fn mutation_batch_local(
+        &mut self,
+        clock: &str,
+        commits: &[Commit],
+        locals: &[LocalCommit],
+    ) -> Result<()> {
+        self.commit_local_batch(clock, commits, locals, true)
+    }
+
     fn mutation_batch(&mut self, expected_clock: &str, commits: &[Commit]) -> Result<()> {
         self.commit_local_batch(expected_clock, commits, &[], true)
     }

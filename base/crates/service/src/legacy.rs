@@ -1,5 +1,5 @@
 //! Old Web REST wire projection. All writes still execute shared core use cases.
-use crate::{call, error, kind, ApiResult, Host};
+use crate::{call, error, kind, ApiResult, Host, V1Contract};
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -176,6 +176,28 @@ pub async fn list(
 ) -> ApiResult {
     let k = kind(&name).map_err(error)?;
     let Json(rows) = call(h.clone(), "list", json!({"kind":k})).await?;
+    if h.v1_contract == V1Contract::SyncEntities {
+        if rows.as_array().into_iter().flatten().any(|r| {
+            r["pendingFields"]
+                .as_array()
+                .is_some_and(|fields| !fields.is_empty())
+        }) {
+            return Err(error("sync_field_pending".into()));
+        }
+        let values: Vec<_> = rows
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(sync_project)
+            .filter(|v| query.get("book").is_none_or(|b| v["bookId"] == *b))
+            .filter(|v| {
+                query
+                    .get("folder")
+                    .is_none_or(|f| v.get("folderId").and_then(Value::as_str).unwrap_or("") == f)
+            })
+            .collect();
+        return Ok(Json(json!({name:values})));
+    }
     let (folders, books) = context(h).await?;
     let values: Vec<_> = rows
         .as_array()
@@ -203,8 +225,16 @@ pub async fn one(
 ) -> ApiResult {
     let k = kind(&name).map_err(error)?;
     let Json(record) = call(h.clone(), "get", json!({"kind":k,"id":id})).await?;
+    if h.v1_contract == V1Contract::SyncEntities {
+        return Ok(Json(sync_project(&record)));
+    }
     let (folders, books) = context(h).await?;
     Ok(Json(project(&name, &record, &folders, &books, false)))
+}
+fn sync_project(record: &Value) -> Value {
+    let mut value = record["value"].clone();
+    value["extId"] = value["id"].clone();
+    value
 }
 fn string(value: &Value, key: &str, max: usize, required: bool) -> Result<(), String> {
     match value.get(key) {
@@ -528,11 +558,162 @@ fn patch(
     }
     Ok((Value::Object(result), unset))
 }
+pub(crate) async fn sync_mutation(
+    h: Arc<Host>,
+    name: &str,
+    id: &str,
+    headers: &HeaderMap,
+    body: &Value,
+    create: bool,
+    deleted: bool,
+) -> ApiResult {
+    sync_mutation_source(h, name, id, headers, body, create, deleted, "api").await
+}
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn sync_mutation_source(
+    h: Arc<Host>,
+    name: &str,
+    id: &str,
+    headers: &HeaderMap,
+    body: &Value,
+    create: bool,
+    deleted: bool,
+    source: &str,
+) -> ApiResult {
+    let k = kind(name).map_err(error)?;
+    let mut patch = body
+        .as_object()
+        .cloned()
+        .ok_or_else(|| error("invalid_patch".into()))?;
+    patch.remove("extId");
+    patch.remove("id");
+    if let Some(value) = patch.remove("bookExtId") {
+        patch.insert("bookId".into(), value);
+    }
+    if let Some(value) = patch.remove("folder") {
+        patch.insert("folderId".into(), value);
+    }
+    if create {
+        if k == "books" {
+            patch.entry("author".to_owned()).or_insert(json!(""));
+            patch.entry("format".to_owned()).or_insert(json!("txt"));
+            patch.entry("chapters".to_owned()).or_insert(json!([]));
+            patch.entry("coverTone".to_owned()).or_insert(json!(0));
+            let chapter = patch["chapters"][0]["id"].as_str().unwrap_or("").to_owned();
+            patch
+                .entry("progress".to_owned())
+                .or_insert(json!({"chapterId":chapter,"ratio":0}));
+        }
+        if k == "notes" {
+            patch.entry("content".to_owned()).or_insert(json!(""));
+        }
+        if k == "translations" || k == "highlights" {
+            patch.entry("chapterId".to_owned()).or_insert(json!(""));
+        }
+        if k == "highlights" {
+            patch.entry("chapterTitle".to_owned()).or_insert(json!(""));
+            patch.entry("text".to_owned()).or_insert(json!(""));
+        }
+    }
+    let operation_id = headers
+        .get("idempotency-key")
+        .map(|h| h.to_str().map(str::to_owned))
+        .transpose()
+        .map_err(|_| error("invalid_operation_id".into()))?
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    use shufang_application::{ReplicationRepository, Repository};
+    let mut core = h
+        .workspace
+        .core
+        .lock()
+        .map_err(|_| error("core_lock_failed".into()))?;
+    if core
+        .repository()
+        .operation(&operation_id)
+        .map_err(error)?
+        .is_some()
+    {
+        core.local_replica_command_with_creation(
+            k,
+            id,
+            &operation_id,
+            patch,
+            vec![],
+            deleted,
+            create,
+        )
+        .map_err(error)?;
+    } else {
+        let revision = core
+            .repository()
+            .load(k, id)
+            .map_err(error)?
+            .map_or(0, |row| row.revision)
+            + 1;
+        let resource = match k {
+            "mindMaps" => "mindmap",
+            "studySets" => "studyset",
+            _ => k.strip_suffix('s').unwrap_or(k),
+        };
+        let action = if deleted {
+            "deleted"
+        } else if create {
+            "created"
+        } else {
+            "updated"
+        };
+        let mut data = body.clone();
+        data["extId"] = json!(id);
+        let extra = vec![crate::webhooks::override_commit_source(
+            &core,
+            k,
+            id,
+            revision,
+            &format!("{resource}.{action}"),
+            data,
+            source,
+        )
+        .map_err(error)?];
+        let fingerprint = serde_json::to_string(
+            &json!({"kind":k,"id":id,"patch":patch,"create":create,"deleted":deleted}),
+        )
+        .map_err(|e| error(e.to_string()))?;
+        core.with_receipt(
+            &format!("api-command:{operation_id}"),
+            &fingerprint,
+            extra,
+            |c| {
+                c.local_replica_command_with_creation(
+                    k,
+                    id,
+                    &operation_id,
+                    patch,
+                    vec![],
+                    deleted,
+                    create,
+                )
+                .map(|_| ())
+            },
+        )
+        .map_err(error)?;
+    }
+    Ok(Json(json!({"ok":true,"extId":id})))
+}
 pub async fn create(
     State(h): State<Arc<Host>>,
     Path(name): Path<String>,
+    headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    if h.v1_contract == V1Contract::SyncEntities {
+        let id = body["extId"]
+            .as_str()
+            .or_else(|| body["id"].as_str())
+            .ok_or_else(|| error("invalid_id".into()))?;
+        return sync_mutation(h, &name, id, &headers, &body, true, false)
+            .await
+            .map(|v| (StatusCode::OK, v));
+    }
     let k = kind(&name).map_err(error)?;
     string(&body, "extId", 64, true).map_err(error)?;
     let id = body["extId"].as_str().unwrap();
@@ -583,6 +764,9 @@ pub async fn update(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> ApiResult {
+    if h.v1_contract == V1Contract::SyncEntities {
+        return sync_mutation(h, &name, &id, &headers, &body, false, false).await;
+    }
     let k = kind(&name).map_err(error)?;
     let Json(prior) = call(h.clone(), "get", json!({"kind":k,"id":id})).await?;
     let expected = body["revision"]
@@ -613,6 +797,9 @@ pub async fn remove(
     Path((name, id)): Path<(String, String)>,
     headers: HeaderMap,
 ) -> ApiResult {
+    if h.v1_contract == V1Contract::SyncEntities {
+        return sync_mutation(h, &name, &id, &headers, &json!({}), false, true).await;
+    }
     if name != "notes" {
         return crate::remove(State(h), Path((name, id)), headers).await;
     }
@@ -626,7 +813,10 @@ pub async fn remove(
     Ok(Json(json!({"ok":true})))
 }
 pub async fn chapters(State(h): State<Arc<Host>>, Path(id): Path<String>) -> ApiResult {
-    let Json(book) = call(h, "get", json!({"kind":"books","id":id})).await?;
+    let Json(book) = call(h.clone(), "get", json!({"kind":"books","id":id})).await?;
+    if h.v1_contract == V1Contract::SyncEntities {
+        return Ok(Json(json!({"chapters":book["value"]["chapters"]})));
+    }
     let rows:Vec<_>=book["value"]["chapters"].as_array().into_iter().flatten().enumerate().map(|(index,c)|json!({"index":index,"id":c["id"],"title":c["title"],"paragraphs":c["paragraphs"].as_array().map_or(0,Vec::len),"chars":c["paragraphs"].as_array().into_iter().flatten().map(len).sum::<usize>()})).collect();
     Ok(Json(json!({"chapters":rows})))
 }
@@ -637,16 +827,21 @@ pub async fn chapter(
     let index = index
         .parse::<usize>()
         .map_err(|_| error("not_found".into()))?;
-    let Json(book) = call(h, "get", json!({"kind":"books","id":id})).await?;
+    let Json(book) = call(h.clone(), "get", json!({"kind":"books","id":id})).await?;
     let mut value = book["value"]["chapters"]
         .get(index)
         .cloned()
         .ok_or_else(|| error("not_found".into()))?;
-    value["index"] = index.into();
+    if h.v1_contract == V1Contract::Mirror {
+        value["index"] = index.into();
+    }
     Ok(Json(value))
 }
 pub async fn reader_state(State(h): State<Arc<Host>>, Path(id): Path<String>) -> ApiResult {
-    let Json(book) = call(h, "get", json!({"kind":"books","id":id})).await?;
+    let Json(book) = call(h.clone(), "get", json!({"kind":"books","id":id})).await?;
+    if h.v1_contract == V1Contract::SyncEntities {
+        return Ok(Json(sync_project(&book)));
+    }
     let mut state = json!({});
     for key in ["progress", "lastOpenedAt"] {
         if let Some(v) = book["value"].get(key) {
@@ -691,6 +886,96 @@ pub async fn events(State(h): State<Arc<Host>>, Json(mut event): Json<Value>) ->
     if !data.is_object() {
         return Err(error("invalid_event_data".into()));
     }
+    if h.v1_contract == crate::V1Contract::SyncEntities && typ.starts_with("book.import.") {
+        data = crate::reader_event::upload(typ, data).map_err(error)?;
+    }
+    if h.v1_contract == crate::V1Contract::SyncEntities && !typ.starts_with("book.import.") {
+        let normalized = crate::reader_event::normalize(typ, data).map_err(error)?;
+        let (prefix, action) = typ
+            .split_once('.')
+            .ok_or_else(|| error("invalid_event_type".into()))?;
+        let k = match prefix {
+            "book" => "books",
+            "note" => "notes",
+            "folder" => "folders",
+            "highlight" | "qa" | "review" => "highlights",
+            "association" => "associations",
+            "translation" => "translations",
+            "mindmap" => "mindMaps",
+            "studyset" => "studySets",
+            _ => return Err(error("invalid_event_type".into())),
+        };
+        let mut values = normalized.as_object().unwrap().clone();
+        let id = values.remove("extId").unwrap();
+        for (old, new) in [
+            ("bookExtId", "bookId"),
+            ("noteExtId", "noteId"),
+            ("folder", "folderId"),
+        ] {
+            if let Some(v) = values.remove(old) {
+                values.insert(new.into(), v);
+            }
+        }
+        let operation = format!("event-{:x}", Sha256::digest(delivery.as_bytes()));
+        let fingerprint = format!(
+            "{:x}",
+            Sha256::digest(json!({"type":typ,"data":normalized}).to_string().as_bytes())
+        );
+        let receipt = format!("event:{delivery}");
+        let typ = typ.to_owned();
+        let create = ["created", "imported"].contains(&action);
+        let deleted = action == "deleted";
+        let workspace = h.workspace.clone();
+        tokio::task::spawn_blocking(move || -> Result<(), String> {
+            use shufang_application::{ReplicationRepository, Repository};
+            let mut core = workspace.core.lock().map_err(|_| "core_lock_failed")?;
+            if let Some((_, prior)) = core.local_value(&receipt)? {
+                return if prior["fingerprint"] == fingerprint {
+                    Ok(())
+                } else {
+                    Err("delivery_conflict".into())
+                };
+            }
+            let previous = core.repository().operation(&operation)?;
+            if create {
+                let clock = core.mutation_clock(&operation)?;
+                let now = clock
+                    .split(':')
+                    .next()
+                    .ok_or("invalid_clock")?
+                    .parse::<u64>()
+                    .map_err(|_| "invalid_clock")?;
+                values.entry("createdAt").or_insert(json!(now));
+            }
+            let id = id.as_str().ok_or("invalid_extId")?;
+            let revision = core.repository().load(k, id)?.map_or(0, |v| v.revision);
+            let extra = if previous.is_some() {
+                vec![]
+            } else {
+                vec![crate::webhooks::override_commit(
+                    &core,
+                    k,
+                    id,
+                    revision + 1,
+                    &typ,
+                    normalized,
+                )?]
+            };
+            core.with_receipt(&receipt, &fingerprint, extra, |c| {
+                let (duplicate, _) =
+                    c.local_replica_command(k, id, &operation, values, vec![], deleted)?;
+                if duplicate {
+                    c.commit_receipt()?;
+                }
+                Ok(())
+            })?;
+            Ok(())
+        })
+        .await
+        .map_err(|_| error("event_failed".into()))?
+        .map_err(error)?;
+        return Ok(Json(json!({"ok":true,"mirrored":true})));
+    }
     let fingerprint = format!(
         "{:x}",
         Sha256::digest(json!({"type":typ,"data":data}).to_string().as_bytes())
@@ -727,11 +1012,25 @@ pub async fn events(State(h): State<Arc<Host>>, Json(mut event): Json<Value>) ->
                         .all(|b| b.is_ascii_alphanumeric() || b"._:-".contains(&b))
             })
             .ok_or_else(|| error("invalid_upload_id".into()))?;
-        let key = format!("upload:{upload}");
+        let key = if h.v1_contract == crate::V1Contract::SyncEntities {
+            format!(
+                "upload:{:x}",
+                Sha256::digest(format!("{id}\0{upload}").as_bytes())
+            )
+        } else {
+            format!("upload:{upload}")
+        };
         let (revision, mut state) = core
             .local_value(&key)
             .map_err(error)?
             .unwrap_or((0, Value::Null));
+        if state.is_null() && h.v1_contract == crate::V1Contract::SyncEntities {
+            if let shufang_native::storage::Storage::Mysql(repo) = core.repository() {
+                if let Some(legacy) = repo.legacy_upload(&id, upload).map_err(error)? {
+                    state = legacy;
+                }
+            }
+        }
         let count = data["chunkCount"]
             .as_u64()
             .filter(|n| (1..=512).contains(n))
@@ -849,6 +1148,59 @@ pub async fn events(State(h): State<Arc<Host>>, Json(mut event): Json<Value>) ->
                     body.as_object_mut().unwrap().remove(key);
                 }
                 body["chapters"] = chapters;
+                if h.v1_contract == crate::V1Contract::SyncEntities {
+                    crate::reader_event::upload_chapters(&body["chapters"]).map_err(error)?;
+                }
+                if h.v1_contract == crate::V1Contract::SyncEntities {
+                    use shufang_application::{ReplicationRepository, Repository};
+                    let operation = format!(
+                        "legacy-upload-{:x}",
+                        Sha256::digest(format!("{id}:{upload}").as_bytes())
+                    );
+                    let prior = core.repository().load("books", &id).map_err(error)?;
+                    let mut values = body
+                        .as_object()
+                        .cloned()
+                        .ok_or_else(|| error("invalid_body".into()))?;
+                    values.remove("extId");
+                    if let Some(folder) = values.remove("folder") {
+                        values.insert("folderId".into(), folder);
+                    }
+                    if prior.is_none() {
+                        values.insert("coverTone".into(), json!(0));
+                        values.insert("progress".into(),json!({"chapterId":body["chapters"][0]["id"].as_str().unwrap_or(""),"ratio":0}));
+                        let clock = core.mutation_clock(&operation).map_err(error)?;
+                        values.insert(
+                            "createdAt".into(),
+                            json!(clock
+                                .split(':')
+                                .next()
+                                .ok_or_else(|| error("invalid_clock".into()))?
+                                .parse::<u64>()
+                                .map_err(|_| error("invalid_clock".into()))?),
+                        );
+                    }
+                    let previous = core.repository().operation(&operation).map_err(error)?;
+                    if previous.is_some() {
+                        return Ok(Json(json!({"ok":true,"mirrored":true})));
+                    }
+                    let extra = vec![shufang_application::LocalCommit {
+                        key: key.clone(),
+                        expected: revision,
+                        value: {
+                            let mut completed = state.clone();
+                            completed["completed"] = json!(true);
+                            completed["expires"] = json!(now() + 7 * 86400000);
+                            completed
+                        },
+                    }];
+                    core.with_receipt(&receipt, &fingerprint, extra, |c| {
+                        c.local_replica_command("books", &id, &operation, values, vec![], false)
+                            .map(|_| ())
+                    })
+                    .map_err(error)?;
+                    return Ok(Json(json!({"ok":true,"mirrored":true})));
+                }
                 let prior = match core.entity("books", &id) {
                     Ok(r) => serde_json::to_value(r).unwrap(),
                     Err(e) if e == "not_found" => Value::Null,
@@ -1149,7 +1501,13 @@ pub async fn translate(State(h): State<Arc<Host>>, Json(body): Json<Value>) -> A
         return Err(error("invalid_extId".into()));
     }
     let request = json!({"extId":id,"bookExtId":body["bookExtId"],"chapterTitle":body["chapterTitle"].as_str().unwrap_or(""),"targetLang":lang,"scope":mode,"text":translation});
-    let _ = create(State(h), Path("translations".into()), Json(request)).await?;
+    let _ = create(
+        State(h),
+        Path("translations".into()),
+        HeaderMap::new(),
+        Json(request),
+    )
+    .await?;
     Ok(Json(
         json!({"extId":id,"translation":translation,"targetLang":lang}),
     ))
@@ -1158,4 +1516,16 @@ pub async fn directory() -> Json<Value> {
     Json(
         json!({"name":"Shufang API","version":"1.0","auth":"X-API-Key or Authorization: Bearer <API key>","eventTypes":EVENT_TYPES,"webhookSignature":"X-Shufang-Signature: sha256=<hmac(secret, body)>","endpoints":["GET/POST /api/v1/books","GET/PATCH/DELETE /api/v1/books/:extId","GET /api/v1/books/:extId/state","GET /api/v1/books/:extId/chapters","GET /api/v1/books/:extId/chapters/:index","GET /api/v1/digest/:contentHash","GET/POST /api/v1/highlights","PATCH/DELETE /api/v1/highlights/:extId","GET /api/v1/review/due","GET/POST /api/v1/associations","GET/PATCH/DELETE /api/v1/associations/:extId","GET/POST /api/v1/notes","GET/PATCH/DELETE /api/v1/notes/:extId","GET/POST /api/v1/folders","DELETE /api/v1/folders/:extId","POST /api/v1/ask","POST /api/v1/translate","GET/POST /api/v1/translations","DELETE /api/v1/translations/:extId","GET/POST /api/v1/mindmaps","GET/PATCH/DELETE /api/v1/mindmaps/:extId","POST /api/v1/events","GET/POST /api/v1/webhooks","PATCH/DELETE /api/v1/webhooks/:id","POST /api/v1/webhooks/:id/test","GET/POST /api/v1/studysets"]}),
     )
+}
+
+pub async fn book_state(
+    State(h): State<Arc<Host>>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+    Json(input): Json<Value>,
+) -> ApiResult {
+    if h.v1_contract != V1Contract::SyncEntities {
+        return Err(error("unsupported_state_mutation".into()));
+    }
+    sync_mutation(h, "books", &id, &headers, &input, false, false).await
 }

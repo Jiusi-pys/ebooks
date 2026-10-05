@@ -224,3 +224,61 @@ fn javascript_number_echo_is_duplicate_but_changed_number_is_id_reuse() {
     );
     assert_eq!(c.replication_operations(0, 100).unwrap().len(), 1);
 }
+
+#[test]
+fn creation_uses_one_clock_even_when_runtime_advances_and_retries_keep_defaults() {
+    struct Advancing(std::sync::atomic::AtomicU64);
+    impl Runtime for Advancing {
+        fn now(&self) -> u64 {
+            self.0.fetch_add(17, std::sync::atomic::Ordering::SeqCst)
+        }
+        fn new_id(&self) -> String {
+            "id".into()
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let mut core = CoreSession::new(
+        SqliteRepository::open(&dir.path().join("db"), "w", "local").unwrap(),
+        Advancing(std::sync::atomic::AtomicU64::new(1000)),
+        "w".into(),
+        "local".into(),
+    )
+    .unwrap();
+    let patch = json!({"title":"Title","content":"Content"})
+        .as_object()
+        .unwrap()
+        .clone();
+    assert!(
+        !core
+            .local_replica_command_with_creation(
+                "notes",
+                "n",
+                "created",
+                patch.clone(),
+                vec![],
+                false,
+                true
+            )
+            .unwrap()
+            .0
+    );
+    let op = core.repository().operation("created").unwrap().unwrap();
+    assert_eq!(
+        op.patch["createdAt"].as_u64().unwrap().to_string(),
+        op.clock.split(':').next().unwrap()
+    );
+    assert!(
+        core.local_replica_command_with_creation(
+            "notes",
+            "n",
+            "created",
+            patch,
+            vec![],
+            false,
+            true
+        )
+        .unwrap()
+        .0
+    );
+    assert_eq!(core.replication_head().unwrap().sequence, "1");
+}

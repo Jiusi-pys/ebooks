@@ -97,3 +97,7 @@ the manifest and `git show HEAD:<path>`. The archive script now stages those
 canonical bytes before packaging, avoiding a Windows checkout's CRLF drift.
 MySQL remains 0014, SQLite remains 0003 and IndexedDB remains 11. This is a
 migration-source recovery repair, not a data backup or upgrade acceptance run.
+
+## 2026-10-05 Rust / MySQL 0015
+
+新增不可变归档 `20261005-rust-through-mysql0015-sqlite0003-indexeddb0011.tar.gz` 及对应 SHA-256 清单，覆盖完整顺序迁移链。另行保留 `20261005-production-mysql0014-line-endings.tar.gz` 和清单，记录生产 0014 的历史 CRLF 哈希、当前 LF 源文件及明确标注的 CRLF 重建；未改写历史账本或旧迁移。只允许该精确版本与哈希别名。升级起点、顺序、故障恢复和验证详见 [0015 计划](../../../docs/mysql-rust-0015-plan.md)。脚本归档不代替数据库和原文件备份。

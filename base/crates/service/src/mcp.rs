@@ -122,11 +122,19 @@ fn limit(args: &Value, default: u64, max: u64) -> Result<usize, String> {
     Ok(value as usize)
 }
 fn list(host: &Host, kind: &str) -> Result<Vec<Value>, String> {
-    host.workspace
+    let rows = host
+        .workspace
         .execute("list", json!({"kind":kind}))?
         .as_array()
         .cloned()
-        .ok_or("invalid_records".into())
+        .ok_or("invalid_records")?;
+    if rows
+        .iter()
+        .any(|v| v["pendingFields"].as_array().is_some_and(|v| !v.is_empty()))
+    {
+        return Err("sync_field_pending".into());
+    }
+    Ok(rows)
 }
 fn truncate(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
@@ -169,7 +177,7 @@ fn tool(host: &Host, name: &str, args: &Value) -> Result<Value, String> {
             let id = string_arg(args, "book_id", "bookId", true, 64)?;
             let book = host
                 .workspace
-                .execute("get", json!({"kind":"books","id":id}))?;
+                .execute("getReplica", json!({"kind":"books","id":id}))?;
             let v = &book["value"];
             text(
                 json!({"bookId":id,"progress":v["progress"],"lastOpenedAt":v["lastOpenedAt"],"synced":truthy(&v["progress"])||truthy(&v["lastOpenedAt"])}),
@@ -237,7 +245,7 @@ fn tool(host: &Host, name: &str, args: &Value) -> Result<Value, String> {
             let id = string_arg(args, "note_id", "noteId", true, 64)?;
             let record = host
                 .workspace
-                .execute("get", json!({"kind":"notes","id":id}))?;
+                .execute("getReplica", json!({"kind":"notes","id":id}))?;
             let mut note = legacy::project("notes", &record, &[], &[], false);
             note["content"] = truncate(note["content"].as_str().unwrap_or(""), 10000).into();
             text(note)

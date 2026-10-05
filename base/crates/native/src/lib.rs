@@ -5,6 +5,7 @@ pub mod books;
 pub mod credentials;
 pub mod metadata;
 mod pdf;
+pub mod storage;
 pub mod sync_blobs;
 pub mod sync_config;
 pub mod workspace;

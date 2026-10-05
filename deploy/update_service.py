@@ -81,7 +81,13 @@ class Jobs:
 
 
 class Rollout:
-    def __init__(self, run, healthy=None):
+    def __init__(self, run, healthy=None, runtime="node"):
+        if runtime not in ("node", "rust"):
+            raise ValueError("Unsupported runtime")
+        self.runtime = runtime
+        self.port = int(os.environ.get('DEPLOY_PORT', '3000'))
+        if not 1 <= self.port <= 65535:
+            raise ValueError('Invalid deployment port')
         self.run = run
         self.healthy = healthy or self.wait_healthy
 
@@ -90,7 +96,7 @@ class Rollout:
         consecutive = 0
         while time.monotonic() < deadline:
             try:
-                with urlopen('http://127.0.0.1:3000/api/auth/session', timeout=4) as response:
+                with urlopen(f'http://127.0.0.1:{self.port}/api/auth/session', timeout=4) as response:
                     body = json.load(response)
                     ready = response.status == 200 and body.get('configured') is True
                 state = self.run(['docker', 'inspect', '--format', '{{.State.Running}} {{.RestartCount}}', 'shufang-app'], capture=True)
@@ -103,6 +109,8 @@ class Rollout:
         return False
 
     def switch(self, sha):
+        if self.runtime == 'rust':
+            return self.switch_rust(sha)
         image = 'shufang:' + sha
         environment = ['--network', 'host', '--env-file', str(ROOT / '.env.sync'),
                        '-e', 'HOST=127.0.0.1', '-e', 'PORT=3000', '-e', 'AUTO_UPDATE_ENABLED=false',
@@ -132,6 +140,41 @@ class Rollout:
             self.run(['docker', 'start', 'shufang-app'])
             raise
 
+    def switch_rust(self, sha):
+        image = 'shufang:' + sha
+        environment = ['--network', 'host', '--env-file', str(ROOT / '.env.rust'),
+                       '-v', str(ROOT / 'runtime-rust') + ':/app/runtime']
+        migration = 'shufang-migrate-' + sha[:12]
+        self.run(['docker', 'inspect', 'shufang-app'], capture=True)
+        # Keep a recoverable snapshot before appending migrations. This helper
+        # must fail closed and is installed/configured by the first Rust rollout.
+        self.run([str(ROOT / 'backup-rust.sh')], timeout=300)
+        self.run(['docker', 'run', '--rm', '--name', migration, *environment,
+                  image, '--migrate', '--migrations', '/app/migrations'], timeout=300)
+        self.run(['docker', 'rm', '-f', 'shufang-previous'], check=False)
+        renamed = False
+        try:
+            self.run(['docker', 'stop', '-t', '30', 'shufang-app'])
+            self.run(['docker', 'rename', 'shufang-app', 'shufang-previous'])
+            renamed = True
+            self.run(['docker', 'run', '-d', '--name', 'shufang-app', '--restart', 'unless-stopped',
+                      *environment, '--label', 'org.opencontainers.image.revision=' + sha,
+                      image, '--mysql', '--workspace', '/app/runtime',
+                      '--workspace-id', os.environ.get('SYNC_WORKSPACE_ID', 'personal-workspace'),
+                      '--node-id', os.environ.get('SYNC_NODE_ID', 'us-server'),
+                      '--port', str(self.port), '--v1-contract', 'sync-entities',
+                      '--auth-runtime', '/app/runtime', '--public-url', 'https://us.jiusi.org'])
+            if not self.healthy():
+                raise RuntimeError('Candidate failed readiness checks')
+        except Exception:
+            if renamed:
+                self.run(['docker', 'rm', '-f', 'shufang-app'], check=False)
+                self.run(['docker', 'rename', 'shufang-previous', 'shufang-app'])
+            # Restart uses the same MySQL/runtime and therefore preserves any
+            # candidate writes; it does not pretend to roll back the database.
+            self.run(['docker', 'start', 'shufang-app'])
+            raise
+
 
 def deploy(job, jobs):
     log_path = jobs.directory / (job['id'] + '.log')
@@ -149,13 +192,18 @@ def deploy(job, jobs):
                     raise RuntimeError('Deployment step failed: ' + args[0])
                 return result.stdout or ''
             with tempfile.TemporaryDirectory(prefix='build-', dir=ROOT) as directory:
-                run(['git', 'clone', '--depth', '1', '--branch', 'main', '--single-branch', REPOSITORY, directory])
+                branch = os.environ.get('DEPLOY_BRANCH', 'main')
+                if branch not in ('main', 'base'):
+                    raise RuntimeError('Unsupported deployment branch')
+                run(['git', 'clone', '--depth', '1', '--branch', branch, '--single-branch', REPOSITORY, directory])
                 head = run(['git', '-C', directory, 'rev-parse', 'HEAD'], capture=True).strip()
                 if head != job['sha']:
-                    raise RuntimeError('Requested SHA is no longer the head of main; deploy the latest push')
+                    raise RuntimeError('Requested SHA is no longer the deployment branch head; deploy the latest push')
+                runtime = os.environ.get('DEPLOY_RUNTIME', 'node')
+                dockerfile = '/deploy/Dockerfile.rust' if runtime == 'rust' else '/app/Dockerfile'
                 run(['docker', 'build', '--label', 'org.opencontainers.image.revision=' + head,
-                     '-t', 'shufang:' + head, '-f', directory + '/app/Dockerfile', directory])
-                Rollout(run).switch(head)
+                     '-t', 'shufang:' + head, '-f', directory + dockerfile, directory])
+                Rollout(run, runtime=runtime).switch(head)
         jobs.finish(job['id'], 'succeeded')
     except Exception as error:
         # Details remain in the local restricted log; never expose command output/secrets.

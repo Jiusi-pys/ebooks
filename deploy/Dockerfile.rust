@@ -1,0 +1,32 @@
+# Server runtime is Rust; Node is used only to compile the unchanged browser bundle.
+FROM rust:1.93.1-bookworm AS core
+WORKDIR /source
+RUN rustup target add wasm32-unknown-unknown
+COPY base/ ./base/
+RUN cargo build --manifest-path base/Cargo.toml --locked --release -p shufang-bindings --target wasm32-unknown-unknown
+FROM node:22-bookworm-slim AS browser
+WORKDIR /source/app
+COPY app/package*.json ./
+RUN npm ci
+COPY app/ ./
+COPY --from=core /source/base/target/wasm32-unknown-unknown/release/shufang_bindings.wasm /source/core.wasm
+ENV SHUFANG_CORE_WASM=/source/core.wasm
+RUN npm run build
+FROM node:22-bookworm-slim AS codex
+WORKDIR /bundle
+RUN npm pack @openai/codex@0.160.0-linux-x64 --silent && mkdir codex && tar xzf openai-codex-0.160.0-linux-x64.tgz -C codex --strip-components=1
+FROM rust:1.93.1-bookworm AS backend
+WORKDIR /source/base
+COPY base/ ./
+RUN cargo build --locked --release -p shufang-service
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libssl3 && rm -rf /var/lib/apt/lists/* && useradd -u 10001 -m shufang
+WORKDIR /app
+COPY --from=backend /source/base/target/release/shufang-service /usr/local/bin/shufang-service
+COPY --from=browser /source/app/dist/public /app/public
+COPY --from=codex /bundle/codex/vendor /opt/codex/vendor
+ENV HOME=/home/shufang CODEX_HOME=/app/runtime/codex CODEX_BIN=/opt/codex/vendor/x86_64-unknown-linux-musl/bin/codex
+COPY app/db/migrations /app/migrations
+COPY app/db/migration-history /app/migration-history
+USER shufang
+ENTRYPOINT ["shufang-service"]

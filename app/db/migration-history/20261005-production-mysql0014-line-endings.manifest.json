@@ -1,0 +1,24 @@
+{
+  "sourceCommit": "ade79bea381a088e42c215d8e4cca57c3f249aba",
+  "scope": "MySQL 0014 line ending evidence; full immutable chain remains in prior archives",
+  "productionLedger": {
+    "createdAt": 1790469000000,
+    "hash": "0d33a43b95cc793c398193ac609bb0db2c88118a27db925c2be820884f6438d1"
+  },
+  "deployedNodeFileHash": "6aa0d710b0e63a5eaac84f106ecff5a764cf8b1e553b9644d38f3e26a7c100b7",
+  "historicalBytes": "Reconstructed CRLF from unchanged canonical SQL; exact SHA256 matches observed production ledger. Not claimed as a captured original executed file.",
+  "recovery": "Use full 0000-0015 chain. Keep original ledger. Rust recognizes only this exact historical hash for this exact canonical SQL and timestamp. All other drift fails closed.",
+  "files": [
+    {
+      "path": "canonical/0014_workspace_sync.sql",
+      "sha256": "6aa0d710b0e63a5eaac84f106ecff5a764cf8b1e553b9644d38f3e26a7c100b7",
+      "size": 1928
+    },
+    {
+      "path": "historical-reconstruction/0014_workspace_sync.sql",
+      "sha256": "0d33a43b95cc793c398193ac609bb0db2c88118a27db925c2be820884f6438d1",
+      "size": 1941
+    }
+  ],
+  "archiveSha256": "9ee00657ce18a095abffbc67d3745ab43ac71069022ee91b6bd9cad2bac6ac43"
+}

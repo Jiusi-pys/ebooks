@@ -20,6 +20,18 @@ pub(crate) fn override_commit(
     event: &str,
     data: Value,
 ) -> Result<shufang_application::LocalCommit, String> {
+    override_commit_source(core, kind, id, revision, event, data, "reader")
+}
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn override_commit_source(
+    core: &shufang_native::workspace::Session,
+    kind: &str,
+    id: &str,
+    revision: u64,
+    event: &str,
+    data: Value,
+    source: &str,
+) -> Result<shufang_application::LocalCommit, String> {
     let (expected, mut value) = core.local_value("webhooks")?.unwrap_or((0, initial()));
     if value.get("overrides").is_none() {
         value["overrides"] = json!({});
@@ -33,7 +45,7 @@ pub(crate) fn override_commit(
         return Err("webhook_limit".into());
     }
     value["overrides"][format!("{kind}:{id}:{revision}")] =
-        json!({"type":event,"data":data,"source":"reader"});
+        json!({"type":event,"data":data,"source":source});
     Ok(shufang_application::LocalCommit {
         key: "webhooks".into(),
         expected,
@@ -406,7 +418,7 @@ pub async fn tick(h: &Arc<Host>) -> Result<(), String> {
                 (
                     v["type"].as_str().ok_or("invalid_webhooks")?.to_owned(),
                     v["data"].clone(),
-                    "reader",
+                    v["source"].as_str().ok_or("invalid_webhooks")?.to_owned(),
                 )
             } else {
                 let data = if let Some(snapshot) = &change.snapshot {
@@ -445,7 +457,7 @@ pub async fn tick(h: &Arc<Host>) -> Result<(), String> {
                         crate::legacy::project(&format!("{kind}s"), &r, &folders, &books, false)
                     }
                 };
-                (event, data, "native")
+                (event, data, "native".to_owned())
             };
             let body = json!({"id":uuid::Uuid::new_v4().to_string(),"type":event,"data":data,"source":source,"timestamp":timestamp()});
             for (id, subscription) in subscriptions {
@@ -549,4 +561,46 @@ fn now() -> u64 {
 }
 fn timestamp() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+}
+
+pub fn import_mysql_subscriptions(host: &Host) -> Result<(), String> {
+    if host.is_read_only() {
+        return Err("read_only".into());
+    }
+    let mut core = host.workspace.core.lock().map_err(|_| "core_lock_failed")?;
+    if core.local_value("webhooks")?.is_some() {
+        return Ok(());
+    }
+    let shufang_native::storage::Storage::Mysql(repo) = core.repository() else {
+        return Ok(());
+    };
+    let rows = repo.legacy_webhooks()?;
+    if rows.len() > 100 {
+        return Err("webhook_limit".into());
+    }
+    let mut state = initial();
+    let mut last = 0;
+    for mut value in rows {
+        validate(&value)?;
+        let legacy = value["id"].as_u64().ok_or("invalid_webhook")?;
+        last = last.max(legacy);
+        use sha2::Digest;
+        let digest = Sha256::digest(format!("mysql-webhook:{legacy}").as_bytes());
+        let id = uuid::Uuid::from_bytes(digest[..16].try_into().map_err(|_| "invalid_webhook")?)
+            .to_string();
+        let secret = value["secret"].as_str().ok_or("invalid_webhook")?;
+        if !secret.is_empty() {
+            let reference = format!("webhook-{id}");
+            shufang_native::credentials::store(&host.workspace.root, &reference, secret)?;
+            value["secretRef"] = json!(reference);
+        }
+        value.as_object_mut().unwrap().remove("secret");
+        value["id"] = json!(id);
+        value["legacyId"] = json!(legacy);
+        state["subscriptions"][id] = value;
+    }
+    state["lastLegacyId"] = json!(last);
+    state["mysqlImported"] = json!(true);
+    core.set_local_value("webhooks", 0, &state)?;
+    Ok(())
 }

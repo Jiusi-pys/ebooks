@@ -17,12 +17,15 @@ async fn restores_operations_and_books_from_public_https_peer() {
         .parse()
         .unwrap();
     let dir = tempfile::tempdir().unwrap();
-    let workspace = Workspace::open(
-        &dir.path().join("library.sqlite3"),
-        &workspace_id,
-        "windows-https-test",
-    )
-    .unwrap();
+    let database = match std::env::var("SHUFANG_HTTPS_TEST_LOCAL_DATABASE") {
+        Ok(path) => {
+            let path = std::path::PathBuf::from(path);
+            assert!(path.is_absolute());
+            path
+        }
+        Err(_) => dir.path().join("library.sqlite3"),
+    };
+    let workspace = Workspace::open(&database, &workspace_id, "windows-https-test").unwrap();
     let host = Host::new(
         workspace.clone(),
         "isolated-owner".into(),

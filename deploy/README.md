@@ -77,3 +77,13 @@ Release/tag；部署的提交 SHA 与迁移链记录在验收和部署任务中�
 `app/` 下运行 `npm run check`、`npm run lint`、`npm test`、`npm run build`。
 工作流串行发布且不取消正在执行的部署，参见
 [GitHub concurrency 文档](https://docs.github.com/en/actions/concepts/workflows-and-actions/concurrency)。
+
+## Rust 生产运行（2026-10-05）
+
+保留 MySQL，Rust 使用 `/opt/shufang/.env.rust` 和 `/opt/shufang/runtime-rust`，仅监听回环 31432，经现有 HTTPS 代理提供 API/MCP/OAuth。生产静态页面保持切换前字节；本次不修改前端或客户端界面。运行时包含原生 Codex CLI，登录和外部模型授权仍由用户现有账号配置管理，不包含 Node 后端进程。
+
+监督器配置 `DEPLOY_RUNTIME=rust`、`DEPLOY_BRANCH=base`、`DEPLOY_PORT=31432`，并明确设置原同步工作区和节点身份。先调用 `backup-rust.sh` 生成一致性整库版本并备份运行密钥，再按完整链迁移；迁移失败不停止旧写入者。Rust 启动前检查 MySQL 单写入者锁。`--initialize-only` 仅用于一次性旧 OAuth/peer 导入，不能留在正常启动参数中。
+
+兼容 Rust 容器回退复用同一 MySQL 和原文件目录，不能撤销数据库迁移。旧 Node 容器仅作历史恢复证据；Rust 接受新写入后不可直接重新启用旧 Node。整库版本恢复至独立、已迁移的空 MySQL，恢复前产生安全备份；核对文件和新同步世代，停止旧写入者后再激活恢复库。单条记录可独立恢复，版本可手动删除。恢复目录出现 `restore.pending` 时禁止启动，按恢复提交标记完成文件发布，不能盲目重试覆盖数据。
+
+服务器资源较小，本次使用经过 Linux 构建/测试并逐项哈希核验的二进制镜像部署。完整 `Dockerfile.rust` 源码构建及监督器整条远程构建发布流程尚未在生产主机端到端验收；不能把监督器单元测试和启动成功表述为此流程已验收。部署与恢复证据见[验收记录](../docs/evidence/rust-production-20261005.md)。

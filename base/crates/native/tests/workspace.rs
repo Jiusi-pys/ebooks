@@ -309,3 +309,22 @@ fn invalid_cover_never_mutates_book_metadata() {
         .unwrap()
         .starts_with("data:image/png;base64,"));
 }
+
+#[test]
+fn replica_command_preserves_production_fields_and_deduplicates_large_payloads() {
+    let dir = tempfile::tempdir().unwrap();
+    let workspace = Workspace::open(&dir.path().join("library.sqlite3"), "w", "n").unwrap();
+    let input = json!({"kind":"notes","id":"note","operationId":"command-one","patch":{"title":"Title","content":"x".repeat(200000),"createdAt":1800000000000u64,"updatedAt":1800000000000u64}});
+    let first = workspace.execute("mutateReplica", input.clone()).unwrap();
+    assert_eq!(first["duplicate"], false);
+    assert_eq!(
+        workspace.execute("mutateReplica", input).unwrap()["duplicate"],
+        true
+    );
+    let note = workspace
+        .execute("get", json!({"kind":"notes","id":"note"}))
+        .unwrap();
+    assert_eq!(note["value"]["content"].as_str().unwrap().len(), 200000);
+    assert_eq!(note["revision"], 1);
+    assert!(workspace.execute("mutateReplica",json!({"kind":"notes","id":"note","operationId":"command-one","patch":{"title":"Different"}})).is_err());
+}

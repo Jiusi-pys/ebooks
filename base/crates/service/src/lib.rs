@@ -1,12 +1,23 @@
+pub mod ai_rpc;
+pub mod browser_auth;
+pub mod browser_session;
+pub mod codex_auth;
+pub mod credentials;
 mod incoming_snapshot;
 pub mod legacy;
 mod legacy_validation;
+mod library;
 pub mod mcp;
 pub mod oauth;
+pub mod oauth_migration;
+pub mod peer_migration;
+mod reader_event;
 pub mod replication;
+mod server_startup;
 mod sync_blobs;
 mod sync_openapi;
 pub mod sync_v2;
+mod trpc;
 pub mod webhooks;
 use axum::{
     extract::{Multipart, Path, Request, State},
@@ -21,12 +32,25 @@ use sha2::{Digest, Sha256};
 use shufang_native::workspace::Workspace;
 use std::sync::Arc;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum V1Contract {
+    Mirror,
+    SyncEntities,
+}
 pub struct Host {
     pub workspace: Arc<Workspace>,
     pub token: String,
+    pub machine_key: Option<String>,
+    pub oauth_enabled: bool,
+    pub oauth_redirects: Option<Vec<String>>,
+    pub codex: Arc<codex_auth::Controller>,
+    pub ai_executor: Arc<dyn ai_rpc::Executor>,
+    pub ai_slots: Arc<tokio::sync::Semaphore>,
     pub base_url: String,
     pub stop: tokio::sync::Notify,
     read_only: bool,
+    pub v1_contract: V1Contract,
+    pub browser: Option<Arc<browser_auth::Auth>>,
 }
 impl Host {
     pub fn new(workspace: Arc<Workspace>, token: String, base_url: String) -> Arc<Self> {
@@ -41,12 +65,29 @@ impl Host {
         base_url: String,
         read_only: bool,
     ) -> Arc<Self> {
+        Self::with_contract(workspace, token, base_url, read_only, V1Contract::Mirror)
+    }
+    pub fn with_contract(
+        workspace: Arc<Workspace>,
+        token: String,
+        base_url: String,
+        read_only: bool,
+        v1_contract: V1Contract,
+    ) -> Arc<Self> {
         Arc::new(Self {
             workspace,
+            machine_key: Some(token.clone()),
+            oauth_enabled: true,
+            oauth_redirects: None,
+            codex: codex_auth::Controller::new(),
+            ai_executor: Arc::new(ai_rpc::NativeExecutor),
+            ai_slots: Arc::new(tokio::sync::Semaphore::new(2)),
             token,
             base_url: base_url.trim_end_matches('/').into(),
             stop: tokio::sync::Notify::new(),
             read_only,
+            v1_contract,
+            browser: None,
         })
     }
     pub fn is_read_only(&self) -> bool {
@@ -92,7 +133,19 @@ pub fn router(host: Arc<Host>) -> Router {
         )
         .route("/api/v1/books/{id}/chapters", get(legacy::chapters))
         .route("/api/v1/books/{id}/chapters/{index}", get(legacy::chapter))
-        .route("/api/v1/books/{id}/state", get(legacy::reader_state))
+        .route(
+            "/api/v1/books/{id}/state",
+            get(legacy::reader_state).patch(legacy::book_state),
+        )
+        .route("/api/v1/books/{id}/source", get(library::source))
+        .route(
+            "/api/v1/books/{id}/source/chunks",
+            axum::routing::put(library::source_chunk),
+        )
+        .route(
+            "/api/v1/books/{id}/source/complete",
+            post(library::source_complete),
+        )
         .route(
             "/api/v1/books/import",
             post(import_book).layer(axum::extract::DefaultBodyLimit::max(513 * 1024 * 1024)),
@@ -150,7 +203,12 @@ pub fn router(host: Arc<Host>) -> Router {
     Router::new()
         .merge(protected)
         .merge(sync_v2::router(host.clone()))
-        .merge(oauth::router())
+        .merge(oauth::router(host.clone()))
+        .merge(browser_auth::router())
+        .merge(library::router(host.clone()))
+        .merge(server_startup::router(host.clone()))
+        .merge(codex_auth::router(host.clone()))
+        .merge(trpc::router())
         .route("/api/v1/", get(legacy::directory))
         .route("/api/v1", get(legacy::directory))
         .route(
@@ -204,21 +262,55 @@ async fn authorize(State(host): State<Arc<Host>>, request: Request, next: Next) 
             }
         }
     }
+    let public_machine =
+        request.uri().path() == "/mcp" || request.uri().path().starts_with("/api/v1/");
     let key = request
         .headers()
         .get("x-api-key")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    if !key.is_empty() && same_secret(key, &host.token) {
+        .unwrap_or("")
+        .trim();
+    if request.method() == axum::http::Method::POST
+        && request.uri().path() == "/api/v1/events"
+        && key.trim().is_empty()
+        && !request.headers().contains_key("authorization")
+    {
+        return library::authorize(State(host), request, next).await;
+    }
+    if public_machine && host.machine_key.is_none() {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"error":"machine_api_unavailable"})),
+        )
+            .into_response();
+    }
+    if !key.is_empty()
+        && (same_secret(key, &host.token)
+            || (public_machine
+                && host
+                    .machine_key
+                    .as_ref()
+                    .is_some_and(|expected| same_secret(key, expected))))
+    {
         return next.run(request).await;
     }
     let token = request
         .headers()
         .get("authorization")
         .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.strip_prefix("Bearer "));
+        .and_then(|s| {
+            s.get(..7)
+                .filter(|prefix| prefix.eq_ignore_ascii_case("Bearer "))
+                .map(|_| s[7..].trim())
+        });
     if let Some(token) = token {
-        if same_secret(token, &host.token) {
+        if same_secret(token, &host.token)
+            || (public_machine
+                && host
+                    .machine_key
+                    .as_ref()
+                    .is_some_and(|expected| same_secret(token, expected)))
+        {
             return next.run(request).await;
         }
         if oauth::valid_access(&host, token)
@@ -265,11 +357,13 @@ pub type ApiResult = Result<Json<Value>, (StatusCode, Json<Value>)>;
 pub fn error(message: String) -> (StatusCode, Json<Value>) {
     let status = match message.as_str() {
         "transport_cache_limit" => StatusCode::TOO_MANY_REQUESTS,
-        "ai_not_configured" | "model_not_selected" | "codex_unavailable" => {
+        "csrf_rejected" => StatusCode::FORBIDDEN,
+        "ai_not_configured" | "model_not_selected" | "codex_unavailable" | "sync_field_pending" => {
             StatusCode::SERVICE_UNAVAILABLE
         }
         "not_found" | "entity_deleted" => StatusCode::NOT_FOUND,
         "revision_conflict"
+        | "operation_id_reused"
         | "clock_conflict"
         | "delivery_conflict"
         | "upload_conflict"
@@ -539,8 +633,17 @@ async fn create_version(State(h): State<Arc<Host>>) -> ApiResult {
 async fn delete_version(State(h): State<Arc<Host>>, Path(id): Path<String>) -> ApiResult {
     call(h, "deleteVersion", json!({"id":id})).await
 }
-async fn restore_version(State(h): State<Arc<Host>>, Path(id): Path<String>) -> ApiResult {
-    call(h, "restoreVersion", json!({"id":id})).await
+async fn restore_version(
+    State(h): State<Arc<Host>>,
+    Path(id): Path<String>,
+    input: Option<Json<Value>>,
+) -> ApiResult {
+    let mut input = input.map(|v| v.0).unwrap_or(json!({}));
+    if !input.is_object() {
+        return Err(error("invalid_restore_request".into()));
+    }
+    input["id"] = id.into();
+    call(h, "restoreVersion", input).await
 }
 async fn restore_version_entity(
     State(h): State<Arc<Host>>,

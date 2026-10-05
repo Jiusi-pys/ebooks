@@ -82,6 +82,30 @@ class UpdateTests(unittest.TestCase):
         self.assertTrue(any('dist/api/boot.js' in command for command in commands))
 
 
+class RustRolloutTests(unittest.TestCase):
+    def test_rust_release_uses_rust_migrations_and_retains_shared_state_on_failure(self):
+        commands=[]
+        rollout=Rollout(run=lambda args, **kw: commands.append(args) or '',healthy=lambda:False,runtime='rust')
+        with self.assertRaises(RuntimeError):
+            rollout.switch(SHA)
+        self.assertTrue(any('--migrate' in command for command in commands))
+        self.assertTrue(any('--mysql' in command for command in commands))
+        self.assertTrue(any(command[0].endswith('backup-rust.sh') for command in commands))
+        self.assertFalse(any('node' in command for command in commands))
+        self.assertIn(['docker','rename','shufang-previous','shufang-app'],commands)
+        self.assertIn(['docker','start','shufang-app'],commands)
+    def test_backup_failure_does_not_stop_writer(self):
+        commands=[]
+        def run(args,**kw):
+            commands.append(args)
+            if args[0].endswith('backup-rust.sh'):
+                raise RuntimeError('backup failed')
+            return ''
+        with self.assertRaises(RuntimeError):
+            Rollout(run,healthy=lambda:True,runtime='rust').switch(SHA)
+        self.assertFalse(any('stop' in command for command in commands))
+
+
 class HttpTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

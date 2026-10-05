@@ -1,0 +1,14 @@
+[package]
+name = "shufang-mysql"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shufang-application = { path = "../application" }
+shufang-domain = { path = "../domain" }
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+uuid = { version = "1.21", features = ["v4"] }
+mysql = { version = "28.0.3", default-features = false, features = ["minimal-rust", "rustls-tls-ring"] }
+base64 = "0.22"

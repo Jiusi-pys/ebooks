@@ -10,9 +10,45 @@ import {
   timestamp,
   primaryKey,
   uniqueIndex,
+  index,
 } from "drizzle-orm/mysql-core";
 
 const workspace = () => varchar("workspace", { length: 128 }).notNull();
+export const rustEntityRevisions = mysqlTable(
+  "rust_entity_revisions",
+  {
+    workspace: workspace(),
+    kind: varchar("kind", { length: 32 }).notNull(),
+    entityId: varchar("entity_id", { length: 128 }).notNull(),
+    revision: bigint("revision", { mode: "bigint", unsigned: true }).notNull(),
+  },
+  table => [primaryKey({ columns: [table.workspace, table.kind, table.entityId] })]
+);
+export const rustLocalValues = mysqlTable(
+  "rust_local_values",
+  {
+    workspace: workspace(),
+    localKey: varchar("local_key", { length: 256 }).notNull(),
+    revision: bigint("revision", { mode: "bigint", unsigned: true }).notNull(),
+    valueJson: longtext("value_json").notNull(),
+  },
+  table => [primaryKey({ columns: [table.workspace, table.localKey] })]
+);
+export const rustChanges = mysqlTable(
+  "rust_changes",
+  {
+    seq: bigint("seq", { mode: "bigint", unsigned: true })
+      .autoincrement()
+      .primaryKey(),
+    workspace: workspace(),
+    kind: varchar("kind", { length: 32 }).notNull(),
+    entityId: varchar("entity_id", { length: 128 }).notNull(),
+    revision: bigint("revision", { mode: "bigint", unsigned: true }).notNull(),
+    deleted: boolean("deleted").notNull(),
+    snapshot: longtext("snapshot"),
+  },
+  table => [index("rust_changes_workspace").on(table.workspace, table.seq)]
+);
 export const syncHeads = mysqlTable("sync_heads", {
   workspace: workspace().primaryKey(),
   nodeId: varchar("node_id", { length: 128 }).notNull(),

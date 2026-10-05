@@ -105,6 +105,71 @@ impl BlobStore {
         }
         Ok(self.root.join("uploads").join(id))
     }
+    fn legacy_directory(&self, book: &str, hash: &str) -> Result<PathBuf> {
+        if !shufang_domain::sync::valid_identifier(book) || !BlobManifest::valid_hash(hash) {
+            return Err("invalid_source_upload".into());
+        }
+        Ok(self
+            .root
+            .join("legacy")
+            .join(format!("{:x}", Sha256::digest(book.as_bytes())))
+            .join(hash))
+    }
+    pub fn stage_legacy(&self, book: &str, hash: &str, index: u64, bytes: &[u8]) -> Result<()> {
+        if index >= 1024 || bytes.len() > CHUNK_SIZE as usize {
+            return Err("invalid_chunk".into());
+        }
+        let directory = self.legacy_directory(book, hash)?;
+        let _lock = self.lock()?;
+        fs::create_dir_all(&directory).map_err(io)?;
+        let path = directory.join(index.to_string());
+        match fs::read(&path) {
+            Ok(prior) => {
+                return if prior == bytes {
+                    Ok(())
+                } else {
+                    Err("chunk_id_reused".into())
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(io(e)),
+        }
+        let mut temporary = tempfile::NamedTempFile::new_in(&directory).map_err(io)?;
+        temporary.write_all(bytes).map_err(io)?;
+        temporary.as_file().sync_all().map_err(io)?;
+        temporary.persist_noclobber(path).map_err(io)?;
+        Ok(())
+    }
+    pub fn complete_legacy(&self, book: &str, manifest: &BlobManifest) -> Result<BlobManifest> {
+        let directory = self.legacy_directory(book, &manifest.sha256)?;
+        let upload = self.create(manifest)?;
+        if !upload.present {
+            for index in 0..upload.chunks {
+                let path = directory.join(index.to_string());
+                let file = File::open(path).map_err(|e| {
+                    if e.kind() == std::io::ErrorKind::NotFound {
+                        "missing_chunks".to_owned()
+                    } else {
+                        io(e)
+                    }
+                })?;
+                if file.metadata().map_err(io)?.len() > CHUNK_SIZE {
+                    return Err("invalid_chunk".into());
+                }
+                let mut bytes = Vec::new();
+                file.take(CHUNK_SIZE + 1)
+                    .read_to_end(&mut bytes)
+                    .map_err(io)?;
+                self.put(
+                    &upload.id,
+                    index,
+                    &bytes,
+                    &format!("{:x}", Sha256::digest(&bytes)),
+                )?;
+            }
+        }
+        self.commit(&upload.id)
+    }
     pub fn has(&self, hash: &str) -> Result<bool> {
         let path = self.path(hash)?;
         let mut file = match File::open(path) {

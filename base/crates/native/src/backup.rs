@@ -31,9 +31,18 @@ pub fn create(database: &Path, destination: &Path) -> Result<()> {
     let temp = tempfile::tempdir().map_err(|e| e.to_string())?;
     let snapshot = temp.path().join("library.sqlite3");
     shufang_sqlite::SqliteRepository::snapshot(database, &snapshot)?;
-    let mut paths = vec![("library.sqlite3".to_owned(), snapshot)];
+    create_archive(root, destination, &snapshot, "library.sqlite3", 1)
+}
+fn create_archive(
+    root: &Path,
+    destination: &Path,
+    snapshot: &Path,
+    database_name: &str,
+    format: u32,
+) -> Result<()> {
+    let mut paths = vec![(database_name.to_owned(), snapshot.to_path_buf())];
     // Original resources are content addressed and never modified or collected during backup.
-    for folder in ["files", "credentials"] {
+    for folder in ["files", "credentials", "auth"] {
         let directory = root.join(folder);
         if directory.exists() {
             for entry in std::fs::read_dir(directory).map_err(|e| e.to_string())? {
@@ -77,7 +86,7 @@ pub fn create(database: &Path, destination: &Path) -> Result<()> {
     zip.start_file("manifest.json", options)
         .map_err(|e| e.to_string())?;
     zip.write_all(
-        json!({"format":1,"files":manifest,"credentials":if cfg!(windows){"Windows DPAPI; same OS user required"}else{"AES-256-GCM; independent deployment key and environment references required"}})
+        json!({"format":format,"files":manifest,"credentials":if cfg!(windows){"Windows DPAPI; same OS user required"}else{"AES-256-GCM; independent deployment key and environment references required"}})
             .to_string()
             .as_bytes(),
     )
@@ -94,6 +103,21 @@ pub fn restore(archive: &Path, destination: &Path) -> Result<()> {
         return Err("restore_destination_must_be_new".into());
     }
     let parent = destination.parent().ok_or("invalid_destination")?;
+    let staging = extract_verified(archive, parent, 1, "library.sqlite3")?;
+    shufang_sqlite::SqliteRepository::prepare_restored_database(
+        &staging.path().join("library.sqlite3"),
+    )?;
+    // No existing workspace is ever replaced. Directory rename is on the same volume.
+    std::fs::rename(staging.path(), destination).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn extract_verified(
+    archive: &Path,
+    parent: &Path,
+    format: u32,
+    database_name: &str,
+) -> Result<tempfile::TempDir> {
     let staging = tempfile::tempdir_in(parent).map_err(|e| e.to_string())?;
     let mut zip = ZipArchive::new(std::fs::File::open(archive).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
@@ -108,9 +132,10 @@ pub fn restore(archive: &Path, destination: &Path) -> Result<()> {
         let path = file.enclosed_name().ok_or("invalid_backup_path")?;
         if name.contains(['\\', ':'])
             || !names.insert(name.clone())
-            || !(name == "library.sqlite3"
+            || !(name == database_name
                 || name == "manifest.json"
-                || ((name.starts_with("files/") || name.starts_with("credentials/"))
+                || ((name.starts_with("files/")
+                    || (name.starts_with("credentials/") || name.starts_with("auth/")))
                     && name.split('/').count() == 2)
                 || valid_blob_path(&name))
         {
@@ -119,20 +144,21 @@ pub fn restore(archive: &Path, destination: &Path) -> Result<()> {
         total = total.checked_add(file.size()).ok_or("backup_too_large")?;
         if total > 100 * 1024 * 1024 * 1024
             || (name == "manifest.json" && file.size() > 32 * 1024 * 1024)
+            || (name == "mysql.dump.json" && file.size() > 256 * 1024 * 1024)
         {
             return Err("backup_too_large".into());
         }
         let target = staging.path().join(path);
         std::fs::create_dir_all(target.parent().ok_or("invalid_backup_path")?)
             .map_err(|e| e.to_string())?;
-        let mut out = std::fs::File::create(target).map_err(|e| e.to_string())?;
+        let mut out = std::fs::File::create(&target).map_err(|e| e.to_string())?;
         #[cfg(unix)]
-        if name.starts_with("credentials/") {
+        if name.starts_with("credentials/") || name.starts_with("auth/") {
             use std::os::unix::fs::PermissionsExt;
             out.set_permissions(std::fs::Permissions::from_mode(0o600))
                 .map_err(|_| "credential_permissions_failed")?;
             std::fs::set_permissions(
-                staging.path().join("credentials"),
+                target.parent().ok_or("invalid_backup_path")?,
                 std::fs::Permissions::from_mode(0o700),
             )
             .map_err(|_| "credential_permissions_failed")?;
@@ -147,7 +173,7 @@ pub fn restore(archive: &Path, destination: &Path) -> Result<()> {
         &std::fs::read(staging.path().join("manifest.json")).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
-    if manifest["format"] != 1 || !names.contains("library.sqlite3") {
+    if manifest["format"] != format || !names.contains(database_name) {
         return Err("invalid_backup".into());
     }
     let entries = manifest["files"].as_array().ok_or("invalid_manifest")?;
@@ -164,18 +190,20 @@ pub fn restore(archive: &Path, destination: &Path) -> Result<()> {
     if verified.len() + 1 != names.len() {
         return Err("incomplete_manifest".into());
     }
-    shufang_sqlite::SqliteRepository::prepare_restored_database(
-        &staging.path().join("library.sqlite3"),
-    )?;
-    // No existing workspace is ever replaced. Directory rename is on the same volume.
-    std::fs::rename(staging.path(), destination).map_err(|e| e.to_string())?;
-    Ok(())
+    Ok(staging)
 }
 
 fn valid_blob_path(name: &str) -> bool {
     let parts: Vec<_> = name.split('/').collect();
     match parts.as_slice() {
         ["sync-blobs", "objects", hash] => shufang_application::BlobManifest::valid_hash(hash),
+        ["sync-blobs", "legacy", book, hash, index] => {
+            shufang_application::BlobManifest::valid_hash(book)
+                && shufang_application::BlobManifest::valid_hash(hash)
+                && index
+                    .parse::<u64>()
+                    .is_ok_and(|n| n < 1024 && n.to_string() == *index)
+        }
         ["sync-blobs", "uploads", id, file] => {
             uuid::Uuid::parse_str(id).is_ok_and(|v| v.to_string() == *id)
                 && (*file == "manifest.json"
@@ -205,7 +233,7 @@ fn collect_blobs(
             .ok_or("invalid_filename")?
             .replace('\\', "/");
         if kind.is_dir() {
-            if name.split('/').count() > 3 {
+            if name.split('/').count() > 4 {
                 return Err("invalid_backup_path".into());
             }
             collect_blobs(root, &path, paths)?;
@@ -217,4 +245,74 @@ fn collect_blobs(
         }
     }
     Ok(())
+}
+
+#[cfg(feature = "server-mysql")]
+pub fn create_mysql(
+    repository: &shufang_mysql::MysqlRepository,
+    root: &Path,
+    destination: &Path,
+) -> Result<()> {
+    if !destination.is_absolute() || destination.exists() {
+        return Err("backup_destination_must_be_new".into());
+    }
+    let blobs = crate::sync_blobs::BlobStore::new(&root.join("sync-blobs"));
+    let _lock = blobs.lock()?;
+    let temp = tempfile::tempdir().map_err(|e| e.to_string())?;
+    let snapshot = temp.path().join("mysql.dump.json");
+    let file = std::fs::File::create(&snapshot).map_err(|e| e.to_string())?;
+    serde_json::to_writer(file, &repository.dump()?).map_err(|e| e.to_string())?;
+    if std::fs::metadata(&snapshot)
+        .map_err(|e| e.to_string())?
+        .len()
+        > 256 * 1024 * 1024
+    {
+        return Err("backup_too_large".into());
+    }
+    create_archive(root, destination, &snapshot, "mysql.dump.json", 2)
+}
+#[cfg(feature = "server-mysql")]
+pub fn restore_mysql(archive: &Path, destination: &Path, url: &str) -> Result<String> {
+    if !destination.is_absolute() || destination.exists() {
+        return Err("restore_destination_must_be_new".into());
+    }
+    let staging = extract_verified(
+        archive,
+        destination.parent().ok_or("invalid_destination")?,
+        2,
+        "mysql.dump.json",
+    )?;
+    let dump: shufang_mysql::backup::Dump = serde_json::from_reader(
+        std::fs::File::open(staging.path().join("mysql.dump.json")).map_err(|e| e.to_string())?,
+    )
+    .map_err(|_| "invalid_mysql_backup")?;
+    // A database commit and filesystem publication cannot share one transaction.
+    // Keep verified files and a durable journal until both stages are complete.
+    std::fs::write(
+        staging.path().join("restore.pending"),
+        b"mysql restore in progress\n",
+    )
+    .map_err(|_| "restore_journal_failed")?;
+    let recovery = staging.keep();
+    let database = shufang_mysql::backup::restore(url, &dump)
+        .map_err(|e| format!("{e}; verified files retained at {}", recovery.display()))?;
+    std::fs::write(
+        recovery.join("restore.database-committed"),
+        database.as_bytes(),
+    )
+    .map_err(|_| {
+        format!(
+            "restore_publication_failed; committed database and files retained at {}",
+            recovery.display()
+        )
+    })?;
+    std::fs::rename(&recovery, destination).map_err(|_| {
+        format!(
+            "restore_publication_failed; committed database and files retained at {}",
+            recovery.display()
+        )
+    })?;
+    std::fs::remove_file(destination.join("restore.pending"))
+        .map_err(|_| "restore_completion_journal_failed")?;
+    Ok(database)
 }

@@ -8,6 +8,12 @@ fn backup_restores_committed_wal_and_files_without_overwriting_a_workspace() {
     workspace.execute("save",json!({"kind":"notes","id":"n","expected":0,"patch":{"title":"备份","content":"正文😀"}})).unwrap();
     std::fs::create_dir(workspace.root.join("files")).unwrap();
     std::fs::write(workspace.root.join("files/book.txt"), "original").unwrap();
+    std::fs::create_dir(workspace.root.join("auth")).unwrap();
+    std::fs::write(
+        workspace.root.join("auth/session-secret"),
+        "public-backup-test-key",
+    )
+    .unwrap();
     let archive = dir.path().join("backup.zip");
     let original_epoch = workspace
         .core
@@ -20,6 +26,10 @@ fn backup_restores_committed_wal_and_files_without_overwriting_a_workspace() {
     let target = dir.path().join("restored");
     backup::restore(&archive, &target).unwrap();
     assert!(backup::restore(&archive, &target).is_err());
+    assert_eq!(
+        std::fs::read_to_string(target.join("auth/session-secret")).unwrap(),
+        "public-backup-test-key"
+    );
     let restored = Workspace::open(&target.join("library.sqlite3"), "w", "r").unwrap();
     assert_ne!(
         restored

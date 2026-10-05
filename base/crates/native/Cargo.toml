@@ -7,6 +7,7 @@ edition.workspace = true
 shufang-application = { path = "../application" }
 shufang-domain = { path = "../domain" }
 shufang-sqlite = { path = "../sqlite" }
+shufang-mysql = { path = "../mysql", optional = true }
 serde.workspace = true
 serde_json.workspace = true
 uuid = { version = "1.21", features = ["v4"] }
@@ -26,6 +27,9 @@ base64 = "0.22"
 
 [dev-dependencies]
 tempfile = "3.26"
+
+[features]
+server-mysql = ["dep:shufang-mysql"]
 
 [target.'cfg(not(windows))'.dependencies]
 ring = "0.17.14"

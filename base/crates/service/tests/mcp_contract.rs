@@ -67,3 +67,24 @@ fn native_mcp_discovers_modern_revision_without_a_session() {
     assert_eq!(tools["result"]["resultType"], "complete");
     assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 6);
 }
+#[test]
+fn production_mcp_refuses_incomplete_blob_values() {
+    use shufang_service::V1Contract;
+    let dir = tempfile::tempdir().unwrap();
+    let w = Workspace::open(&dir.path().join("db"), "w", "n").unwrap();
+    let op = json!({"workspaceId":"w","operationId":"op","replicaId":"peer","kind":"notes","entityId":"note","clock":"1:0","patch":{"title":"Title","content":{"$blob":{"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100}}},"unset":[],"deleted":false});
+    w.core
+        .lock()
+        .unwrap()
+        .receive_operations(&[serde_json::from_value(op).unwrap()], None)
+        .unwrap();
+    let h = Host::with_contract(
+        w,
+        "token".into(),
+        "http://localhost".into(),
+        true,
+        V1Contract::SyncEntities,
+    );
+    let response = result(&h, "search_notes", json!({"query":"Title"}));
+    assert!(response["error"].is_object(), "{response}");
+}

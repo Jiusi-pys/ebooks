@@ -69,7 +69,13 @@ async fn authorize(State(host): State<Arc<Host>>, request: Request, next: Next) 
                 .and_then(|s| s.strip_prefix("Bearer "))
         })
         .unwrap_or("");
-    if !key.is_empty() && same_secret(key, &host.token) {
+    if !key.is_empty()
+        && (same_secret(key, &host.token)
+            || host
+                .machine_key
+                .as_ref()
+                .is_some_and(|expected| same_secret(key, expected)))
+    {
         return next.run(request).await;
     }
     let authorized = {

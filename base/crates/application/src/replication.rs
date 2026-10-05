@@ -24,6 +24,17 @@ pub struct LogOperation {
 pub trait ReplicationRepository: Repository {
     /// Local v2 commands and their cascades share a clock and commit atomically.
     fn mutation_batch(&mut self, expected_clock: &str, commits: &[Commit]) -> Result<()>;
+    fn mutation_batch_local(
+        &mut self,
+        clock: &str,
+        commits: &[Commit],
+        locals: &[LocalCommit],
+    ) -> Result<()> {
+        if !locals.is_empty() {
+            return Err("atomic_local_mutation_unsupported".into());
+        }
+        self.mutation_batch(clock, commits)
+    }
     fn replication_head(&self) -> Result<ReplicationHead>;
     fn operation(&self, id: &str) -> Result<Option<Operation>>;
     fn operation_sequence(&self, id: &str) -> Result<Option<u64>>;
@@ -59,6 +70,78 @@ impl<R: ReplicationRepository, T: Runtime> CoreSession<R, T> {
             Some(prior) => Ok(prior.clock),
             None => shufang_domain::sync::next_clock(&self.repository.clock()?, self.runtime.now()),
         }
+    }
+    /// Local production command: externalize fields before committing a replayable operation.
+    pub fn local_replica_command(
+        &mut self,
+        kind: &str,
+        id: &str,
+        operation_id: &str,
+        patch: serde_json::Map<String, serde_json::Value>,
+        unset: Vec<String>,
+        deleted: bool,
+    ) -> Result<(bool, u64)> {
+        self.local_replica_command_with_creation(
+            kind,
+            id,
+            operation_id,
+            patch,
+            unset,
+            deleted,
+            false,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn local_replica_command_with_creation(
+        &mut self,
+        kind: &str,
+        id: &str,
+        operation_id: &str,
+        mut patch: serde_json::Map<String, serde_json::Value>,
+        unset: Vec<String>,
+        deleted: bool,
+        create: bool,
+    ) -> Result<(bool, u64)> {
+        let clock = self.mutation_clock(operation_id)?;
+        if create {
+            let prior = self.repository.operation(operation_id)?;
+            let now: u64 = clock
+                .split(':')
+                .next()
+                .ok_or("invalid_clock")?
+                .parse()
+                .map_err(|_| "invalid_clock")?;
+            // Older candidates could assign a default timestamp before the final
+            // operation clock. Preserve that persisted value on retries too.
+            let created = prior
+                .as_ref()
+                .and_then(|p| p.patch.get("createdAt"))
+                .cloned()
+                .unwrap_or(serde_json::json!(now));
+            patch.entry("createdAt".to_owned()).or_insert(created);
+            let updated = prior
+                .as_ref()
+                .and_then(|p| p.patch.get("updatedAt"))
+                .cloned()
+                .unwrap_or_else(|| patch["createdAt"].clone());
+            patch.entry("updatedAt".to_owned()).or_insert(updated);
+        }
+        let mut operation = Operation {
+            workspace_id: self.workspace.clone(),
+            replica_id: self.replica.clone(),
+            operation_id: operation_id.into(),
+            kind: kind.into(),
+            entity_id: id.into(),
+            clock,
+            patch,
+            unset,
+            deleted,
+        };
+        operation.patch = shufang_domain::sync::flatten_fields(kind, &operation.patch)?;
+        validate_operation(&operation)?;
+        shufang_domain::sync_validation::validate_patch(&operation)?;
+        operation.patch = self.prepare_patch(operation.patch)?;
+        self.mutate_replica_entity(operation)
     }
     pub fn mutate_replica_entity(&mut self, mut operation: Operation) -> Result<(bool, u64)> {
         operation.patch = shufang_domain::sync::flatten_fields(&operation.kind, &operation.patch)?;
@@ -162,13 +245,28 @@ impl<R: ReplicationRepository, T: Runtime> CoreSession<R, T> {
                 }
             }
         }
-        self.repository.mutation_batch(&clock, &commits)?;
+        let locals = self.pending_local.take().unwrap_or_default();
+        self.repository
+            .mutation_batch_local(&clock, &commits, &locals)?;
         Ok((
             false,
             self.repository
                 .operation_sequence(&operation.operation_id)?
                 .ok_or("operation_not_persisted")?,
         ))
+    }
+    pub fn replica_entity(&self, kind: &str, id: &str) -> Result<crate::Record> {
+        if !shufang_domain::sync::ENTITY_KINDS.contains(&kind) {
+            return Err("invalid_kind".into());
+        }
+        let row = self.repository.load(kind, id)?.ok_or("not_found")?;
+        Ok(crate::Record {
+            revision: row.revision,
+            value: self
+                .materialize_state(&row.state)?
+                .ok_or("entity_deleted")?,
+            pending_fields: vec![],
+        })
     }
     pub fn entity_history(&self, kind: &str, id: &str) -> Result<Vec<Operation>> {
         if !shufang_domain::sync::ENTITY_KINDS.contains(&kind) {

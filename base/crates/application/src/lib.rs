@@ -87,6 +87,12 @@ pub struct CoreSession<R, T> {
 }
 
 impl<R: Repository, T: Runtime> CoreSession<R, T> {
+    pub fn repository(&self) -> &R {
+        &self.repository
+    }
+    pub fn repository_mut(&mut self) -> &mut R {
+        &mut self.repository
+    }
     pub fn new(repository: R, runtime: T, workspace: String, replica: String) -> Result<Self> {
         if !valid_identifier(&workspace) || !valid_identifier(&replica) {
             return Err("invalid_identity".into());

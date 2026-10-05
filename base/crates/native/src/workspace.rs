@@ -1,3 +1,4 @@
+use crate::storage::Storage;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -29,7 +30,7 @@ impl Runtime for SystemRuntime {
         uuid::Uuid::new_v4().to_string()
     }
 }
-pub type Session = CoreSession<SqliteRepository, SystemRuntime>;
+pub type Session = CoreSession<Storage, SystemRuntime>;
 pub struct Workspace {
     pub root: PathBuf,
     database: PathBuf,
@@ -111,7 +112,48 @@ impl Workspace {
         if !path.is_absolute() {
             return Err("absolute_database_path_required".into());
         }
+        std::fs::create_dir_all(path.parent().ok_or("invalid_database_path")?)
+            .map_err(|e| e.to_string())?;
+        let storage = Storage::Sqlite(SqliteRepository::open(path, workspace, replica)?);
+        Self::open_storage(path, workspace, replica, storage)
+    }
+    #[cfg(feature = "server-mysql")]
+    pub fn open_mysql(
+        path: &Path,
+        url: &str,
+        workspace: &str,
+        replica: &str,
+        read_only: bool,
+    ) -> Result<Arc<Self>> {
+        if !path.is_absolute() {
+            return Err("absolute_database_path_required".into());
+        }
+        if path
+            .parent()
+            .ok_or("invalid_database_path")?
+            .join("restore.pending")
+            .exists()
+        {
+            return Err("workspace_restore_incomplete".into());
+        }
+        let storage = Storage::Mysql(shufang_mysql::MysqlRepository::open(
+            url, workspace, replica, read_only,
+        )?);
+        Self::open_storage(path, workspace, replica, storage)
+    }
+    fn open_storage(
+        path: &Path,
+        workspace: &str,
+        replica: &str,
+        storage: Storage,
+    ) -> Result<Arc<Self>> {
+        if !path.is_absolute() {
+            return Err("absolute_database_path_required".into());
+        }
         let root = path.parent().ok_or("invalid_database_path")?;
+        if root.join("restore.pending").exists() {
+            return Err("workspace_restore_incomplete".into());
+        }
         std::fs::create_dir_all(root).map_err(|e| e.to_string())?;
         let update_lease = std::fs::OpenOptions::new()
             .read(true)
@@ -121,15 +163,10 @@ impl Workspace {
             .open(root.join("update.lock"))
             .map_err(|e| e.to_string())?;
         fs2::FileExt::try_lock_shared(&update_lease).map_err(|_| "workspace_update_in_progress")?;
-        let core = CoreSession::new(
-            SqliteRepository::open(path, workspace, replica)?,
-            SystemRuntime,
-            workspace.into(),
-            replica.into(),
-        )?
-        .with_field_storage(Box::new(crate::sync_blobs::BlobStore::new(
-            &root.join("sync-blobs"),
-        )));
+        let core = CoreSession::new(storage, SystemRuntime, workspace.into(), replica.into())?
+            .with_field_storage(Box::new(crate::sync_blobs::BlobStore::new(
+                &root.join("sync-blobs"),
+            )));
         let instance = uuid::Uuid::new_v4().to_string();
         std::fs::create_dir_all(root.join("jobs")).map_err(|e| e.to_string())?;
         let lease = std::fs::OpenOptions::new()
@@ -166,6 +203,14 @@ impl Workspace {
             expected: u64,
         }
         match command {
+            "getReplica"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.replica_entity(string(&args,"kind")?,string(&args,"id")?)?).map_err(|e|e.to_string()),
+            "mutateReplica"=>{
+                let mut core=self.core.lock().map_err(|_|"core_lock_failed")?;
+                let patch=args["patch"].as_object().cloned().ok_or("invalid_patch")?;
+                let unset=serde_json::from_value(args.get("unset").cloned().unwrap_or(json!([]))).map_err(|_|"invalid_unset")?;
+                let (duplicate,sequence)=core.local_replica_command_with_creation(string(&args,"kind")?,string(&args,"id")?,string(&args,"operationId")?,patch,unset,args["deleted"].as_bool().unwrap_or(false),args["create"].as_bool().unwrap_or(false))?;
+                Ok(json!({"duplicate":duplicate,"sequence":sequence.to_string()}))
+            },
             "syncConfig" => crate::sync_config::public_config(self),
             "saveSyncPeer" => crate::sync_config::save_peer(self,&args),
             "pauseSync" => crate::sync_config::pause(self,&args),
@@ -179,12 +224,12 @@ impl Workspace {
             "editOutline" => serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.edit_outline(string(&args,"id")?,number(&args,"expected")?,&args)?).map_err(|e|e.to_string()),
             "setCover"=>{let path=PathBuf::from(string(&args,"path")?);if !path.is_absolute(){return Err("absolute_path_required".into());}let cover=crate::books::cover_data(&path)?;serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.save_entity("books",string(&args,"id")?,json!({"customCover":cover}),vec![],number(&args,"expected")?)?).map_err(|e|e.to_string())},
             "saveAiResult"=>crate::ai::save_result(self,&args),
-            "backup"=>{let destination=PathBuf::from(string(&args,"path")?);let database=self.database.clone();self.start("backup",move|job|{job.check()?;crate::backup::create(&database,&destination)?;Ok(json!({"path":destination}))})},
-            "restore"=>{let archive=PathBuf::from(string(&args,"path")?);let destination=PathBuf::from(string(&args,"destination")?);self.start("restore",move|job|{job.check()?;crate::backup::restore(&archive,&destination)?;Ok(json!({"path":destination}))})},
+            "backup"=>{let destination=PathBuf::from(string(&args,"path")?);let workspace=self.clone();self.start("backup",move|job|{job.check()?;let core=workspace.core.lock().map_err(|_|"core_lock_failed")?;workspace.backup_locked(&core,&destination)?;Ok(json!({"path":destination}))})},
+            "restore"=>{let archive=PathBuf::from(string(&args,"path")?);let destination=PathBuf::from(string(&args,"destination")?);let workspace=self.clone();self.start("restore",move|job|{job.check()?;let core=workspace.core.lock().map_err(|_|"core_lock_failed")?;workspace.restore_locked(&core,&archive,&destination,&args)?;Ok(json!({"path":destination}))})},
             "createVersion"=>self.create_version(),
             "listVersions"=>self.list_versions(),
             "deleteVersion"=>self.delete_version(string(&args,"id")?),
-            "restoreVersion"=>self.restore_version(string(&args,"id")?),
+            "restoreVersion"=>self.restore_version(string(&args,"id")?, &args),
             "restoreVersionEntity"=>self.restore_version_entity(&args),
             "checkpoint"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.checkpoint(string(&args,"id")?,string(&args,"session")?,args["progress"].clone(),number(&args,"activeSeconds")?)?).map_err(|e|e.to_string()),
             "bookResource"=>Ok(json!({"path":self.book_file(string(&args,"id")?)?})),
@@ -218,6 +263,49 @@ impl Workspace {
         }
         Ok(self.root.join("versions").join(format!("{id}.zip")))
     }
+    fn backup_locked(&self, core: &Session, destination: &Path) -> Result<()> {
+        match core.repository() {
+            Storage::Sqlite(_) => crate::backup::create(&self.database, destination),
+            #[cfg(feature = "server-mysql")]
+            Storage::Mysql(r) => crate::backup::create_mysql(r, &self.root, destination),
+        }
+    }
+    fn delete_snapshot_locked(&self, core: &mut Session, id: &str) -> Result<()> {
+        match core.repository_mut() {
+            Storage::Sqlite(_) => {
+                shufang_sqlite::SqliteRepository::delete_version_snapshot(&self.database, id)
+            }
+            #[cfg(feature = "server-mysql")]
+            Storage::Mysql(r) => r.delete_version(id),
+        }
+    }
+    fn restore_locked(
+        &self,
+        core: &Session,
+        archive: &Path,
+        destination: &Path,
+        args: &Value,
+    ) -> Result<()> {
+        let _ = args;
+        match core.repository() {
+            Storage::Sqlite(_) => crate::backup::restore(archive, destination),
+            #[cfg(feature = "server-mysql")]
+            Storage::Mysql(_) => {
+                let reference = string(args, "databaseUrlEnv")?;
+                if reference.is_empty()
+                    || reference.len() > 128
+                    || !reference
+                        .bytes()
+                        .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == b'_')
+                {
+                    return Err("invalid_database_reference".into());
+                }
+                let url =
+                    std::env::var(reference).map_err(|_| "restore_database_not_configured")?;
+                crate::backup::restore_mysql(archive, destination, &url).map(|_| ())
+            }
+        }
+    }
     fn create_version(&self) -> Result<Value> {
         let id = format!("version-{}", uuid::Uuid::new_v4());
         let archive = self.version_path(&id)?;
@@ -228,17 +316,27 @@ impl Workspace {
         let sequence = head.sequence.parse::<u64>().map_err(|_| "invalid_head")?;
         let checkpoint = URL_SAFE_NO_PAD.encode(json!({"workspace":head.workspace_id,"node":head.node_id,"epoch":head.epoch,"seq":head.sequence}).to_string());
         core.create_sync_snapshot(&id, &checkpoint, sequence)?;
-        if let Err(error) = crate::backup::create(&self.database, &archive) {
-            shufang_sqlite::SqliteRepository::delete_version_snapshot(&self.database, &id)?;
+        if let Err(error) = self.backup_locked(&core, &archive) {
+            self.delete_snapshot_locked(&mut core, &id)?;
             return Err(error);
         }
         Ok(json!({"id":id,"archive":archive,"checkpoint":checkpoint}))
     }
     fn list_versions(&self) -> Result<Value> {
         let mut values = Vec::new();
-        for (id, created_at) in
-            shufang_sqlite::SqliteRepository::list_version_snapshots(&self.database)?
-        {
+        let core = self.core.lock().map_err(|_| "core_lock_failed")?;
+        let versions = match core.repository() {
+            Storage::Sqlite(_) => {
+                shufang_sqlite::SqliteRepository::list_version_snapshots(&self.database)?
+            }
+            #[cfg(feature = "server-mysql")]
+            Storage::Mysql(r) => r
+                .list_versions()?
+                .into_iter()
+                .map(|(id, at)| (id, at as i64))
+                .collect(),
+        };
+        for (id, created_at) in versions {
             let path = self.version_path(&id)?;
             if path.is_file() {
                 values
@@ -277,28 +375,28 @@ impl Workspace {
         }
         let deleting = archive.with_extension("deleting");
         std::fs::rename(&archive, &deleting).map_err(|e| e.to_string())?;
-        if let Err(error) =
-            shufang_sqlite::SqliteRepository::delete_version_snapshot(&self.database, id)
-        {
+        let mut core = self.core.lock().map_err(|_| "core_lock_failed")?;
+        if let Err(error) = self.delete_snapshot_locked(&mut core, id) {
             std::fs::rename(&deleting, &archive).map_err(|e| e.to_string())?;
             return Err(error);
         }
         std::fs::remove_file(deleting).map_err(|e| e.to_string())?;
         Ok(Value::Null)
     }
-    fn restore_version(&self, id: &str) -> Result<Value> {
+    fn restore_version(&self, id: &str, args: &Value) -> Result<Value> {
         let archive = self.version_path(id)?;
         if !id.starts_with("version-") || !archive.is_file() {
             return Err("version_not_found".into());
         }
         let safety = self.version_path(&format!("safety-{}", uuid::Uuid::new_v4()))?;
-        crate::backup::create(&self.database, &safety)?;
+        let core = self.core.lock().map_err(|_| "core_lock_failed")?;
+        self.backup_locked(&core, &safety)?;
         let destination = self
             .root
             .parent()
             .ok_or("invalid_workspace")?
             .join(format!("restored-{}", uuid::Uuid::new_v4()));
-        crate::backup::restore(&archive, &destination)?;
+        self.restore_locked(&core, &archive, &destination, args)?;
         Ok(json!({"path":destination,"safetyBackup":safety,"activationRequired":true}))
     }
     fn restore_version_entity(&self, args: &Value) -> Result<Value> {
@@ -318,12 +416,17 @@ impl Workspace {
         if !self.version_path(version)?.is_file() {
             return Err("version_not_found".into());
         }
-        let state = shufang_sqlite::SqliteRepository::version_entity(
-            &self.database,
-            version,
-            kind,
-            source,
-        )?;
+        let mut core = self.core.lock().map_err(|_| "core_lock_failed")?;
+        let state = match core.repository() {
+            Storage::Sqlite(_) => shufang_sqlite::SqliteRepository::version_entity(
+                &self.database,
+                version,
+                kind,
+                source,
+            )?,
+            #[cfg(feature = "server-mysql")]
+            Storage::Mysql(r) => r.version_entity(version, kind, source)?,
+        };
         if state.deleted {
             return Err("snapshot_entity_deleted".into());
         }
@@ -333,7 +436,6 @@ impl Workspace {
             .filter(|(_, field)| !field.removed)
             .filter_map(|(key, field)| field.value.map(|value| (key, value)))
             .collect();
-        let mut core = self.core.lock().map_err(|_| "core_lock_failed")?;
         let head = core.replication_head()?;
         let current = match core.entity(kind, target) {
             Ok(record) => Some(record),
