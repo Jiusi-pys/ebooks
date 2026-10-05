@@ -163,6 +163,81 @@ async fn bootstrap_setup_login_profile_and_old_cookie_revocation() {
             .status(),
         400
     );
+    // The unchanged browser synchronizer authenticates only with its session cookie.
+    for path in [
+        "/api/v2/capabilities",
+        "/api/v2/sync/changes",
+        "/api/v2/entities",
+    ] {
+        let response = app
+            .clone()
+            .oneshot(request(
+                "GET",
+                path,
+                Value::Null,
+                &cookie,
+                "https://library.example",
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 200, "{path}");
+        assert_eq!(response.headers()["cache-control"], "no-store");
+    }
+    for bad_cookie in ["", bootstrap.as_str()] {
+        assert_eq!(
+            app.clone()
+                .oneshot(request(
+                    "GET",
+                    "/api/v2/capabilities",
+                    Value::Null,
+                    bad_cookie,
+                    "https://library.example"
+                ))
+                .await
+                .unwrap()
+                .status(),
+            401
+        );
+    }
+    let mut bad_key = request(
+        "GET",
+        "/api/v2/capabilities",
+        Value::Null,
+        &cookie,
+        "https://library.example",
+    );
+    bad_key
+        .headers_mut()
+        .insert("x-api-key", "wrong-key".parse().unwrap());
+    assert_eq!(app.clone().oneshot(bad_key).await.unwrap().status(), 401);
+    assert_eq!(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/api/v2/sync/snapshots",
+                json!({}),
+                &cookie,
+                "https://evil.example"
+            ))
+            .await
+            .unwrap()
+            .status(),
+        403
+    );
+    assert_eq!(
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/api/v2/sync/snapshots",
+                json!({}),
+                &cookie,
+                "https://library.example"
+            ))
+            .await
+            .unwrap()
+            .status(),
+        201
+    );
     // Browser consent requires the owner cookie, same origin, and paired CSRF.
     let registered = app.clone().oneshot(request("POST", "/oauth/register", json!({"client_name":"Browser acceptance","redirect_uris":["https://client.example/callback"]}), "", "https://library.example")).await.unwrap();
     assert_eq!(registered.status(), 200);
@@ -440,6 +515,20 @@ async fn bootstrap_setup_login_profile_and_old_cookie_revocation() {
         .unwrap();
     assert_eq!(r.status(), 200);
     assert!(!shufang_service::oauth::valid_access(&host, oauth_token));
+    assert_eq!(
+        app.clone()
+            .oneshot(request(
+                "GET",
+                "/api/v2/capabilities",
+                Value::Null,
+                &cookie,
+                "https://library.example"
+            ))
+            .await
+            .unwrap()
+            .status(),
+        401
+    );
     let fresh = r.headers()["set-cookie"]
         .to_str()
         .unwrap()

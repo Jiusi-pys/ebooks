@@ -57,6 +57,13 @@ pub fn router(host: Arc<Host>) -> Router<Arc<Host>> {
         .layer(middleware::from_fn_with_state(host, authorize))
 }
 async fn authorize(State(host): State<Arc<Host>>, request: Request, next: Next) -> Response {
+    // The existing browser synchronizer sends only its signed account cookie.
+    // Explicit machine credentials never fall back to browser authorization.
+    let machine_credential_supplied = request.headers().contains_key("x-api-key")
+        || request.headers().contains_key("authorization");
+    if !machine_credential_supplied && host.browser.is_some() {
+        return crate::library::authorize(State(host), request, next).await;
+    }
     let key = request
         .headers()
         .get("x-api-key")
