@@ -1,3 +1,5 @@
+> 后续完整源码构建与真实监督器发布结果见[补齐验收](rust-release-completion.md)。本文件保留首次切换的二进制及阶段限制，不代表后续最新运行字节。
+
 # Rust / MySQL 生产验收（2026-10-05）
 
 本次仅迁移后端，保留 MySQL 8.4 和原前端静态文件。生产 `https://us.jiusi.org` 由 Rust 提供 API、同步、MCP、OAuth、浏览器账号、AI/tRPC、原文件及版本恢复接口。旧 Node 写入者已停止、禁用自动重启。基线提交为 `ade79bea381a088e42c215d8e4cca57c3f249aba`，最终提交见 Git 历史。

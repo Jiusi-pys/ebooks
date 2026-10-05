@@ -1,0 +1,14 @@
+{
+  "jobId": "b1f027b9205e4130a10d697f3bef962a",
+  "state": "succeeded",
+  "deploymentCommit": "427e988baf18eaff19ba1f030d434a3d4ba6fdd3",
+  "imageId": "sha256:a708a427d82e7e013de6b5574f396bdfa2e7fb94626c47fdf8704d3a9c639c92",
+  "serviceSha256": "84550ded331ec314f446c082db4e20d6a4e2fee3ccbb9c93cc33444f7fdd683f",
+  "httpsBooksAtLeast": 9,
+  "ownerSessionPreserved": true,
+  "staticFilesUnchanged": 8,
+  "secondWriterRejected": true,
+  "sourceBuildPromotion": true,
+  "migrationAndBackupBeforeStop": true,
+  "externalCodexAuthorizationPending": true
+}

@@ -1,0 +1,12 @@
+{
+  "sourceBuildCommit": "90fdf65849bba75a027b65575993247d4f6f4e07",
+  "deploymentCommit": "427e988baf18eaff19ba1f030d434a3d4ba6fdd3",
+  "rustTreeUnchangedBetweenCommits": true,
+  "fullSourceDockerBuild": true,
+  "sourceImageId": "sha256:c36cb142997dc8cb4dd4111e22aeb44e1113afe6d3e96197fc0e65b2371c4808",
+  "serviceSha256": "84550ded331ec314f446c082db4e20d6a4e2fee3ccbb9c93cc33444f7fdd683f",
+  "codexVersion": "0.160.0",
+  "codexSha256": "12eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad",
+  "supervisorTestsPassed": 15,
+  "externalAuthorization": "manual required"
+}

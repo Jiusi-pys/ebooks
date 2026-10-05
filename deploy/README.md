@@ -93,3 +93,5 @@ Release/tag；部署的提交 SHA 与迁移链记录在验收和部署任务中�
 `DEPLOY_BUILD_MODE=prebuilt` 仅允许 Rust。管理员先在外部构建器完成全源码镜像构建，安装提交对应镜像 `shufang:<完整 SHA>`，其 OCI revision 标签必须相同。将该不可变镜像 ID 与 revision 写入 `/opt/shufang/prebuilt/<SHA>.json`，字段仅为 `imageId` 和 `revision`，目录 0700、文件 0600。HTTP 发布接口仍只接受 SHA；监督器核对 base HEAD、管理员登记的镜像 ID 和 OCI 提交标签，缺失或不匹配即失败，不停止当前写入者。登记不是用户通过 HTTP 上传的参数。默认 source 模式保留。
 
 生产静态文件仍由 nginx 提供切换前原文件，本模式只替换后端容器。备份、完整链迁移、停旧写入者、启动候选、三次健康检查和失败回退顺序不变。
+
+上述初次生产切换的构建限制已由后续验收补充：完整 Docker 源码镜像在独立 Linux 构建器构建和启动成功，真实预构建监督器已在生产完成备份、迁移检查、单写入者交接和健康检查。详见[最新发布验收](../docs/evidence/rust-release-completion.md)。仍不在资源不足的生产主机进行完整源码编译。

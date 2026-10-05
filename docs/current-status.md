@@ -1,3 +1,5 @@
+> 最新补齐：完整 Docker 源码构建与真实 Rust 监督器发布已验收，见[发布补齐](evidence/rust-release-completion.md)；需要用户账号参与的步骤见[手动验收](manual-backend-acceptance.md)。
+
 # 最新后端状态（2026-10-05）
 
 生产已切换为 Rust 后端，保留 MySQL 8.4；MySQL 最新迁移为 0015，SQLite 0003、IndexedDB 11 保持原版本。原前端构建文件保留。真实数据库、HTTPS、跨节点同步、整库恢复后的单写入者切换与独立备份证据见[最终验收](evidence/rust-production-20261005.md)。以下章节保留之前阶段的历史范围。
