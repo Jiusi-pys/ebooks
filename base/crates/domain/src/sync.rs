@@ -124,11 +124,26 @@ pub fn next_clock(previous: &str, now: u64) -> Result<String> {
     let (wall, counter) = clock_parts(previous)?;
     let result = if now > wall {
         format!("{now}:0")
+    } else if counter == 9_999_999_999 {
+        format!("{}:0", wall.checked_add(1).ok_or("invalid_clock")?)
     } else {
         format!("{wall}:{}", counter + 1)
     };
     clock_parts(&result)?;
     Ok(result)
+}
+
+/// Reject remote clock poisoning before any entity, log or checkpoint commits.
+/// Historical offline clocks remain valid; nodes ahead by more than one day
+/// must correct their system clock before transmitting new state.
+pub fn validate_received_clock(clock: &str, now: u64) -> Result<()> {
+    let (wall, _) = clock_parts(clock)?;
+    if wall > now.saturating_add(86_400_000) {
+        return Err("clock_too_far_ahead".into());
+    }
+    // A valid wire clock must have a representable successor.
+    next_clock(clock, now)?;
+    Ok(())
 }
 
 pub fn compare_clock(a: &str, b: &str) -> Result<Ordering> {

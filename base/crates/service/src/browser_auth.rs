@@ -447,6 +447,38 @@ impl Auth {
 pub fn router() -> Router<Arc<Host>> {
     Router::new().route("/api/auth/{path}", any(handle))
 }
+pub(crate) fn client_ip(request: &Request) -> String {
+    let Some(peer) = request
+        .extensions()
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+    else {
+        return "local".into();
+    };
+    let ip = peer.0.ip();
+    let loopback = ip.is_loopback()
+        || matches!(ip, std::net::IpAddr::V6(v) if v.to_ipv4_mapped().is_some_and(|v|v.is_loopback()));
+    if loopback {
+        let values = request.headers().get_all("x-real-ip");
+        let mut values = values.iter();
+        if let Some(value) = values.next().filter(|_| values.next().is_none()) {
+            if let Some(real) = value
+                .to_str()
+                .ok()
+                .and_then(|v| v.parse::<std::net::IpAddr>().ok())
+            {
+                return match real {
+                    std::net::IpAddr::V6(v) => v
+                        .to_ipv4_mapped()
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| v.to_string()),
+                    _ => real.to_string(),
+                };
+            }
+        }
+    }
+    ip.to_string()
+}
+
 async fn handle(State(host): State<Arc<Host>>, request: Request) -> Response {
     let Some(auth) = host.browser.clone() else {
         return (
@@ -461,11 +493,7 @@ async fn handle(State(host): State<Arc<Host>>, request: Request) -> Response {
         .path()
         .trim_start_matches("/api/auth/")
         .to_string();
-    let peer = request
-        .extensions()
-        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-        .map(|v| v.0.ip().to_string())
-        .unwrap_or_else(|| "local".into());
+    let peer = client_ip(&request);
     let headers = request.headers().clone();
     let body = match to_bytes(request.into_body(), 32 * 1024).await {
         Ok(b) if b.is_empty() => Value::Null,
@@ -508,4 +536,47 @@ async fn handle(State(host): State<Arc<Host>>, request: Request) -> Response {
         }
     }
     response
+}
+
+#[cfg(test)]
+mod proxy_tests {
+    use super::*;
+    #[test]
+    fn real_ip_requires_a_single_overwritten_header_from_loopback() {
+        for (peer, headers, expected) in [
+            (Some("127.0.0.1:1"), vec!["192.0.2.1"], "192.0.2.1"),
+            (Some("[::1]:1"), vec!["2001:db8::1"], "2001:db8::1"),
+            (
+                Some("[::ffff:127.0.0.1]:1"),
+                vec!["::ffff:192.0.2.1"],
+                "192.0.2.1",
+            ),
+            (Some("198.51.100.1:1"), vec!["192.0.2.1"], "198.51.100.1"),
+            (None, vec!["192.0.2.1"], "local"),
+            (
+                Some("127.0.0.1:1"),
+                vec!["192.0.2.1, 192.0.2.2"],
+                "127.0.0.1",
+            ),
+            (
+                Some("127.0.0.1:1"),
+                vec!["192.0.2.1", "192.0.2.2"],
+                "127.0.0.1",
+            ),
+            (Some("127.0.0.1:1"), vec!["bad"], "127.0.0.1"),
+        ] {
+            let mut request = Request::builder().body(axum::body::Body::empty()).unwrap();
+            if let Some(peer) = peer {
+                request.extensions_mut().insert(axum::extract::ConnectInfo(
+                    peer.parse::<std::net::SocketAddr>().unwrap(),
+                ));
+            }
+            for header in headers {
+                request
+                    .headers_mut()
+                    .append("x-real-ip", header.parse().unwrap());
+            }
+            assert_eq!(client_ip(&request), expected);
+        }
+    }
 }

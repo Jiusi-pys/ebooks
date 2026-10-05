@@ -7,6 +7,7 @@ use axum::{
     Form, Json, Router,
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use hmac::{Hmac, Mac};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
@@ -162,47 +163,74 @@ async fn register(State(h): State<Arc<Host>>, Json(request): Json<Value>) -> Api
     {
         return Err(error("invalid_redirect_uri".into()));
     }
-    let id = random();
-    let client = json!({"client_id":id,"client_id_issued_at":now(),"client_name":request["client_name"].as_str().unwrap_or("MCP client").chars().take(100).collect::<String>(),"redirect_uris":redirects,"token_endpoint_auth_method":"none","grant_types":["authorization_code","refresh_token"],"response_types":["code"]});
-    mutate(&h, |store| {
-        let active: HashSet<String> = ["pending", "codes", "access", "refresh"]
-            .iter()
-            .filter_map(|key| store[*key].as_object())
-            .flat_map(|records| records.values())
-            .filter_map(|record| record["client"].as_str().map(str::to_owned))
-            .collect();
-        let clients = store["clients"]
-            .as_object_mut()
-            .ok_or("invalid_oauth_store")?;
-        // Older registrations have no timestamp. Give them a full grace period on
-        // first registration attempt instead of dropping potentially live clients.
-        for old in clients.values_mut() {
-            if old["client_id_issued_at"].as_u64().is_none() {
-                old["client_id_issued_at"] = now().into();
-            }
-        }
-        clients.retain(|id, record| {
-            active.contains(id)
-                || record["client_id_issued_at"].as_u64().unwrap_or(0) + 86400 > now()
-        });
-        if clients.len() >= 200 {
-            return Ok(Err("client_limit".to_owned()));
-        }
-        clients.insert(id.clone(), client.clone());
-        Ok(Ok(()))
-    })
-    .map_err(error)?
-    .map_err(error)?;
+    // Registration is public, so it must not allocate persistent global slots.
+    // The signed envelope becomes persistent only after owner consent.
+    let client = json!({"client_id_issued_at":now(),"client_name":request["client_name"].as_str().unwrap_or("MCP client").chars().take(100).collect::<String>(),"redirect_uris":redirects,"token_endpoint_auth_method":"none","grant_types":["authorization_code","refresh_token"],"response_types":["code"]});
+    let payload = json!({"client":client,"nonce":random()}).to_string();
+    if payload.len() > 2048 {
+        return Err(error("registration_metadata_too_large".into()));
+    }
+    let encoded = URL_SAFE_NO_PAD.encode(payload);
+    let mut mac = registration_mac(&h)?;
+    mac.update(encoded.as_bytes());
+    let id = format!(
+        "reg.{encoded}.{}",
+        URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
+    );
+    let mut client = client;
+    client["client_id"] = id.into();
     Ok(Json(client))
 }
+fn registration_mac(host: &Host) -> Result<Hmac<Sha256>, (StatusCode, Json<Value>)> {
+    Hmac::<Sha256>::new_from_slice(
+        format!("{}\0shufang-oauth-registration-v1", host.token).as_bytes(),
+    )
+    .map_err(|_| error("oauth_unavailable".into()))
+}
+fn registered_client(host: &Host, store: &Value, id: &str) -> Result<Value, String> {
+    if let Some(client) = store["clients"].get(id) {
+        return Ok(client.clone());
+    }
+    if id.len() > 4096 {
+        return Err("invalid_client".into());
+    }
+    let encoded = id.strip_prefix("reg.").ok_or("invalid_client")?;
+    let (payload, signature) = encoded.split_once('.').ok_or("invalid_client")?;
+    let signature = URL_SAFE_NO_PAD
+        .decode(signature)
+        .map_err(|_| "invalid_client")?;
+    let mut mac = registration_mac(host).map_err(|_| "invalid_client")?;
+    mac.update(payload.as_bytes());
+    mac.verify_slice(&signature).map_err(|_| "invalid_client")?;
+    let bytes = URL_SAFE_NO_PAD
+        .decode(payload)
+        .map_err(|_| "invalid_client")?;
+    let value: Value = serde_json::from_slice(&bytes).map_err(|_| "invalid_client")?;
+    let mut client = value["client"].clone();
+    let issued = client["client_id_issued_at"]
+        .as_u64()
+        .ok_or("invalid_client")?;
+    if issued > now() || now().saturating_sub(issued) >= 86400 {
+        return Err("expired_client".into());
+    }
+    client["client_id"] = id.into();
+    Ok(client)
+}
+
 async fn authorize(
     State(h): State<Arc<Host>>,
     Query(q): Query<HashMap<String, String>>,
 ) -> Response {
-    let result = mutate(&h, |store| {
+    let result = (|| -> Result<_, String> {
+        let core = h.workspace.core.lock().map_err(|_| "core_lock_failed")?;
+        let store = core
+            .local_value("oauth-store")?
+            .map(|(_, v)| v)
+            .unwrap_or_else(empty);
         let client = q.get("client_id").ok_or("invalid_client")?;
         let redirect = q.get("redirect_uri").ok_or("invalid_redirect_uri")?;
-        if !store["clients"][client]["redirect_uris"]
+        let registration = registered_client(&h, &store, client)?;
+        if !registration["redirect_uris"]
             .as_array()
             .is_some_and(|rs| rs.iter().any(|r| r == redirect))
         {
@@ -220,27 +248,28 @@ async fn authorize(
         {
             return Err("invalid_scope_or_resource".into());
         }
-        if store["pending"]
-            .as_object()
-            .ok_or("invalid_oauth_store")?
-            .len()
-            >= 100
-        {
-            return Err("authorization_limit".into());
-        }
-        let id = random();
         let csrf = random();
-        store["pending"][&id] = json!({"client":client,"redirect":redirect,"challenge":q["code_challenge"],"state":q.get("state"),"resource":format!("{}/mcp",h.base_url),"expires":now()+600,"csrfHash":format!("{:x}",Sha256::digest(csrf.as_bytes()))});
+        let pending = json!({"client":client,"redirect":redirect,"challenge":q["code_challenge"],"state":q.get("state"),"resource":format!("{}/mcp",h.base_url),"expires":now()+600,"csrfHash":format!("{:x}",Sha256::digest(csrf.as_bytes())),"registration":registration});
+        if pending.to_string().len() > 12_000 {
+            return Err("authorization_metadata_too_large".into());
+        }
+        let encoded = URL_SAFE_NO_PAD.encode(pending.to_string());
+        let mut mac = authorization_mac(&h)?;
+        mac.update(encoded.as_bytes());
+        let id = format!(
+            "req.{encoded}.{}",
+            URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
+        );
         Ok((
             id,
-            store["clients"][client]["client_name"]
+            registration["client_name"]
                 .as_str()
                 .unwrap_or("MCP client")
                 .to_owned(),
             redirect.to_owned(),
             csrf,
         ))
-    });
+    })();
     match result {
         Ok((id, name, redirect, csrf)) => {
             let request_name = if h.browser.is_some() {
@@ -293,6 +322,39 @@ fn html(value: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
 }
+fn authorization_mac(host: &Host) -> Result<Hmac<Sha256>, String> {
+    Hmac::<Sha256>::new_from_slice(
+        format!("{}\0shufang-oauth-authorization-v1", host.token).as_bytes(),
+    )
+    .map_err(|_| "oauth_unavailable".into())
+}
+fn authorization_request(host: &Host, id: &str) -> Result<Value, String> {
+    if id.len() > 16_384 {
+        return Err("invalid_request".into());
+    }
+    let (encoded, signature) = id
+        .strip_prefix("req.")
+        .and_then(|s| s.split_once('.'))
+        .ok_or("invalid_request")?;
+    let mut mac = authorization_mac(host)?;
+    mac.update(encoded.as_bytes());
+    mac.verify_slice(
+        &URL_SAFE_NO_PAD
+            .decode(signature)
+            .map_err(|_| "invalid_request")?,
+    )
+    .map_err(|_| "invalid_request")?;
+    let pending: Value = serde_json::from_slice(
+        &URL_SAFE_NO_PAD
+            .decode(encoded)
+            .map_err(|_| "invalid_request")?,
+    )
+    .map_err(|_| "invalid_request")?;
+    if pending["expires"].as_u64().unwrap_or(0) <= now() {
+        return Err("expired_authorization".into());
+    }
+    Ok(pending)
+}
 async fn consent(
     State(h): State<Arc<Host>>,
     headers: HeaderMap,
@@ -341,11 +403,28 @@ async fn consent(
             .get("request_id")
             .or_else(|| form.get("request"))
             .ok_or("invalid_request")?;
-        let pending = store["pending"]
-            .as_object_mut()
-            .ok_or("invalid_oauth_store")?
-            .remove(id)
-            .ok_or("expired_authorization")?;
+        let pending = if id.starts_with("req.") {
+            let marker = format!("used-{}", hash(id));
+            if store["pending"].get(&marker).is_some() {
+                return Err("expired_authorization".into());
+            }
+            let pending = authorization_request(&h, id)?;
+            let records = store["pending"]
+                .as_object_mut()
+                .ok_or("invalid_oauth_store")?;
+            if records.len() >= 5000 {
+                return Err("authorization_limit".into());
+            }
+            records.insert(marker, json!({"expires":pending["expires"],"used":true}));
+            pending
+        } else {
+            // Legacy in-flight forms retain their original one-time consumption.
+            store["pending"]
+                .as_object_mut()
+                .ok_or("invalid_oauth_store")?
+                .remove(id)
+                .ok_or("expired_authorization")?
+        };
         if owner.is_some() {
             let csrf = form.get("csrf").ok_or("csrf_rejected")?;
             let cookie = headers
@@ -371,6 +450,26 @@ async fn consent(
             .get("decision")
             .is_some_and(|d| d == "approve" || d == "allow")
         {
+            let client = pending["client"].as_str().ok_or("invalid_client")?;
+            if store["clients"].get(client).is_none() {
+                let active: HashSet<String> = ["codes", "access", "refresh"]
+                    .iter()
+                    .filter_map(|key| store[*key].as_object())
+                    .flat_map(|records| records.values())
+                    .filter_map(|record| record["client"].as_str().map(str::to_owned))
+                    .collect();
+                let clients = store["clients"]
+                    .as_object_mut()
+                    .ok_or("invalid_oauth_store")?;
+                if clients.len() >= 200 {
+                    // Reclaim old unapproved registrations without evicting grants.
+                    clients.retain(|id, _| active.contains(id));
+                }
+                if clients.len() >= 200 {
+                    return Err("client_limit".into());
+                }
+                clients.insert(client.into(), pending["registration"].clone());
+            }
             let code = random();
             store["codes"][hash(&code)] = pending.clone();
             store["codes"][hash(&code)]["expires"] = (now() + 300).into();

@@ -56,6 +56,7 @@ impl<R: ReplicaRepository, T: Runtime> ReplicaSession<R, T> {
         let mut duplicates = Vec::new();
         for op in operations {
             op.validate()?;
+            shufang_domain::sync::validate_received_clock(&op.clock, self.runtime.now())?;
             if op.workspace_id != self.workspace {
                 return Err("workspace_identity_mismatch".into());
             }

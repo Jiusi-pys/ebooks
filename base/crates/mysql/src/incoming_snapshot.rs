@@ -216,6 +216,15 @@ impl SnapshotRepository for MysqlRepository {
                 let merged = ReplicaState::merge(state.as_ref(), &incoming)?;
                 for field in merged.fields.values() {
                     let next = field_clock(&field.version)?;
+                    shufang_domain::sync::validate_received_clock(
+                        &next,
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map_err(|_| "invalid_system_clock")?
+                            .as_millis()
+                            .try_into()
+                            .map_err(|_| "invalid_system_clock")?,
+                    )?;
                     if compare_clock(&next, &clock)? == Ordering::Greater {
                         clock = next
                     }

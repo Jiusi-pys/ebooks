@@ -146,6 +146,7 @@ impl<R: ReplicationRepository, T: Runtime> CoreSession<R, T> {
     pub fn mutate_replica_entity(&mut self, mut operation: Operation) -> Result<(bool, u64)> {
         operation.patch = shufang_domain::sync::flatten_fields(&operation.kind, &operation.patch)?;
         validate_operation(&operation)?;
+        shufang_domain::sync::validate_received_clock(&operation.clock, self.runtime.now())?;
         shufang_domain::sync_validation::validate_patch(&operation)?;
         if operation.workspace_id != self.workspace || operation.replica_id != self.replica {
             return Err("identity_mismatch".into());
@@ -438,6 +439,7 @@ impl<R: ReplicationRepository, T: Runtime> CoreSession<R, T> {
         let mut duplicates = Vec::new();
         for op in operations {
             validate_operation(op)?;
+            shufang_domain::sync::validate_received_clock(&op.clock, self.runtime.now())?;
             shufang_domain::sync_validation::validate_patch(op)?;
             if op.workspace_id != self.workspace {
                 return Err("workspace_identity_mismatch".into());

@@ -51,7 +51,7 @@ fn exact_clocks_and_monotonicity() {
         std::cmp::Ordering::Greater
     );
     assert!(next_clock("bad", 0).is_err());
-    assert!(next_clock("1:9999999999", 0).is_err());
+    assert_eq!(next_clock("1:9999999999", 0).unwrap(), "2:0");
 }
 
 #[test]
@@ -95,4 +95,23 @@ fn deep_mind_maps_fail_explicitly_instead_of_silently_truncating() {
     }
     let state = apply_operation(None, &op).unwrap();
     assert_eq!(materialize(&state).unwrap_err(), "mind_map_depth_exceeded");
+}
+
+#[test]
+fn counter_rollover_preserves_a_monotonic_representable_clock() {
+    assert_eq!(next_clock("1:9999999999", 0).unwrap(), "2:0");
+}
+
+#[test]
+fn received_clock_rejects_future_and_terminal_values_but_preserves_offline_history() {
+    use shufang_domain::sync::validate_received_clock;
+    for clock in [
+        "9999999999999999:9999999999",
+        "0999999999999999:0000000000",
+        "86400101:0",
+    ] {
+        assert!(validate_received_clock(clock, 100).is_err());
+    }
+    assert!(validate_received_clock("86400100:9999999999", 100).is_ok());
+    assert!(validate_received_clock("1:0", 100).is_ok());
 }

@@ -209,6 +209,14 @@ pub fn restore(url: &str, dump: &Dump) -> Result<String> {
     }
     tx.query_drop("DELETE FROM sync_cursors").map_err(failure)?;
     tx.query_drop("DELETE FROM rust_local_values WHERE local_key LIKE 'sync:receive:%' OR local_key LIKE 'sync:snapshot-at:%' OR local_key LIKE 'sync:incoming:%' OR local_key LIKE 'sync:incoming-page:%'").map_err(failure)?;
+    let stores: Vec<(String, String)> = tx
+        .query("SELECT workspace,value_json FROM rust_local_values WHERE local_key='oauth-store'")
+        .map_err(failure)?;
+    for (workspace, raw) in stores {
+        let mut value: Value = parse(&raw)?;
+        shufang_application::recovery::reset_oauth(&mut value)?;
+        tx.exec_drop("UPDATE rust_local_values SET revision=revision+1,value_json=? WHERE workspace=? AND local_key='oauth-store'", (stringify(&value)?,workspace)).map_err(failure)?;
+    }
     tx.commit().map_err(failure)?;
     // Dedicated connection closes here; FK checks never leak into a pool.
     Ok(database)

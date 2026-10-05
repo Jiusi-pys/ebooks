@@ -226,6 +226,15 @@ impl SnapshotRepository for SqliteRepository {
                 let merged = ReplicaState::merge(state.as_ref(), &incoming)?;
                 for field in merged.fields.values() {
                     let incoming_clock = field_clock(&field.version)?;
+                    shufang_domain::sync::validate_received_clock(
+                        &incoming_clock,
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map_err(|_| "invalid_system_clock")?
+                            .as_millis()
+                            .try_into()
+                            .map_err(|_| "invalid_system_clock")?,
+                    )?;
                     if compare_clock(&incoming_clock, &clock)? == Ordering::Greater {
                         clock = incoming_clock;
                     }

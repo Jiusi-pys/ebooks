@@ -300,59 +300,29 @@ async fn pkce_consent_rotation_revocation_and_read_only_scope() {
 }
 
 #[tokio::test]
-async fn expired_unused_dynamic_clients_release_capacity() {
+async fn anonymous_dynamic_registration_never_consumes_persistent_slots() {
     let dir = tempfile::tempdir().unwrap();
     let workspace = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();
-    let host = Host::new(
+    let app = router(Host::new(
         workspace.clone(),
         "admin-key".into(),
         "http://127.0.0.1:31417".into(),
-    );
-    let app = router(host);
-    let registration = json!({"redirect_uris":["http://127.0.0.1:5555/callback"]}).to_string();
-    for _ in 0..200 {
-        assert_eq!(
-            send(
-                &app,
-                "POST",
-                "/oauth/register",
-                registration.clone(),
-                false,
-                ""
-            )
-            .await
-            .0,
-            200
-        );
+    ));
+    for index in 0..250 {
+        let (status, body, _) = send(&app,"POST","/oauth/register",json!({"client_name":format!("client-{index}"),"redirect_uris":["http://127.0.0.1:5555/callback"]}).to_string(),false,"").await;
+        assert_eq!(status, 200);
+        assert!(serde_json::from_str::<Value>(&body).unwrap()["client_id"]
+            .as_str()
+            .unwrap()
+            .starts_with("reg."));
     }
-    assert_eq!(
-        send(
-            &app,
-            "POST",
-            "/oauth/register",
-            registration.clone(),
-            false,
-            ""
-        )
-        .await
-        .0,
-        400
-    );
-    {
-        let mut core = workspace.core.lock().unwrap();
-        let (revision, mut state) = core.local_value("oauth-store").unwrap().unwrap();
-        for client in state["clients"].as_object_mut().unwrap().values_mut() {
-            client["client_id_issued_at"] = json!(1);
-        }
-        core.set_local_value("oauth-store", revision, &state)
-            .unwrap();
-    }
-    assert_eq!(
-        send(&app, "POST", "/oauth/register", registration, false, "")
-            .await
-            .0,
-        200
-    );
+    assert!(workspace
+        .core
+        .lock()
+        .unwrap()
+        .local_value("oauth-store")
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -470,6 +440,109 @@ async fn replay_revokes_grant_even_when_access_store_is_full() {
                 ("refresh_token", "new-refresh"),
                 ("client_id", "client"),
                 ("resource", resource)
+            ]),
+            true,
+            ""
+        )
+        .await
+        .0,
+        400
+    );
+}
+
+#[tokio::test]
+async fn registration_and_authorization_envelopes_cannot_pin_or_tamper_with_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();
+    let app = router(Host::new(
+        w.clone(),
+        "admin-key".into(),
+        "http://127.0.0.1:31417".into(),
+    ));
+    let (_, body, _) = send(
+        &app,
+        "POST",
+        "/oauth/register",
+        json!({"redirect_uris":["http://127.0.0.1:5555/callback"]}).to_string(),
+        false,
+        "",
+    )
+    .await;
+    let c: Value = serde_json::from_str(&body).unwrap();
+    let id = c["client_id"].as_str().unwrap();
+    let query = form(&[
+        ("client_id", id),
+        ("redirect_uri", "http://127.0.0.1:5555/callback"),
+        ("response_type", "code"),
+        ("code_challenge_method", "S256"),
+        ("code_challenge", &"a".repeat(43)),
+        ("resource", "http://127.0.0.1:31417/mcp"),
+    ]);
+    for _ in 0..150 {
+        assert_eq!(
+            send(
+                &app,
+                "GET",
+                &format!("/oauth/authorize?{query}"),
+                String::new(),
+                false,
+                ""
+            )
+            .await
+            .0,
+            200
+        );
+    }
+    assert!(w
+        .core
+        .lock()
+        .unwrap()
+        .local_value("oauth-store")
+        .unwrap()
+        .is_none());
+    let forged = format!("{}x", id);
+    let bad = query.replace(
+        &url::form_urlencoded::byte_serialize(id.as_bytes()).collect::<String>(),
+        &url::form_urlencoded::byte_serialize(forged.as_bytes()).collect::<String>(),
+    );
+    assert_eq!(
+        send(
+            &app,
+            "GET",
+            &format!("/oauth/authorize?{bad}"),
+            String::new(),
+            false,
+            ""
+        )
+        .await
+        .0,
+        400
+    );
+    let (_, page, _) = send(
+        &app,
+        "GET",
+        &format!("/oauth/authorize?{query}"),
+        String::new(),
+        false,
+        "",
+    )
+    .await;
+    let request = page
+        .split("name='request' value='")
+        .nth(1)
+        .unwrap()
+        .split('\'')
+        .next()
+        .unwrap();
+    assert_eq!(
+        send(
+            &app,
+            "POST",
+            "/oauth/authorize",
+            form(&[
+                ("request", &format!("{request}x")),
+                ("decision", "allow"),
+                ("token", "admin-key")
             ]),
             true,
             ""

@@ -58,6 +58,7 @@ fn restore_retains_operations_and_changes_epoch_then_transfers_writer() {
     let head = core.replication_head().unwrap();
     core.set_local_value("sync:receive:old-peer", 0, &json!({"cursor":"123"}))
         .unwrap();
+    core.set_local_value("oauth-store",0,&json!({"clients":{"legacy":{"client_id":"legacy"}},"access":{"base64url-hash":{"expires":u64::MAX}},"refresh":{"hex-hash":{"expires":u64::MAX}},"codes":{"old-code":{}},"pending":{"old-request":{}},"used_refresh":{"old-refresh":{}}})).unwrap();
     let dump = core.repository().dump().unwrap();
     assert!(shufang_mysql::backup::restore(&url, &dump).is_err());
     shufang_mysql::backup::restore(&target, &dump).unwrap();
@@ -69,6 +70,12 @@ fn restore_retains_operations_and_changes_epoch_then_transfers_writer() {
         head.epoch
     );
     assert_eq!(restored.pending().unwrap().len(), 1);
+    let (_, oauth) = restored.get_local("oauth-store").unwrap().unwrap();
+    assert_eq!(oauth["clients"]["legacy"]["client_id"], "legacy");
+    for key in ["access", "refresh", "codes", "pending", "used_refresh"] {
+        assert!(oauth[key].as_object().unwrap().is_empty());
+    }
+
     assert!(restored
         .get_local("sync:receive:old-peer")
         .unwrap()

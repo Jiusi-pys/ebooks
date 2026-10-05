@@ -7,6 +7,7 @@ pub mod incoming_snapshot;
 mod library;
 mod outline;
 pub mod record_drafts;
+pub mod recovery;
 pub mod replica;
 mod replication;
 pub mod sync_receipts;

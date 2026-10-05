@@ -63,6 +63,23 @@ impl SqliteRepository {
         }
         tx.execute("DELETE FROM local_values WHERE key LIKE 'sync:receive:%' OR key LIKE 'sync:snapshot-at:%' OR key LIKE 'sync:incoming:%' OR key LIKE 'sync:incoming-page:%'", [])
             .map_err(failure)?;
+        let oauth: Option<String> = tx
+            .query_row(
+                "SELECT value_json FROM local_values WHERE key='oauth-store'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(failure)?;
+        if let Some(raw) = oauth {
+            let mut value: serde_json::Value = serde_json::from_str(&raw).map_err(failure)?;
+            shufang_application::recovery::reset_oauth(&mut value)?;
+            tx.execute(
+                "UPDATE local_values SET revision=revision+1,value_json=? WHERE key='oauth-store'",
+                [value.to_string()],
+            )
+            .map_err(failure)?;
+        }
         tx.commit().map_err(failure)
     }
     pub fn list_version_snapshots(path: &Path) -> Result<Vec<(String, i64)>> {

@@ -101,6 +101,13 @@ impl<R: crate::Repository + SnapshotRepository, T: crate::Runtime> crate::CoreSe
         id: &str,
         page: &SnapshotPage,
     ) -> Result<()> {
+        page.validate()?;
+        for state in &page.states {
+            for field in state.fields.values() {
+                let clock = shufang_domain::lossless_sync::field_clock(&field.version)?;
+                shufang_domain::sync::validate_received_clock(&clock, self.runtime.now())?;
+            }
+        }
         self.repository.stage_snapshot_page(peer, id, page)
     }
     pub fn finish_incoming_snapshot(

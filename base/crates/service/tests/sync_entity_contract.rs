@@ -11,7 +11,7 @@ async fn incomplete_blob_fields_are_unavailable_instead_of_leaking_storage_refer
     let workspace = Workspace::open(&dir.path().join("db"), "w", "n").unwrap();
     let op = serde_json::from_value(json!({
         "workspaceId":"w","operationId":"remote-note","replicaId":"other",
-        "kind":"notes","entityId":"note","clock":"1800000000000:0000",
+        "kind":"notes","entityId":"note","clock":"100:0000",
         "patch":{"title":"Remote","content":{"$blob":{"sha256":"a".repeat(64),"size":200000,"encoding":"json"}}},
         "unset":[],"deleted":false
     })).unwrap();
