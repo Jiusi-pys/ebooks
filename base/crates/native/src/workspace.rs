@@ -503,7 +503,31 @@ impl Workspace {
     where
         F: FnOnce(Arc<Job>) -> Result<Value> + Send + 'static,
     {
+        self.start_with_receipt(kind, None, action)
+    }
+    /// Persist job creation and its retry identity in one repository transaction.
+    pub fn start_with_receipt<F>(
+        self: &Arc<Self>,
+        kind: &str,
+        receipt: Option<(&str, &str)>,
+        action: F,
+    ) -> Result<Value>
+    where
+        F: FnOnce(Arc<Job>) -> Result<Value> + Send + 'static,
+    {
         let mut jobs = self.jobs.lock().map_err(|_| "jobs_lock_failed")?;
+        if let Some((key, fingerprint)) = receipt {
+            let core = self.core.lock().map_err(|_| "core_lock_failed")?;
+            if let Some((_, existing)) = core.local_value(key)? {
+                if existing["fingerprint"] != fingerprint {
+                    return Err("operation_id_reused".into());
+                }
+                return core
+                    .local_value(&format!("{key}:job"))?
+                    .map(|(_, v)| v)
+                    .ok_or("job_receipt_missing".into());
+            }
+        }
         // Terminal results are persisted in local_values and remain readable via
         // job_state after eviction. Reserve the in-memory table for active work.
         if jobs.len() >= 128 {
@@ -541,14 +565,27 @@ impl Workspace {
         let initial =
             serde_json::to_value(job.state.lock().map_err(|_| "job_lock_failed")?.clone())
                 .map_err(|e| e.to_string())?;
-        self.core
-            .lock()
-            .map_err(|_| "core_lock_failed")?
-            .set_local_value(
-                &format!("job:{id}"),
-                0,
-                &json!({"owner":self.instance,"state":initial}),
-            )?;
+        let initial = json!({"owner":self.instance,"state":initial});
+        {
+            let mut core = self.core.lock().map_err(|_| "core_lock_failed")?;
+            if let Some((key, fingerprint)) = receipt {
+                core.with_receipt(
+                    key,
+                    fingerprint,
+                    vec![shufang_application::LocalCommit {
+                        key: format!("{key}:job"),
+                        expected: 0,
+                        value: json!({"job":id}),
+                    }],
+                    |c| {
+                        c.set_local_value(&format!("job:{id}"), 0, &initial)?;
+                        Ok(())
+                    },
+                )?;
+            } else {
+                core.set_local_value(&format!("job:{id}"), 0, &initial)?;
+            }
+        }
         jobs.insert(id.clone(), job.clone());
         let workspace = self.clone();
         std::thread::spawn(move || {

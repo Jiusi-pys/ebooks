@@ -222,18 +222,18 @@ async fn stdio(host: Arc<Host>) -> Result<(), String> {
     loop {
         let mut bytes = Vec::new();
         let n = (&mut reader)
-            .take(1024 * 1024 + 1)
+            .take(16 * 1024 * 1024 + 1)
             .read_until(b'\n', &mut bytes)
             .await
             .map_err(|e| e.to_string())?;
         if n == 0 {
             break;
         }
-        if n > 1024 * 1024 {
+        if n > 16 * 1024 * 1024 {
             return Err("mcp_request_too_large".into());
         }
         let request = serde_json::from_slice(&bytes).map_err(|_| "invalid_json")?;
-        let response = mcp::dispatch(&host, request)?;
+        let response = mcp::dispatch_async(host.clone(), request, mcp::Access::Write).await?;
         if !response.is_null() {
             output
                 .write_all(format!("{response}\n").as_bytes())

@@ -60,6 +60,167 @@ fn form(pairs: &[(&str, &str)]) -> String {
         .finish()
 }
 
+async fn issue_user_grant(app: &Router, scope: Option<&str>) -> Value {
+    let (_, body, _) = send(
+        app,
+        "POST",
+        "/oauth/register",
+        json!({"client_name":"MCP全功能","redirect_uris":["http://127.0.0.1:5555/callback"]})
+            .to_string(),
+        false,
+        "",
+    )
+    .await;
+    let client: Value = serde_json::from_str(&body).unwrap();
+    let id = client["client_id"].as_str().unwrap();
+    let verifier = "b".repeat(43);
+    let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
+    let mut pairs = vec![
+        ("client_id", id),
+        ("redirect_uri", "http://127.0.0.1:5555/callback"),
+        ("response_type", "code"),
+        ("code_challenge_method", "S256"),
+        ("code_challenge", &challenge),
+        ("resource", "http://127.0.0.1:31417/mcp"),
+    ];
+    if let Some(scope) = scope {
+        pairs.push(("scope", scope));
+    }
+    let (status, page, _) = send(
+        app,
+        "GET",
+        &format!("/oauth/authorize?{}", form(&pairs)),
+        String::new(),
+        false,
+        "",
+    )
+    .await;
+    assert_eq!(status, 200);
+    if scope.is_none() {
+        assert!(page.contains("访问和修改"));
+        assert!(page.contains("单条恢复"));
+        assert!(!page.contains("允许只读访问"));
+    } else if scope == Some("library:read") {
+        assert!(page.contains("不会授予修改权限"));
+    }
+    let pending = page
+        .split("name='request' value='")
+        .nth(1)
+        .unwrap()
+        .split('\'')
+        .next()
+        .unwrap();
+    let (status, _, redirect) = send(
+        app,
+        "POST",
+        "/oauth/authorize",
+        form(&[
+            ("request", pending),
+            ("token", "admin-key"),
+            ("decision", "allow"),
+        ]),
+        true,
+        "",
+    )
+    .await;
+    assert_eq!(status, 303);
+    let redirect = url::Url::parse(&redirect).unwrap();
+    let code = redirect
+        .query_pairs()
+        .find(|(k, _)| k == "code")
+        .unwrap()
+        .1
+        .to_string();
+    let (status, body, _) = send(
+        app,
+        "POST",
+        "/oauth/token",
+        form(&[
+            ("grant_type", "authorization_code"),
+            ("client_id", id),
+            ("redirect_uri", "http://127.0.0.1:5555/callback"),
+            ("code", &code),
+            ("code_verifier", &verifier),
+            ("resource", "http://127.0.0.1:31417/mcp"),
+        ]),
+        true,
+        "",
+    )
+    .await;
+    assert_eq!(status, 200);
+    let mut token: Value = serde_json::from_str(&body).unwrap();
+    token["client_id"] = json!(id);
+    token
+}
+#[tokio::test]
+async fn full_consent_and_refresh_preserve_scope_without_upgrading_old_read_grants() {
+    let d = tempfile::tempdir().unwrap();
+    let w = Workspace::open(&d.path().join("db"), "w", "n").unwrap();
+    let app = router(Host::new(
+        w,
+        "admin-key".into(),
+        "http://127.0.0.1:31417".into(),
+    ));
+    let full = issue_user_grant(&app, None).await;
+    assert_eq!(full["scope"], "library:read library:write");
+    let (status, body, _) = send(
+        &app,
+        "POST",
+        "/oauth/token",
+        form(&[
+            ("grant_type", "refresh_token"),
+            ("client_id", full["client_id"].as_str().unwrap()),
+            ("refresh_token", full["refresh_token"].as_str().unwrap()),
+            ("resource", "http://127.0.0.1:31417/mcp"),
+        ]),
+        true,
+        "",
+    )
+    .await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap()["scope"],
+        "library:read library:write"
+    );
+    let read = issue_user_grant(&app, Some("library:read")).await;
+    assert_eq!(read["scope"], "library:read");
+    let (status, _, _) = send(
+        &app,
+        "POST",
+        "/oauth/token",
+        form(&[
+            ("grant_type", "refresh_token"),
+            ("client_id", read["client_id"].as_str().unwrap()),
+            ("refresh_token", read["refresh_token"].as_str().unwrap()),
+            ("resource", "http://127.0.0.1:31417/mcp"),
+            ("scope", "library:read library:write"),
+        ]),
+        true,
+        "",
+    )
+    .await;
+    assert_eq!(status, 400);
+    let (status, body, _) = send(
+        &app,
+        "POST",
+        "/oauth/token",
+        form(&[
+            ("grant_type", "refresh_token"),
+            ("client_id", read["client_id"].as_str().unwrap()),
+            ("refresh_token", read["refresh_token"].as_str().unwrap()),
+            ("resource", "http://127.0.0.1:31417/mcp"),
+        ]),
+        true,
+        "",
+    )
+    .await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        serde_json::from_str::<Value>(&body).unwrap()["scope"],
+        "library:read"
+    );
+}
+
 #[tokio::test]
 async fn pkce_consent_rotation_revocation_and_read_only_scope() {
     let dir = tempfile::tempdir().unwrap();

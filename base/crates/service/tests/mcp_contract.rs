@@ -14,7 +14,7 @@ fn native_mcp_uses_the_shared_snake_case_tool_contract() {
     let host = Host::new(workspace, "token".into(), "http://127.0.0.1:31417".into());
     let initialized =
         mcp::dispatch(&host, json!({"jsonrpc":"2.0","id":1,"method":"initialize"})).unwrap();
-    assert_eq!(initialized["result"]["serverInfo"]["version"], "1.0.0");
+    assert_eq!(initialized["result"]["serverInfo"]["version"], "1.1.0");
     let listed =
         mcp::dispatch(&host, json!({"jsonrpc":"2.0","id":1,"method":"tools/list"})).unwrap();
     let tools = listed["result"]["tools"].as_array().unwrap();
@@ -57,7 +57,7 @@ fn native_mcp_discovers_modern_revision_without_a_session() {
     assert_eq!(discovered["result"]["resultType"], "complete");
     assert_eq!(
         discovered["result"]["_meta"]["io.modelcontextprotocol/serverInfo"],
-        json!({"name":"shufang-library","version":"1.0.0"})
+        json!({"name":"shufang-library","version":"1.1.0"})
     );
     let tools = mcp::dispatch(
         &host,
@@ -65,7 +65,11 @@ fn native_mcp_discovers_modern_revision_without_a_session() {
     )
     .unwrap();
     assert_eq!(tools["result"]["resultType"], "complete");
-    assert_eq!(tools["result"]["tools"].as_array().unwrap().len(), 6);
+    assert!(tools["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|t| t["name"] == "create_book"));
 }
 #[test]
 fn production_mcp_refuses_incomplete_blob_values() {

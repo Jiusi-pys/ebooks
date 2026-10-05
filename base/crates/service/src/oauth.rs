@@ -115,30 +115,54 @@ pub fn valid_access(host: &Host, token: &str) -> bool {
     valid_access_result(host, token).unwrap_or(false)
 }
 pub fn valid_access_result(host: &Host, token: &str) -> Result<bool, String> {
+    Ok(access_scope(host, token)?.is_some())
+}
+fn canonical_scope(scope: &str) -> Result<String, String> {
+    let parts: HashSet<&str> = scope.split_whitespace().collect();
+    if parts.is_empty()
+        || parts
+            .iter()
+            .any(|s| !["library:read", "library:write"].contains(s))
+    {
+        return Err("invalid_scope".into());
+    }
+    Ok(if parts.contains("library:write") {
+        "library:read library:write"
+    } else {
+        "library:read"
+    }
+    .into())
+}
+pub fn access_scope(host: &Host, token: &str) -> Result<Option<String>, String> {
     if !host.oauth_enabled {
-        return Ok(false);
+        return Ok(None);
     }
     if token.len() > 1024 {
-        return Ok(false);
+        return Ok(None);
     }
     let core = host.workspace.core.lock().map_err(|_| "core_lock_failed")?;
     let Some((_, value)) = core.local_value("oauth-store")? else {
-        return Ok(false);
+        return Ok(None);
     };
     let item = &value["access"][stored_key(&value["access"], token)];
-    Ok(item["expires"].as_u64().unwrap_or(0) > now()
-        && item["resource"] == format!("{}/mcp", host.base_url)
-        && item["scope"] == "library:read"
-        && valid_owner(host, item)?)
+    if item["expires"].as_u64().unwrap_or(0) <= now()
+        || item["resource"] != format!("{}/mcp", host.base_url)
+        || !valid_owner(host, item)?
+    {
+        return Ok(None);
+    }
+    Ok(item["scope"]
+        .as_str()
+        .and_then(|scope| canonical_scope(scope).ok()))
 }
 async fn resource(State(h): State<Arc<Host>>) -> Json<Value> {
     Json(
-        json!({"resource":format!("{}/mcp",h.base_url),"authorization_servers":[h.base_url],"scopes_supported":["library:read"],"bearer_methods_supported":["header"]}),
+        json!({"resource":format!("{}/mcp",h.base_url),"authorization_servers":[h.base_url],"scopes_supported":["library:read","library:write"],"bearer_methods_supported":["header"]}),
     )
 }
 async fn metadata(State(h): State<Arc<Host>>) -> Json<Value> {
     Json(
-        json!({"issuer":h.base_url,"authorization_endpoint":format!("{}/oauth/authorize",h.base_url),"token_endpoint":format!("{}/oauth/token",h.base_url),"registration_endpoint":format!("{}/oauth/register",h.base_url),"revocation_endpoint":format!("{}/oauth/revoke",h.base_url),"response_types_supported":["code"],"grant_types_supported":["authorization_code","refresh_token"],"code_challenge_methods_supported":["S256"],"token_endpoint_auth_methods_supported":["none"],"scopes_supported":["library:read"]}),
+        json!({"issuer":h.base_url,"authorization_endpoint":format!("{}/oauth/authorize",h.base_url),"token_endpoint":format!("{}/oauth/token",h.base_url),"registration_endpoint":format!("{}/oauth/register",h.base_url),"revocation_endpoint":format!("{}/oauth/revoke",h.base_url),"response_types_supported":["code"],"grant_types_supported":["authorization_code","refresh_token"],"code_challenge_methods_supported":["S256"],"token_endpoint_auth_methods_supported":["none"],"scopes_supported":["library:read","library:write"]}),
     )
 }
 fn redirect_valid(value: &str) -> bool {
@@ -242,14 +266,18 @@ async fn authorize(
         {
             return Err("invalid_pkce".into());
         }
-        if q.get("scope").is_some_and(|s| s != "library:read")
-            || q.get("resource")
-                .is_none_or(|s| s != &format!("{}/mcp", h.base_url))
+        let scope = canonical_scope(
+            q.get("scope")
+                .map(String::as_str)
+                .unwrap_or("library:read library:write"),
+        )?;
+        if q.get("resource")
+            .is_none_or(|s| s != &format!("{}/mcp", h.base_url))
         {
             return Err("invalid_scope_or_resource".into());
         }
         let csrf = random();
-        let pending = json!({"client":client,"redirect":redirect,"challenge":q["code_challenge"],"state":q.get("state"),"resource":format!("{}/mcp",h.base_url),"expires":now()+600,"csrfHash":format!("{:x}",Sha256::digest(csrf.as_bytes())),"registration":registration});
+        let pending = json!({"client":client,"redirect":redirect,"challenge":q["code_challenge"],"state":q.get("state"),"resource":format!("{}/mcp",h.base_url),"expires":now()+600,"csrfHash":format!("{:x}",Sha256::digest(csrf.as_bytes())),"scope":scope,"registration":registration});
         if pending.to_string().len() > 12_000 {
             return Err("authorization_metadata_too_large".into());
         }
@@ -282,7 +310,16 @@ async fn authorize(
             } else {
                 "<label>管理员访问令牌 <input type='password' name='token' autocomplete='off' required></label>".into()
             };
-            let mut response=Html(format!("<!doctype html><html lang='zh-CN'><meta charset='utf-8'><title>书房授权</title><body><h1>允许 {} 读取书库？</h1><p>回调地址：{}</p><p>授权范围：书目、阅读进度、书摘、复习队列和笔记。不会授予修改权限。</p><form method='post'><input type='hidden' name='{request_name}' value='{id}'>{credential}<button name='decision' value='allow'>允许只读访问</button><button name='decision' value='deny'>拒绝</button></form></body></html>",html(&name),html(&redirect))).into_response();
+            let write = q
+                .get("scope")
+                .is_none_or(|scope| scope.split_whitespace().any(|s| s == "library:write"));
+            let access = if write { "访问和修改" } else { "读取" };
+            let detail = if write {
+                "完整用户书库能力：读取原文、导入与修改书籍/封面、文件夹、阅读记录、书摘/复习、笔记/关联、翻译/脑图/学习卡、AI 调用、创建/删除版本及单条恢复。不授予同步、节点、部署、账号登录或整库恢复等控制能力。AI 调用可能发送内容至模型服务并产生费用。"
+            } else {
+                "只读用户书库能力，包括原文、书目、阅读记录、书摘、笔记及版本列表。不会授予修改权限。"
+            };
+            let mut response=Html(format!("<!doctype html><html lang='zh-CN'><meta charset='utf-8'><title>书房授权</title><body><h1>允许 {} {access}书库？</h1><p>回调地址：{}</p><p>授权范围：{detail}</p><form method='post'><input type='hidden' name='{request_name}' value='{id}'>{credential}<button name='decision' value='allow'>允许{access}</button><button name='decision' value='deny'>拒绝</button></form></body></html>",html(&name),html(&redirect))).into_response();
             let cookie = format!(
                 "mcp_oauth_csrf={csrf}; Path=/oauth; HttpOnly; SameSite=Lax; Max-Age=600{}",
                 if h.base_url.starts_with("https:") {
@@ -572,6 +609,18 @@ async fn token(State(h): State<Arc<Host>>, Form(form): Form<HashMap<String, Stri
         if !valid_owner(&h, &identity)? {
             return Err("invalid_grant".into());
         }
+        let original_scope = canonical_scope(identity["scope"].as_str().unwrap_or("library:read"))?;
+        let scope = canonical_scope(
+            form.get("scope")
+                .map(String::as_str)
+                .unwrap_or(&original_scope),
+        )?;
+        if scope
+            .split_whitespace()
+            .any(|s| !original_scope.split_whitespace().any(|o| o == s))
+        {
+            return Err("invalid_scope".into());
+        }
         let access = random();
         let refresh = random();
         let grant = identity["grant"]
@@ -585,10 +634,10 @@ async fn token(State(h): State<Arc<Host>>, Form(form): Form<HashMap<String, Stri
         } else {
             now() + 30 * 86400
         };
-        store["access"][hash(&access)] = json!({"client":client,"resource":resource,"scope":"library:read","expires":(now()+3600).min(grant_expires),"grant":grant,"owner":identity["owner"]});
-        store["refresh"][hash(&refresh)] = json!({"client":client,"resource":resource,"scope":"library:read","expires":grant_expires,"grant_expires":grant_expires,"grant":grant,"owner":identity["owner"]});
+        store["access"][hash(&access)] = json!({"client":client,"resource":resource,"scope":scope,"expires":(now()+3600).min(grant_expires),"grant":grant,"owner":identity["owner"]});
+        store["refresh"][hash(&refresh)] = json!({"client":client,"resource":resource,"scope":scope,"expires":grant_expires,"grant_expires":grant_expires,"grant":grant,"owner":identity["owner"]});
         Ok(
-            json!({"access_token":access,"token_type":"Bearer","expires_in":3600u64.min(grant_expires.saturating_sub(now())),"refresh_token":refresh,"scope":"library:read"}),
+            json!({"access_token":access,"token_type":"Bearer","expires_in":3600u64.min(grant_expires.saturating_sub(now())),"refresh_token":refresh,"scope":scope}),
         )
     });
     match result {

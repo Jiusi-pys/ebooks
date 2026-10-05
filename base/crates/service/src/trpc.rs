@@ -14,7 +14,7 @@ use std::{collections::HashMap, sync::Arc};
 pub(crate) struct Failure {
     status: u16,
     code: &'static str,
-    message: String,
+    pub(crate) message: String,
 }
 pub(crate) fn fail(code: &'static str, message: impl Into<String>) -> Failure {
     let status = match code {
@@ -221,7 +221,12 @@ pub(crate) fn secret(provider: &str, supplied: Option<String>) -> Option<String>
         })
         .map(|s| s.trim().to_owned())
 }
-async fn call(host: &Arc<Host>, path: &str, method: &str, input: Value) -> Result<Value, Failure> {
+pub(crate) async fn call(
+    host: &Arc<Host>,
+    path: &str,
+    method: &str,
+    input: Value,
+) -> Result<Value, Failure> {
     let query = matches!(path, "ping" | "ai.status" | "ai.getDigest");
     if !matches!(
         path,

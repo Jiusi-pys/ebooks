@@ -1,3 +1,5 @@
+> MCP 85 项用户能力、单条版本恢复及重新授权步骤见[MCP 用户能力](mcp-user-capabilities.md)。
+>
 > 最新安全修复验收与生产代理限制见[安全修复记录](security-fix-acceptance.md)。
 
 > 最新补齐：完整 Docker 源码构建与真实 Rust 监督器发布已验收，见[发布补齐](evidence/rust-release-completion.md)；需要用户账号参与的步骤见[手动验收](manual-backend-acceptance.md)。

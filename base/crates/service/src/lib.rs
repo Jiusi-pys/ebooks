@@ -8,6 +8,7 @@ pub mod legacy;
 mod legacy_validation;
 mod library;
 pub mod mcp;
+mod mcp_users;
 pub mod oauth;
 pub mod oauth_migration;
 pub mod peer_migration;
@@ -690,9 +691,46 @@ async fn mcp_http(
                 .into_response();
         }
     }
-    match tokio::task::spawn_blocking(move || mcp::dispatch(&h, request)).await {
-        Ok(Ok(value)) if value.is_null() => StatusCode::ACCEPTED.into_response(),
-        Ok(Ok(value)) => Json(value).into_response(),
+    let bearer = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| {
+            v.get(..7)
+                .filter(|p| p.eq_ignore_ascii_case("Bearer "))
+                .map(|_| v[7..].trim())
+        })
+        .unwrap_or("");
+    let key = headers
+        .get("x-api-key")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .trim();
+    let privileged = [bearer, key].into_iter().any(|v| {
+        !v.is_empty()
+            && (same_secret(v, &h.token)
+                || h.machine_key.as_ref().is_some_and(|k| same_secret(v, k)))
+    });
+    let access = if privileged
+        || oauth::access_scope(&h, bearer)
+            .ok()
+            .flatten()
+            .is_some_and(|s| s.split_whitespace().any(|s| s == "library:write"))
+    {
+        mcp::Access::Write
+    } else {
+        mcp::Access::Read
+    };
+    if access == mcp::Access::Read
+        && request["method"] == "tools/call"
+        && mcp_users::catalogue()
+            .into_iter()
+            .any(|s| s.write && Some(s.name.as_str()) == request["params"]["name"].as_str())
+    {
+        return (StatusCode::FORBIDDEN,[("WWW-Authenticate",format!("Bearer error=\"insufficient_scope\", scope=\"library:read library:write\", resource_metadata=\"{}/.well-known/oauth-protected-resource\"",h.base_url))],Json(json!({"error":"insufficient_scope"}))).into_response();
+    }
+    match mcp::dispatch_async(h, request, access).await {
+        Ok(value) if value.is_null() => StatusCode::ACCEPTED.into_response(),
+        Ok(value) => Json(value).into_response(),
         _ => error("invalid_mcp_request".into()).into_response(),
     }
 }

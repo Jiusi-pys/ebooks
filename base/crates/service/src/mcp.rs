@@ -1,5 +1,67 @@
 use crate::{legacy, Host};
 use serde_json::{json, Value};
+use std::sync::Arc;
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Access {
+    Read,
+    Write,
+}
+pub async fn dispatch_async(
+    host: Arc<Host>,
+    request: Value,
+    access: Access,
+) -> Result<Value, String> {
+    if request["jsonrpc"] != "2.0" || request["method"].as_str().is_none() {
+        return Err("invalid_jsonrpc".into());
+    }
+    if request.get("id").is_none() {
+        return Ok(Value::Null);
+    }
+    let modern = request["method"] == "server/discover"
+        || request["params"]["_meta"]["io.modelcontextprotocol/protocolVersion"] == "2026-07-28";
+    if modern
+        && request["params"]["_meta"]["io.modelcontextprotocol/protocolVersion"] != "2026-07-28"
+    {
+        return dispatch(&host, request);
+    }
+    if request["method"] == "tools/list" {
+        let mut response = dispatch(&host, request)?;
+        if access == Access::Read || host.is_read_only() {
+            response["result"]["tools"]
+                .as_array_mut()
+                .ok_or("invalid_tools")?
+                .retain(|s| s["annotations"]["readOnlyHint"] == true);
+        }
+        return Ok(response);
+    }
+    if request["method"] == "tools/call" {
+        if let Some(spec) = crate::mcp_users::catalogue()
+            .into_iter()
+            .find(|s| Some(s.name.as_str()) == request["params"]["name"].as_str())
+        {
+            let result = if spec.write && access != Access::Write {
+                Err("insufficient_scope".into())
+            } else {
+                crate::mcp_users::execute(host, spec, request["params"]["arguments"].clone()).await
+            };
+            let mut body = match result {
+                Ok(value) => {
+                    json!({"content":[{"type":"text","text":serde_json::to_string_pretty(&value).map_err(|_|"invalid_result")?}],"structuredContent":if value.is_object(){value}else{json!({"value":value})},"isError":false})
+                }
+                Err(e) => json!({"content":[{"type":"text","text":e}],"isError":true}),
+            };
+            if modern {
+                body["resultType"] = json!("complete");
+                body["_meta"]["io.modelcontextprotocol/serverInfo"] =
+                    json!({"name":"shufang-library","version":"1.1.0"});
+            }
+            return Ok(json!({"jsonrpc":"2.0","id":request["id"],"result":body}));
+        }
+    }
+    tokio::task::spawn_blocking(move || dispatch(&host, request))
+        .await
+        .map_err(|_| "worker_failed")?
+}
 pub fn dispatch(host: &Host, request: Value) -> Result<Value, String> {
     if request["jsonrpc"] != "2.0" {
         return Err("invalid_jsonrpc".into());
@@ -23,7 +85,7 @@ pub fn dispatch(host: &Host, request: Value) -> Result<Value, String> {
             Ok(json!({"supportedVersions":["2026-07-28"],"capabilities":{"tools":{}}}))
         }
         "initialize" => Ok(
-            json!({"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"shufang-library","version":"1.0.0"}}),
+            json!({"protocolVersion":"2025-11-25","capabilities":{"tools":{}},"serverInfo":{"name":"shufang-library","version":"1.1.0"}}),
         ),
         "ping" => Ok(json!({})),
         "tools/list" => Ok(json!({"tools":tools()})),
@@ -39,7 +101,7 @@ pub fn dispatch(host: &Host, request: Value) -> Result<Value, String> {
             if modern {
                 value["resultType"] = json!("complete");
                 value["_meta"]["io.modelcontextprotocol/serverInfo"] =
-                    json!({"name":"shufang-library","version":"1.0.0"});
+                    json!({"name":"shufang-library","version":"1.1.0"});
                 if method == "server/discover" || method == "tools/list" {
                     value["ttlMs"] = json!(0);
                     value["cacheScope"] = json!("private");
@@ -89,7 +151,9 @@ fn tools() -> Vec<Value> {
             json!({"type":"object","properties":{"note_id":{"type":"string","minLength":1,"maxLength":64}},"required":["note_id"],"additionalProperties":false}),
         ),
     ];
-    specs.into_iter().map(|(name,title,description,input_schema)|json!({"name":name,"title":title,"description":description,"annotations":{"readOnlyHint":true,"destructiveHint":false},"inputSchema":input_schema})).collect()
+    let mut tools:Vec<Value> = specs.into_iter().map(|(name,title,description,input_schema)|json!({"name":name,"title":title,"description":description,"annotations":{"readOnlyHint":true,"destructiveHint":false},"inputSchema":input_schema})).collect();
+    tools.extend(crate::mcp_users::tools());
+    tools
 }
 fn arg<'a>(args: &'a Value, key: &str, legacy: &str) -> Option<&'a Value> {
     args.get(key).or_else(|| args.get(legacy))
@@ -156,7 +220,7 @@ fn preview(v: &Value) -> Value {
 }
 fn text(value: Value) -> Result<Value, String> {
     Ok(
-        json!({"content":[{"type":"text","text":serde_json::to_string_pretty(&value).map_err(|e|e.to_string())?}]}),
+        json!({"content":[{"type":"text","text":serde_json::to_string_pretty(&value).map_err(|e|e.to_string())?}],"structuredContent":value,"isError":false}),
     )
 }
 fn tool(host: &Host, name: &str, args: &Value) -> Result<Value, String> {
@@ -247,7 +311,7 @@ fn tool(host: &Host, name: &str, args: &Value) -> Result<Value, String> {
                 .workspace
                 .execute("getReplica", json!({"kind":"notes","id":id}))?;
             let mut note = legacy::project("notes", &record, &[], &[], false);
-            note["content"] = truncate(note["content"].as_str().unwrap_or(""), 10000).into();
+            note["revision"] = record["revision"].clone();
             text(note)
         }
         _ => Err("unknown_tool".into()),
