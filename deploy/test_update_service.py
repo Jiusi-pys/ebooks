@@ -7,7 +7,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import Mock
 
-from update_service import Jobs, authorized, validate_sha, Rollout, handler_for
+from update_service import Jobs, authorized, validate_sha, Rollout, handler_for, verified_prebuilt_image
 
 SHA = 'a' * 40
 
@@ -155,6 +155,29 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(self.request(data=json.dumps({'sha': SHA}))[0], 500)
         self.assertEqual(self.jobs.read()['state'], 'failed')
 
+
+class PrebuiltTests(unittest.TestCase):
+    def fixture(self, directory, revision=SHA, image_id='sha256:'+'b'*64):
+        Path(directory, SHA+'.json').write_text(json.dumps({'revision':revision,'imageId':image_id}))
+        return [{'Id':image_id,'Config':{'Labels':{'org.opencontainers.image.revision':revision}}}]
+    def test_verified_image_is_bound_to_commit_and_immutable_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            image=self.fixture(directory)
+            run=Mock(return_value=json.dumps(image))
+            self.assertEqual(verified_prebuilt_image(run,SHA,Path(directory)),'shufang:'+SHA)
+            run.assert_called_once_with(['docker','image','inspect','shufang:'+SHA],capture=True)
+    def test_missing_manifest_and_wrong_commit_or_image_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run=Mock()
+            with self.assertRaises(Exception):verified_prebuilt_image(run,SHA,Path(directory))
+            image=self.fixture(directory,revision='c'*40)
+            with self.assertRaises(ValueError):verified_prebuilt_image(Mock(return_value=json.dumps(image)),SHA,Path(directory))
+            image=self.fixture(directory)
+            image[0]['Id']='sha256:'+'d'*64
+            with self.assertRaises(ValueError):verified_prebuilt_image(Mock(return_value=json.dumps(image)),SHA,Path(directory))
+            image=self.fixture(directory)
+            image[0]['Config']['Labels']['org.opencontainers.image.revision']='e'*40
+            with self.assertRaises(ValueError):verified_prebuilt_image(Mock(return_value=json.dumps(image)),SHA,Path(directory))
 
 if __name__ == '__main__':
     unittest.main()

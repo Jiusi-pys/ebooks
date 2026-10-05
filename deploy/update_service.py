@@ -176,6 +176,28 @@ class Rollout:
             raise
 
 
+
+def verified_prebuilt_image(run, sha, directory=None):
+    # Only administrator-installed local manifests are trusted. The HTTP caller
+    # still supplies only a commit, never a path, image, command or digest.
+    validate_sha({'sha': sha})
+    directory = directory if directory is not None else ROOT / 'prebuilt'
+    manifest = json.loads((directory / (sha + '.json')).read_text())
+    if (not isinstance(manifest, dict) or set(manifest) != {'revision', 'imageId'}
+            or manifest['revision'] != sha
+            or not isinstance(manifest['imageId'], str)
+            or not re.fullmatch(r'sha256:[0-9a-f]{64}', manifest['imageId'])):
+        raise ValueError('Invalid prebuilt release manifest')
+    image = 'shufang:' + sha
+    inspected = json.loads(run(['docker', 'image', 'inspect', image], capture=True))
+    if (not isinstance(inspected, list) or len(inspected) != 1
+            or inspected[0].get('Id') != manifest['imageId']
+            or inspected[0].get('Config', {}).get('Labels', {}).get(
+                'org.opencontainers.image.revision') != sha):
+        raise ValueError('Prebuilt image does not match the registered commit and image ID')
+    return image
+
+
 def deploy(job, jobs):
     log_path = jobs.directory / (job['id'] + '.log')
     try:
@@ -201,8 +223,14 @@ def deploy(job, jobs):
                     raise RuntimeError('Requested SHA is no longer the deployment branch head; deploy the latest push')
                 runtime = os.environ.get('DEPLOY_RUNTIME', 'node')
                 dockerfile = '/deploy/Dockerfile.rust' if runtime == 'rust' else '/app/Dockerfile'
-                run(['docker', 'build', '--label', 'org.opencontainers.image.revision=' + head,
-                     '-t', 'shufang:' + head, '-f', directory + dockerfile, directory])
+                build_mode = os.environ.get('DEPLOY_BUILD_MODE', 'source')
+                if build_mode == 'prebuilt' and runtime == 'rust':
+                    verified_prebuilt_image(run, head)
+                elif build_mode == 'source':
+                    run(['docker', 'build', '--label', 'org.opencontainers.image.revision=' + head,
+                         '-t', 'shufang:' + head, '-f', directory + dockerfile, directory])
+                else:
+                    raise RuntimeError('Unsupported deployment build mode')
                 Rollout(run, runtime=runtime).switch(head)
         jobs.finish(job['id'], 'succeeded')
     except Exception as error:
