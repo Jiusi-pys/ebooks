@@ -1,5 +1,12 @@
 # iOS 验证记录
 
+## 2026-10-03：合并至最新 main
+
+- iOS 更新提交 `201a87a` 基于已有 `ios` 分支 `0dfdaa8`；与最新 `main` 的 `ccdb144` 合并，无冲突。保留 main 的共享核心、Windows 平台、数据库迁移及历史归档，合并未修改这些目录。
+- 合并后的 Swift／本地 HTTP 联调 73 项全部通过，账户认证定向测试 4 项通过，部署监督器测试 11 项通过。iOS 实现与上一节已构建、安装的 1.4.2（10）一致。
+- 完整 Web 检查重新尝试：check／test／build 在共享核心预构建阶段因缺少 `cargo`（ENOENT）失败，lint 因本机隔离依赖缺少 `eslint` 无法运行；不能视为完整 Web 回归通过。没有执行生产迁移或服务器部署。
+- 合并验证在 `/tmp/shufang-release-20261003` 的独立 Git 工作区执行，避免原 iCloud 仓库的文件读取阻塞；原仓库未提交的其他改动保持原样。测试日志保存在本机 `/tmp/shufang-merge-*.log`，未作为源码提交。
+
 ## 2026-10-02：默认主线适配更新 1.4.2（build 10）
 
 - `git ls-remote --symref` 确认远端默认分支为 `main`，最新提交 `40bac54c075ae4467fb2df31fd6083f63db7dad6`；本地 `main` 与 `origin/main` 均为该提交。已执行 fetch，无需合并。按本轮确认使用默认分支，未切换到另外存在的 `base` 分支。

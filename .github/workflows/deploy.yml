@@ -32,7 +32,11 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - name: Test shared core
-        run: cargo test --manifest-path base/Cargo.toml --workspace --locked
+        run: |
+          # Only the isolated test processes receive this ephemeral key.
+          # Production credentials remain configured independently on the server.
+          SHUFANG_CREDENTIAL_KEY="$(openssl rand -hex 32)" \
+            cargo test --manifest-path base/Cargo.toml --workspace --locked
       - name: Install application dependencies
         working-directory: app
         run: npm ci --no-audit --no-fund

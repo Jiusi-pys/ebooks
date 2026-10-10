@@ -139,6 +139,13 @@ vi.mock("./lib/openapi-auth", () => ({
   ): Promise<void> => next(),
 }));
 
+vi.mock("./lib/reader-auth", () => ({
+  requireReaderOrMachine: async (
+    _context: unknown,
+    next: () => Promise<void>
+  ): Promise<void> => next(),
+}));
+
 vi.mock("./lib/webhooks", () => ({
   EVENT_TYPES: ["note.created", "mindmap.created"],
   fanout: (event: Record<string, unknown>) => state.events.push(event),

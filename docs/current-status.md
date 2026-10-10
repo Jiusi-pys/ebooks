@@ -1,4 +1,6 @@
 > MCP 85 项用户能力、单条版本恢复及重新授权步骤见[MCP 用户能力](mcp-user-capabilities.md)。
+
+> Android 原生 APP、离线冲突与跨端学习兼容已完成本轮提交前验收；MuMu 按 N10 Pro 二代和原版 Clear7 尺寸验证，实体笔与墨水屏性能仍待真机。见 [Android 验收](evidence/android-ios/hanvon-mumu-acceptance.md)及 [main 整合回归](evidence/android-ios/main-integration.md)。下文日期章节保留历史状态。
 >
 > 最新安全修复验收与生产代理限制见[安全修复记录](security-fix-acceptance.md)。
 
