@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.shufang.android.MindOperationsTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-08T17:32:24.672Z" hostname="WINDOWS" time="0.014">
+  <properties/>
+  <testcase name="movingRejectsCyclesMissingNodesRootAndOutOfRangePositions" classname="org.shufang.android.MindOperationsTest" time="0.005"/>
+  <testcase name="movingSubtreePreservesCardIdentityAndDoesNotMutateDraft" classname="org.shufang.android.MindOperationsTest" time="0.001"/>
+  <testcase name="movingSupportsTheCoreDepthBoundaryAndRejectsDeeperTrees" classname="org.shufang.android.MindOperationsTest" time="0.005"/>
+  <testcase name="bookOutlineMindKeepsChapterLinksAndEditingPreservesSiblings" classname="org.shufang.android.MindOperationsTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

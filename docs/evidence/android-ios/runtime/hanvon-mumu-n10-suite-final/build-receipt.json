@@ -1,0 +1,17 @@
+{
+  "gitBranch": "android",
+  "gitHead": "40f84d9a17b7ca68e3134f2093afba82fb687c11",
+  "sourceFiles": {
+    "platforms/android/scripts/test-hanvon-mumu.ps1": "281257812f81ad4936a548f9a9ac1999992c5ede90b192f2ab290cbf576f7c30",
+    "platforms/android/app/src/androidTest/java/org/shufang/android/LibraryUiTest.kt": "f84980be40084be2ffb2f77ff2bf0901ea4ad7974b87bf7c8a4d0e5c4b5074be",
+    "platforms/android/app/src/androidTest/java/org/shufang/android/ReadingDesignTest.kt": "94e9b374a41f549ccb1178ab7f81804371d6108b1e1002abe4b342648b113384",
+    "platforms/android/scripts/verify-hanvon-evidence.py": "973ea789c6c14eaaa5b12fc91a1aaf8e179fefb7790cc11f65ec68ffea481db9",
+    "platforms/android/app/src/androidTest/java/org/shufang/android/PdfComparisonTouchTest.kt": "9aa9e3183479f1369a52b3a67b168853336b3025477b21a0e5d4e4bba1dfc425"
+  },
+  "deliveryApkSha256": "5d6919ecce8bcdca5968523def9f26f2c2813d7188e507f28e3e50d605275557",
+  "acceptanceApkSha256": "32c216d915666d43b3f64581145525437bdf51986bec4b25426035b79e1b37a9",
+  "testApkSha256": "70642e2395381988d651b194ce2c9f81ef54003f570f6510f51236f5093f66f9",
+  "fixtureSha256": "ba5fab3d19ec0ccab72d90df945b887e5307115d1ca34c8a5b0a68f5669c5c83",
+  "build": "assembleDebugAndroidTest -PshufangAcceptance=true; BUILD SUCCESSFUL",
+  "hostTimestamp": "2026-10-10T09:53:27.6897475+08:00"
+}

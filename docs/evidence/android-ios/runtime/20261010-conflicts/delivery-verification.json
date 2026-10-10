@@ -1,0 +1,8 @@
+{
+  "sourceReceiptMatches": true,
+  "actualInstalledApkHashMatches": true,
+  "api26Api28Api35Passed": true,
+  "productionConditionalApiAuthenticated": true,
+  "productionBusinessCountsUnchanged": true,
+  "publicEvidenceContainsNoProvidedPasswords": true
+}

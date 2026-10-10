@@ -1,0 +1,14 @@
+{
+  "files": {
+    "base/crates/application/src/library.rs": "4434bfb4646a07a478de3b5b1de54ec178c8199ea80e7869800d4a98bf43e9b6",
+    "base/crates/application/src/replication.rs": "95a6b7f3522ff354dab95e3a337fd1ad10f670fcf62aa905c48ea1bb61bf764a",
+    "base/crates/application/src/lib.rs": "da3fcbd54ff4e23a31db9b0e4ccbbac509da0dbeaa4cb274cacdbe9955c87d72",
+    "base/crates/native/src/replication.rs": "f994871a7a755c933b8b9d7193005ed5b2035d377c103a3018a0205573469c67",
+    "base/crates/native/src/workspace.rs": "adba2ee4dc22835660145f8f634ca1b3abf8992b9781a15757c9955997207f6a",
+    "base/crates/service/src/sync_v2.rs": "7d73eb7bb0e15b4c60c2b9a86d0a10064819f26888c3987bc83386db094514fd",
+    "platforms/android/app/src/main/java/org/shufang/android/CoreRepository.kt": "b6d2fd7946d3acba32c733e7337df1567654fcc6f1f4f29f1a15251dacb90e9d",
+    "platforms/android/app/src/main/java/org/shufang/android/LibraryViewModel.kt": "75a0371f6ab86b946586fdabc5e930f5c4b9e255602485f54e479863faa79fa2",
+    "platforms/android/app/src/main/java/org/shufang/android/MainActivity.kt": "4f6febd70843d10591aef9dbf7dd4f1ff98aae06e6a217ecc76064c6274be060",
+    "platforms/android/app/build.gradle.kts": "ee70ac8e591c647fae51a4cf3b662b46b03849127f1259ee5ba01a947a718a5b"
+  }
+}

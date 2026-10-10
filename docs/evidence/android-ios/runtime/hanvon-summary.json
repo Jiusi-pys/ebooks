@@ -1,0 +1,247 @@
+{
+  "profiles": [
+    {
+      "profile": "clear7",
+      "orientation": "portrait",
+      "densityDpi": 300,
+      "fontScale": 1.0,
+      "widthDp": 674,
+      "heightDp": 896,
+      "pixels": [
+        1264,
+        1680
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-final\\clear7-portrait-font1.0-dpi300"
+    },
+    {
+      "profile": "clear7",
+      "orientation": "portrait",
+      "densityDpi": 300,
+      "fontScale": 1.3,
+      "widthDp": 674,
+      "heightDp": 896,
+      "pixels": [
+        1264,
+        1680
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-final\\clear7-portrait-font1.3-dpi300"
+    },
+    {
+      "profile": "clear7",
+      "orientation": "portrait",
+      "densityDpi": 300,
+      "fontScale": 2.0,
+      "widthDp": 674,
+      "heightDp": 896,
+      "pixels": [
+        1264,
+        1680
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-final\\clear7-portrait-font2.0-dpi300"
+    },
+    {
+      "profile": "clear7",
+      "orientation": "landscape",
+      "densityDpi": 300,
+      "fontScale": 1.0,
+      "widthDp": 896,
+      "heightDp": 674,
+      "pixels": [
+        1680,
+        1264
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-final\\clear7-landscape-font1.0-dpi300"
+    },
+    {
+      "profile": "clear7",
+      "orientation": "landscape",
+      "densityDpi": 300,
+      "fontScale": 1.3,
+      "widthDp": 896,
+      "heightDp": 674,
+      "pixels": [
+        1680,
+        1264
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-final\\clear7-landscape-font1.3-dpi300"
+    },
+    {
+      "profile": "clear7",
+      "orientation": "landscape",
+      "densityDpi": 300,
+      "fontScale": 2.0,
+      "widthDp": 896,
+      "heightDp": 674,
+      "pixels": [
+        1680,
+        1264
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-final\\clear7-landscape-font2.0-dpi300"
+    },
+    {
+      "profile": "clear7",
+      "orientation": "portrait",
+      "densityDpi": 240,
+      "fontScale": 1.0,
+      "widthDp": 843,
+      "heightDp": 1120,
+      "pixels": [
+        1264,
+        1680
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-final\\clear7-portrait-font1.0-dpi240"
+    },
+    {
+      "profile": "clear7",
+      "orientation": "portrait",
+      "densityDpi": 320,
+      "fontScale": 1.0,
+      "widthDp": 632,
+      "heightDp": 840,
+      "pixels": [
+        1264,
+        1680
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-final\\clear7-portrait-font1.0-dpi320"
+    },
+    {
+      "profile": "n10pro2",
+      "orientation": "portrait",
+      "densityDpi": 300,
+      "fontScale": 1.0,
+      "widthDp": 992,
+      "heightDp": 1323,
+      "pixels": [
+        1860,
+        2480
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-n10-final\\n10pro2-portrait-font1.0-dpi300"
+    },
+    {
+      "profile": "n10pro2",
+      "orientation": "portrait",
+      "densityDpi": 300,
+      "fontScale": 1.3,
+      "widthDp": 992,
+      "heightDp": 1323,
+      "pixels": [
+        1860,
+        2480
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-n10-final\\n10pro2-portrait-font1.3-dpi300"
+    },
+    {
+      "profile": "n10pro2",
+      "orientation": "portrait",
+      "densityDpi": 300,
+      "fontScale": 2.0,
+      "widthDp": 992,
+      "heightDp": 1323,
+      "pixels": [
+        1860,
+        2480
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-n10-final\\n10pro2-portrait-font2.0-dpi300"
+    },
+    {
+      "profile": "n10pro2",
+      "orientation": "landscape",
+      "densityDpi": 300,
+      "fontScale": 1.0,
+      "widthDp": 1323,
+      "heightDp": 992,
+      "pixels": [
+        2480,
+        1860
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-n10-final\\n10pro2-landscape-font1.0-dpi300"
+    },
+    {
+      "profile": "n10pro2",
+      "orientation": "landscape",
+      "densityDpi": 300,
+      "fontScale": 1.3,
+      "widthDp": 1323,
+      "heightDp": 992,
+      "pixels": [
+        2480,
+        1860
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-n10-final\\n10pro2-landscape-font1.3-dpi300"
+    },
+    {
+      "profile": "n10pro2",
+      "orientation": "landscape",
+      "densityDpi": 300,
+      "fontScale": 2.0,
+      "widthDp": 1323,
+      "heightDp": 992,
+      "pixels": [
+        2480,
+        1860
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-n10-final\\n10pro2-landscape-font2.0-dpi300"
+    },
+    {
+      "profile": "n10pro2",
+      "orientation": "portrait",
+      "densityDpi": 240,
+      "fontScale": 1.0,
+      "widthDp": 1240,
+      "heightDp": 1653,
+      "pixels": [
+        1860,
+        2480
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-n10-final\\n10pro2-portrait-font1.0-dpi240"
+    },
+    {
+      "profile": "n10pro2",
+      "orientation": "portrait",
+      "densityDpi": 320,
+      "fontScale": 1.0,
+      "widthDp": 930,
+      "heightDp": 1240,
+      "pixels": [
+        1860,
+        2480
+      ],
+      "passedTests": 2,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-n10-final\\n10pro2-portrait-font1.0-dpi320"
+    }
+  ],
+  "fullSuites": [
+    {
+      "profile": "clear7",
+      "discovered": 37,
+      "executedPassed": 28,
+      "conditionalSkipped": 9,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-final\\clear7-suite.log"
+    },
+    {
+      "profile": "n10pro2",
+      "discovered": 37,
+      "executedPassed": 28,
+      "conditionalSkipped": 9,
+      "evidence": "docs\\evidence\\android-ios\\runtime\\hanvon-mumu-n10-suite-final\\n10pro2-suite.log"
+    }
+  ],
+  "layoutConfigurations": 16,
+  "layoutTestsPassed": 32,
+  "totalExecutedPassed": 88
+}

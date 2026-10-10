@@ -1,0 +1,8 @@
+{
+  "profile": "clear7",
+  "size": "Physical size: 1264x1680",
+  "density": "Physical density: 300",
+  "android": "15",
+  "abi": "x86_64",
+  "webview": "Current WebView Update Service state\r\n  Current WebView package (name, version): (com.android.webview, 110.0.5481.154.1)\r\n  Minimum targetSdkVersion: 33\r\n  Minimum WebView version code: 548115537\r\n  Number of relros started: 0\r\n  Number of relros finished: 0\r\n  WebView package dirty: false\r\n  Any WebView package installed: true\r\n  Preferred WebView package (name, version): (com.android.webview, 110.0.5481.154.1)\r\n  WebView packages:\r\n    Valid package com.android.webview (versionName: 110.0.5481.154.1, versionCode: 548115537, targetSdkVersion: 33) is  installed/enabled for all users\r\n"
+}

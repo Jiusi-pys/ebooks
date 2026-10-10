@@ -1,0 +1,135 @@
+[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[2/5] Write swift-version--58304C5D6DBC2206.txt
+[4/20] Compiling ShufangCore StudyRestore.swift
+[5/20] Compiling ShufangCore StudyTextSelection.swift
+[6/21] Compiling ShufangCore ReaderNavigation.swift
+[7/21] Compiling ShufangCore StudyBackup.swift
+[8/21] Compiling ShufangCore StudyTree.swift
+[9/21] Compiling ShufangCore StudyModels.swift
+[10/21] Compiling ShufangCore APIClient.swift
+[11/21] Compiling ShufangCore AccountRoutes.swift
+[12/21] Compiling ShufangCore PortableInk.swift
+[13/21] Compiling ShufangCore PortableInkPencil.swift
+[14/21] Compiling ShufangCore Models.swift
+[15/21] Compiling ShufangCore PDFGeometry.swift
+[16/21] Compiling ShufangCore BookFootnotes.swift
+[17/21] Compiling ShufangCore Keychain.swift
+[18/21] Emitting module ShufangCore
+[19/21] Compiling ShufangCore StudyStore.swift
+[20/40] Compiling ShufangCoreTests ReaderNavigationTests.swift
+[21/40] Compiling ShufangCoreTests ReadingSyncTests.swift
+[22/40] Compiling ShufangCoreTests StudySyncIntegrationTests.swift
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:9:33: error: value of type 'StudyBackupArchive' has no member 'zipData'
+ 7 |     func testStoredZipRoundTripAndTampering() throws {
+ 8 |         let archive = try StudyBackupArchive(title: "跨端😀", origin: "https://example.org", userID: "isolated", payloads: ["study.json": Data("[]".utf8)])
+ 9 |         let bytes = try archive.zipData()
+   |                                 `- error: value of type 'StudyBackupArchive' has no member 'zipData'
+10 |         let restored = try StudyBackupArchive(zipData: bytes)
+11 |         XCTAssertEqual(restored.manifest.title, archive.manifest.title)
+
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:10:46: error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+ 8 |         let archive = try StudyBackupArchive(title: "跨端😀", origin: "https://example.org", userID: "isolated", payloads: ["study.json": Data("[]".utf8)])
+ 9 |         let bytes = try archive.zipData()
+10 |         let restored = try StudyBackupArchive(zipData: bytes)
+   |                                              `- error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+11 |         XCTAssertEqual(restored.manifest.title, archive.manifest.title)
+12 |         XCTAssertEqual(restored.payloads, archive.payloads)
+
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:15:52: error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+13 |         var broken = bytes
+14 |         broken[40] ^= 1
+15 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: broken))
+   |                                                    `- error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+16 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: bytes.dropLast()))
+17 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: Data()))
+
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:16:52: error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+14 |         broken[40] ^= 1
+15 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: broken))
+16 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: bytes.dropLast()))
+   |                                                    `- error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+17 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: Data()))
+18 |     }
+
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:17:52: error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+15 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: broken))
+16 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: bytes.dropLast()))
+17 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: Data()))
+   |                                                    `- error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+18 |     }
+19 | }
+
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:17:62: error: cannot convert value of type 'Data' to expected argument type 'FileWrapper'
+15 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: broken))
+16 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: bytes.dropLast()))
+17 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: Data()))
+   |                                                              `- error: cannot convert value of type 'Data' to expected argument type 'FileWrapper'
+18 |     }
+19 | }
+[23/40] Compiling ShufangCoreTests StudyZipTests.swift
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:9:33: error: value of type 'StudyBackupArchive' has no member 'zipData'
+ 7 |     func testStoredZipRoundTripAndTampering() throws {
+ 8 |         let archive = try StudyBackupArchive(title: "跨端😀", origin: "https://example.org", userID: "isolated", payloads: ["study.json": Data("[]".utf8)])
+ 9 |         let bytes = try archive.zipData()
+   |                                 `- error: value of type 'StudyBackupArchive' has no member 'zipData'
+10 |         let restored = try StudyBackupArchive(zipData: bytes)
+11 |         XCTAssertEqual(restored.manifest.title, archive.manifest.title)
+
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:10:46: error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+ 8 |         let archive = try StudyBackupArchive(title: "跨端😀", origin: "https://example.org", userID: "isolated", payloads: ["study.json": Data("[]".utf8)])
+ 9 |         let bytes = try archive.zipData()
+10 |         let restored = try StudyBackupArchive(zipData: bytes)
+   |                                              `- error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+11 |         XCTAssertEqual(restored.manifest.title, archive.manifest.title)
+12 |         XCTAssertEqual(restored.payloads, archive.payloads)
+
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:15:52: error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+13 |         var broken = bytes
+14 |         broken[40] ^= 1
+15 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: broken))
+   |                                                    `- error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+16 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: bytes.dropLast()))
+17 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: Data()))
+
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:16:52: error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+14 |         broken[40] ^= 1
+15 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: broken))
+16 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: bytes.dropLast()))
+   |                                                    `- error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+17 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: Data()))
+18 |     }
+
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:17:52: error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+15 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: broken))
+16 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: bytes.dropLast()))
+17 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: Data()))
+   |                                                    `- error: incorrect argument label in call (have 'zipData:', expected 'wrapper:')
+18 |     }
+19 | }
+
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyZipTests.swift:17:62: error: cannot convert value of type 'Data' to expected argument type 'FileWrapper'
+15 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: broken))
+16 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: bytes.dropLast()))
+17 |         XCTAssertThrowsError(try StudyBackupArchive(zipData: Data()))
+   |                                                              `- error: cannot convert value of type 'Data' to expected argument type 'FileWrapper'
+18 |     }
+19 | }
+[24/41] Compiling ShufangCoreTests resource_bundle_accessor.swift
+[25/41] Compiling ShufangCoreTests NetworkInkParityTests.swift
+[26/41] Compiling ShufangCoreTests PDFGeometryTests.swift
+[27/41] Compiling ShufangCoreTests ReviewParityFixtureTests.swift
+[28/41] Compiling ShufangCoreTests StudyBackupArchiveTests.swift
+[29/41] Compiling ShufangCoreTests PortableInkPencilTests.swift
+[30/41] Compiling ShufangCoreTests PortableInkTests.swift
+[31/41] Compiling ShufangCoreTests StudyBackupSelectionTests.swift
+[32/41] Compiling ShufangCoreTests StudyInteractionTests.swift
+[33/41] Compiling ShufangCoreTests StudyRestoreTests.swift
+[34/41] Compiling ShufangCoreTests StudyStoreTests.swift
+[35/41] Emitting module ShufangCoreTests
+[36/41] Compiling ShufangCoreTests CoreTests.swift
+[37/41] Compiling ShufangCoreTests HTTPIntegrationTests.swift
+[38/41] Compiling ShufangCoreTests AccountRouteTests.swift
+[39/41] Compiling ShufangCoreTests BookFootnoteTests.swift
+error: fatalError

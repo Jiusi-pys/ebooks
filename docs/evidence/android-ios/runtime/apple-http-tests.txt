@@ -1,0 +1,250 @@
+Test Suite 'All tests' started at 2026-10-08 11:43:25.416.
+Test Suite 'ShufangCorePackageTests.xctest' started at 2026-10-08 11:43:25.418.
+Test Suite 'AccountRouteTests' started at 2026-10-08 11:43:25.418.
+Test Case '-[ShufangCoreTests.AccountRouteTests testFastestFallbackManualAndHysteresis]' started.
+Test Case '-[ShufangCoreTests.AccountRouteTests testFastestFallbackManualAndHysteresis]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.AccountRouteTests testIdentityRequiresBothAccountAndWorkspace]' started.
+Test Case '-[ShufangCoreTests.AccountRouteTests testIdentityRequiresBothAccountAndWorkspace]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.AccountRouteTests testLaggingReplicaCannotEraseNewerFieldsOrTombstones]' started.
+Test Case '-[ShufangCoreTests.AccountRouteTests testLaggingReplicaCannotEraseNewerFieldsOrTombstones]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.AccountRouteTests testOldSnapshotAndPendingSurviveNewRoute]' started.
+Test Case '-[ShufangCoreTests.AccountRouteTests testOldSnapshotAndPendingSurviveNewRoute]' passed (0.007 seconds).
+Test Case '-[ShufangCoreTests.AccountRouteTests testRequestsUseOnlyDestinationSessionAndDoNotReplayFailedWrites]' started.
+Test Case '-[ShufangCoreTests.AccountRouteTests testRequestsUseOnlyDestinationSessionAndDoNotReplayFailedWrites]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.AccountRouteTests testRouteSwitchKeepsStorageAnchorAndPinsTransactions]' started.
+Test Case '-[ShufangCoreTests.AccountRouteTests testRouteSwitchKeepsStorageAnchorAndPinsTransactions]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.AccountRouteTests testSwitchStartsNewSnapshotWithoutSendingOtherNodeCursor]' started.
+Test Case '-[ShufangCoreTests.AccountRouteTests testSwitchStartsNewSnapshotWithoutSendingOtherNodeCursor]' passed (0.029 seconds).
+Test Suite 'AccountRouteTests' passed at 2026-10-08 11:43:25.457.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.040 (0.040) seconds
+Test Suite 'BookFootnoteTests' started at 2026-10-08 11:43:25.458.
+Test Case '-[ShufangCoreTests.BookFootnoteTests testOfflineUpgradeRetainsOriginalAndRejectsChangedText]' started.
+Test Case '-[ShufangCoreTests.BookFootnoteTests testOfflineUpgradeRetainsOriginalAndRejectsChangedText]' passed (0.003 seconds).
+Test Case '-[ShufangCoreTests.BookFootnoteTests testPageClippingAndParagraphOffsetsMatchWeb]' started.
+Test Case '-[ShufangCoreTests.BookFootnoteTests testPageClippingAndParagraphOffsetsMatchWeb]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.BookFootnoteTests testServerChapterPreservesNotesWithoutChangingText]' started.
+Test Case '-[ShufangCoreTests.BookFootnoteTests testServerChapterPreservesNotesWithoutChangingText]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.BookFootnoteTests testSkipsEmptyInvalidAndOverlappingNotes]' started.
+Test Case '-[ShufangCoreTests.BookFootnoteTests testSkipsEmptyInvalidAndOverlappingNotes]' passed (0.000 seconds).
+Test Suite 'BookFootnoteTests' passed at 2026-10-08 11:43:25.461.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.003 (0.003) seconds
+Test Suite 'CoreTests' started at 2026-10-08 11:43:25.461.
+Test Case '-[ShufangCoreTests.CoreTests testAccountLoginUsesSignedSessionWithoutAPIKey]' started.
+Test Case '-[ShufangCoreTests.CoreTests testAccountLoginUsesSignedSessionWithoutAPIKey]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testAskIncludesSelectedText]' started.
+Test Case '-[ShufangCoreTests.CoreTests testAskIncludesSelectedText]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testAuthenticatedRequestAndServerFailures]' started.
+Test Case '-[ShufangCoreTests.CoreTests testAuthenticatedRequestAndServerFailures]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testConfigurationRejectsUnsafeOrigins]' started.
+Test Case '-[ShufangCoreTests.CoreTests testConfigurationRejectsUnsafeOrigins]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testDecodesActualServerResponseShapes]' started.
+Test Case '-[ShufangCoreTests.CoreTests testDecodesActualServerResponseShapes]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testEndpointEncodesUntrustedBookIDs]' started.
+Test Case '-[ShufangCoreTests.CoreTests testEndpointEncodesUntrustedBookIDs]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testExpiredStoredSessionAvoidsNetwork]' started.
+Test Case '-[ShufangCoreTests.CoreTests testExpiredStoredSessionAvoidsNetwork]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testHighlightUsesJavaScriptUTF16Offsets]' started.
+Test Case '-[ShufangCoreTests.CoreTests testHighlightUsesJavaScriptUTF16Offsets]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testHTTPIsRestrictedToDebugLoopback]' started.
+Test Case '-[ShufangCoreTests.CoreTests testHTTPIsRestrictedToDebugLoopback]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testLegacyCapabilityFallbackAndAuthorizationFailure]' started.
+Test Case '-[ShufangCoreTests.CoreTests testLegacyCapabilityFallbackAndAuthorizationFailure]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testReadingTimeMergesCheckpointsAndOverlappingDevices]' started.
+Test Case '-[ShufangCoreTests.CoreTests testReadingTimeMergesCheckpointsAndOverlappingDevices]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testRedirectIsRefused]' started.
+Test Case '-[ShufangCoreTests.CoreTests testRedirectIsRefused]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testReviewMatchesWebScheduling]' started.
+Test Case '-[ShufangCoreTests.CoreTests testReviewMatchesWebScheduling]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testV2MaterializedBooksAndChapters]' started.
+Test Case '-[ShufangCoreTests.CoreTests testV2MaterializedBooksAndChapters]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.CoreTests testV2ReviewUsesLiveHighlightsAndServerClock]' started.
+Test Case '-[ShufangCoreTests.CoreTests testV2ReviewUsesLiveHighlightsAndServerClock]' passed (0.001 seconds).
+Test Suite 'CoreTests' passed at 2026-10-08 11:43:25.468.
+	 Executed 15 tests, with 0 failures (0 unexpected) in 0.007 (0.008) seconds
+Test Suite 'HTTPIntegrationTests' started at 2026-10-08 11:43:25.468.
+Test Case '-[ShufangCoreTests.HTTPIntegrationTests testFixtureReadWriteRoundTrip]' started.
+Test Case '-[ShufangCoreTests.HTTPIntegrationTests testFixtureReadWriteRoundTrip]' passed (0.014 seconds).
+Test Suite 'HTTPIntegrationTests' passed at 2026-10-08 11:43:25.482.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.014 (0.014) seconds
+Test Suite 'OfflineLibraryTests' started at 2026-10-08 11:43:25.482.
+Test Case '-[ShufangCoreTests.OfflineLibraryTests testCompletedDownloadIsReadableAndScopedToCredential]' started.
+Test Case '-[ShufangCoreTests.OfflineLibraryTests testCompletedDownloadIsReadableAndScopedToCredential]' passed (0.007 seconds).
+Test Suite 'OfflineLibraryTests' passed at 2026-10-08 11:43:25.490.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.007 (0.007) seconds
+Test Suite 'PDFGeometryTests' started at 2026-10-08 11:43:25.490.
+Test Case '-[ShufangCoreTests.PDFGeometryTests testInvalidAndOutOfPageRectangles]' started.
+Test Case '-[ShufangCoreTests.PDFGeometryTests testInvalidAndOutOfPageRectangles]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.PDFGeometryTests testRotatedCroppedPageRoundTrip]' started.
+Test Case '-[ShufangCoreTests.PDFGeometryTests testRotatedCroppedPageRoundTrip]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.PDFGeometryTests testTopLeftMatchesWebAndRotation]' started.
+Test Case '-[ShufangCoreTests.PDFGeometryTests testTopLeftMatchesWebAndRotation]' passed (0.000 seconds).
+Test Suite 'PDFGeometryTests' passed at 2026-10-08 11:43:25.490.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+Test Suite 'PortableInkTests' started at 2026-10-08 11:43:25.490.
+Test Case '-[ShufangCoreTests.PortableInkTests testVersionAndFiniteCoordinatesAreValidated]' started.
+Test Case '-[ShufangCoreTests.PortableInkTests testVersionAndFiniteCoordinatesAreValidated]' passed (0.000 seconds).
+Test Suite 'PortableInkTests' passed at 2026-10-08 11:43:25.490.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'ReaderNavigationTests' started at 2026-10-08 11:43:25.490.
+Test Case '-[ShufangCoreTests.ReaderNavigationTests testBothDirectionsAndModesUseSameForwardConvention]' started.
+Test Case '-[ShufangCoreTests.ReaderNavigationTests testBothDirectionsAndModesUseSameForwardConvention]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.ReaderNavigationTests testWrongAxisAndSelectionSizedMovementsDoNotTurnPages]' started.
+Test Case '-[ShufangCoreTests.ReaderNavigationTests testWrongAxisAndSelectionSizedMovementsDoNotTurnPages]' passed (0.000 seconds).
+Test Suite 'ReaderNavigationTests' passed at 2026-10-08 11:43:25.491.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'ReadingSyncTests' started at 2026-10-08 11:43:25.491.
+Test Case '-[ShufangCoreTests.ReadingSyncTests testFailedReceiptIsNotAcknowledgedAndReleasesRoute]' started.
+Test Case '-[ShufangCoreTests.ReadingSyncTests testFailedReceiptIsNotAcknowledgedAndReleasesRoute]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.ReadingSyncTests testPagesMergeCheckpointsAndIgnoreRemovedOrInvalidSessions]' started.
+Test Case '-[ShufangCoreTests.ReadingSyncTests testPagesMergeCheckpointsAndIgnoreRemovedOrInvalidSessions]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.ReadingSyncTests testRepeatedCursorFailsInsteadOfLooping]' started.
+Test Case '-[ShufangCoreTests.ReadingSyncTests testRepeatedCursorFailsInsteadOfLooping]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.ReadingSyncTests testUploadPinsRouteAndUsesAccountSession]' started.
+Test Case '-[ShufangCoreTests.ReadingSyncTests testUploadPinsRouteAndUsesAccountSession]' passed (0.000 seconds).
+Test Suite 'ReadingSyncTests' passed at 2026-10-08 11:43:25.493.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'ReviewParityFixtureTests' started at 2026-10-08 11:43:25.493.
+Test Case '-[ShufangCoreTests.ReviewParityFixtureTests testSharedAndroidIOSReviewVectors]' started.
+Test Case '-[ShufangCoreTests.ReviewParityFixtureTests testSharedAndroidIOSReviewVectors]' passed (0.000 seconds).
+Test Suite 'ReviewParityFixtureTests' passed at 2026-10-08 11:43:25.494.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+Test Suite 'StudyBackupArchiveTests' started at 2026-10-08 11:43:25.494.
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsDuplicateManifestPaths]' started.
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsDuplicateManifestPaths]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsFutureVersionBeforeRestoring]' started.
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsFutureVersionBeforeRestoring]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsIncompleteReferencedAttachment]' started.
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsIncompleteReferencedAttachment]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsMissingPDFSourceDespiteValidManifest]' started.
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsMissingPDFSourceDespiteValidManifest]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsTamperedPayload]' started.
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsTamperedPayload]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsTraversalPathsAndDeclaredOversizeWithoutAllocation]' started.
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRejectsTraversalPathsAndDeclaredOversizeWithoutAllocation]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRoundTripRetainsOriginalAndHashesWithoutCredentials]' started.
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testRoundTripRetainsOriginalAndHashesWithoutCredentials]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testScopeCanonicalizesOriginButRequiresSameAccount]' started.
+Test Case '-[ShufangCoreTests.StudyBackupArchiveTests testScopeCanonicalizesOriginButRequiresSameAccount]' passed (0.000 seconds).
+Test Suite 'StudyBackupArchiveTests' passed at 2026-10-08 11:43:25.498.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.004 (0.004) seconds
+Test Suite 'StudyBackupSelectionTests' started at 2026-10-08 11:43:25.498.
+Test Case '-[ShufangCoreTests.StudyBackupSelectionTests testAssociationBackupIncludesBothOriginalBooks]' started.
+Test Case '-[ShufangCoreTests.StudyBackupSelectionTests testAssociationBackupIncludesBothOriginalBooks]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.StudyBackupSelectionTests testScopedBackupKeepsSourceClosureAndExcludesUnrelatedSets]' started.
+Test Case '-[ShufangCoreTests.StudyBackupSelectionTests testScopedBackupKeepsSourceClosureAndExcludesUnrelatedSets]' passed (0.011 seconds).
+Test Suite 'StudyBackupSelectionTests' passed at 2026-10-08 11:43:25.511.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.013 (0.013) seconds
+Test Suite 'StudyInteractionTests' started at 2026-10-08 11:43:25.511.
+Test Case '-[ShufangCoreTests.StudyInteractionTests testCannotMoveRootOrCreateCycle]' started.
+Test Case '-[ShufangCoreTests.StudyInteractionTests testCannotMoveRootOrCreateCycle]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyInteractionTests testCollapseDoesNotDeleteDescendants]' started.
+Test Case '-[ShufangCoreTests.StudyInteractionTests testCollapseDoesNotDeleteDescendants]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyInteractionTests testLinkedNodeDisplaysCurrentCardInsteadOfCopiedText]' started.
+Test Case '-[ShufangCoreTests.StudyInteractionTests testLinkedNodeDisplaysCurrentCardInsteadOfCopiedText]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyInteractionTests testMovePreservesSubtreeAndCardIdentity]' started.
+Test Case '-[ShufangCoreTests.StudyInteractionTests testMovePreservesSubtreeAndCardIdentity]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyInteractionTests testPassageIdentityMatchesWebAndIgnoresSnapshots]' started.
+Test Case '-[ShufangCoreTests.StudyInteractionTests testPassageIdentityMatchesWebAndIgnoresSnapshots]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyInteractionTests testPDFRelationDeduplicatesReorderedRectsAndDirectionIsDistinct]' started.
+Test Case '-[ShufangCoreTests.StudyInteractionTests testPDFRelationDeduplicatesReorderedRectsAndDirectionIsDistinct]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyInteractionTests testSiblingReorderAndSubtreeDeletion]' started.
+Test Case '-[ShufangCoreTests.StudyInteractionTests testSiblingReorderAndSubtreeDeletion]' passed (0.000 seconds).
+Test Suite 'StudyInteractionTests' passed at 2026-10-08 11:43:25.512.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'StudyRestoreTests' started at 2026-10-08 11:43:25.512.
+Test Case '-[ShufangCoreTests.StudyRestoreTests testCopiedCardRetainsReviewHistoryWithNewEventIdentity]' started.
+Test Case '-[ShufangCoreTests.StudyRestoreTests testCopiedCardRetainsReviewHistoryWithNewEventIdentity]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.StudyRestoreTests testCopiedNoteLinksResolveIDsAndUniqueTitlesWithoutChangingLabels]' started.
+Test Case '-[ShufangCoreTests.StudyRestoreTests testCopiedNoteLinksResolveIDsAndUniqueTitlesWithoutChangingLabels]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.StudyRestoreTests testCopyUsesKindQualifiedIDsAndLeavesProseUntouched]' started.
+Test Case '-[ShufangCoreTests.StudyRestoreTests testCopyUsesKindQualifiedIDsAndLeavesProseUntouched]' passed (0.003 seconds).
+Test Case '-[ShufangCoreTests.StudyRestoreTests testDeletedBookRestoresNewSourceAndInkIdentities]' started.
+Test Case '-[ShufangCoreTests.StudyRestoreTests testDeletedBookRestoresNewSourceAndInkIdentities]' passed (0.006 seconds).
+Test Case '-[ShufangCoreTests.StudyRestoreTests testDeletedNoteRestoresAsCopyEvenWhenKeepingLocal]' started.
+Test Case '-[ShufangCoreTests.StudyRestoreTests testDeletedNoteRestoresAsCopyEvenWhenKeepingLocal]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.StudyRestoreTests testIsolatedDeletedInkStopsBeforeChangingRecords]' started.
+Test Case '-[ShufangCoreTests.StudyRestoreTests testIsolatedDeletedInkStopsBeforeChangingRecords]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.StudyRestoreTests testKeepBothLeavesLiveBookSourceAndInkStable]' started.
+Test Case '-[ShufangCoreTests.StudyRestoreTests testKeepBothLeavesLiveBookSourceAndInkStable]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.StudyRestoreTests testPreparedRestoreRefusesStateDriftWithoutPartiallyQueuingRecords]' started.
+Test Case '-[ShufangCoreTests.StudyRestoreTests testPreparedRestoreRefusesStateDriftWithoutPartiallyQueuingRecords]' passed (0.001 seconds).
+Test Suite 'StudyRestoreTests' passed at 2026-10-08 11:43:25.529.
+	 Executed 8 tests, with 0 failures (0 unexpected) in 0.017 (0.017) seconds
+Test Suite 'StudyStoreTests' started at 2026-10-08 11:43:25.529.
+Test Case '-[ShufangCoreTests.StudyStoreTests testAttachmentIntegrityAndInkSurviveRestart]' started.
+Test Case '-[ShufangCoreTests.StudyStoreTests testAttachmentIntegrityAndInkSurviveRestart]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.StudyStoreTests testCrossParagraphSelectionPreservesUTF16Anchors]' started.
+Test Case '-[ShufangCoreTests.StudyStoreTests testCrossParagraphSelectionPreservesUTF16Anchors]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyStoreTests testEditingKnownCardFieldsPreservesNewerClientMetadata]' started.
+Test Case '-[ShufangCoreTests.StudyStoreTests testEditingKnownCardFieldsPreservesNewerClientMetadata]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.StudyStoreTests testGradingPreservesMetadataAndMoreRecentCardEdits]' started.
+Test Case '-[ShufangCoreTests.StudyStoreTests testGradingPreservesMetadataAndMoreRecentCardEdits]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.StudyStoreTests testMindMapNodeIDsWithColonsMatchServerMaterialization]' started.
+Test Case '-[ShufangCoreTests.StudyStoreTests testMindMapNodeIDsWithColonsMatchServerMaterialization]' passed (0.000 seconds).
+Test Case '-[ShufangCoreTests.StudyStoreTests testNewerLocalFormatIsNeverOverwritten]' started.
+Test Case '-[ShufangCoreTests.StudyStoreTests testNewerLocalFormatIsNeverOverwritten]' passed (0.001 seconds).
+Test Case '-[ShufangCoreTests.StudyStoreTests testOfflineEditsSurviveRestartAndStayAccountScoped]' started.
+Test Case '-[ShufangCoreTests.StudyStoreTests testOfflineEditsSurviveRestartAndStayAccountScoped]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.StudyStoreTests testRestoreKeepsBookIdentityAndRemapsLinkedNotesAndCards]' started.
+Test Case '-[ShufangCoreTests.StudyStoreTests testRestoreKeepsBookIdentityAndRemapsLinkedNotesAndCards]' passed (0.002 seconds).
+Test Case '-[ShufangCoreTests.StudyStoreTests testReviewStateAndEventAreSavedTogether]' started.
+Test Case '-[ShufangCoreTests.StudyStoreTests testReviewStateAndEventAreSavedTogether]' passed (0.002 seconds).
+Test Suite 'StudyStoreTests' passed at 2026-10-08 11:43:25.539.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.010 (0.010) seconds
+Test Suite 'StudySyncIntegrationTests' started at 2026-10-08 11:43:25.539.
+Test Case '-[ShufangCoreTests.StudySyncIntegrationTests testDurableReplayConflictsLostResponseAndSourceUpload]' started.
+Test Case '-[ShufangCoreTests.StudySyncIntegrationTests testDurableReplayConflictsLostResponseAndSourceUpload]' passed (0.063 seconds).
+Test Case '-[ShufangCoreTests.StudySyncIntegrationTests testOfflineDeletionDoesNotEraseConcurrentRemoteEdit]' started.
+Test Case '-[ShufangCoreTests.StudySyncIntegrationTests testOfflineDeletionDoesNotEraseConcurrentRemoteEdit]' passed (0.019 seconds).
+Test Suite 'StudySyncIntegrationTests' passed at 2026-10-08 11:43:25.621.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.081 (0.081) seconds
+Test Suite 'ShufangCorePackageTests.xctest' passed at 2026-10-08 11:43:25.621.
+	 Executed 75 tests, with 0 failures (0 unexpected) in 0.201 (0.203) seconds
+Test Suite 'All tests' passed at 2026-10-08 11:43:25.621.
+	 Executed 75 tests, with 0 failures (0 unexpected) in 0.201 (0.205) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
+[0/1] Planning build
+Building for debugging...
+[0/3] Write swift-version--58304C5D6DBC2206.txt
+[2/18] Compiling ShufangCore StudyTextSelection.swift
+[3/19] Compiling ShufangCore StudyTree.swift
+[4/19] Emitting module ShufangCore
+[5/19] Compiling ShufangCore StudyStore.swift
+[6/19] Compiling ShufangCore StudyRestore.swift
+[7/19] Compiling ShufangCore Models.swift
+[8/19] Compiling ShufangCore PDFGeometry.swift
+[9/19] Compiling ShufangCore ReaderNavigation.swift
+[10/19] Compiling ShufangCore StudyBackup.swift
+[11/19] Compiling ShufangCore PortableInk.swift
+[12/19] Compiling ShufangCore PortableInkPencil.swift
+[13/19] Compiling ShufangCore BookFootnotes.swift
+[14/19] Compiling ShufangCore Keychain.swift
+[15/19] Compiling ShufangCore StudyModels.swift
+[16/19] Compiling ShufangCore APIClient.swift
+[17/19] Compiling ShufangCore AccountRoutes.swift
+[18/36] Compiling ShufangCoreTests StudyInteractionTests.swift
+[19/36] Compiling ShufangCoreTests StudyRestoreTests.swift
+[20/37] Compiling ShufangCoreTests PortableInkTests.swift
+[21/37] Compiling ShufangCoreTests ReaderNavigationTests.swift
+[22/37] Compiling ShufangCoreTests StudyStoreTests.swift
+[23/37] Compiling ShufangCoreTests StudySyncIntegrationTests.swift
+[24/37] Compiling ShufangCoreTests resource_bundle_accessor.swift
+[25/37] Compiling ShufangCoreTests ReadingSyncTests.swift
+[26/37] Compiling ShufangCoreTests ReviewParityFixtureTests.swift
+[27/37] Compiling ShufangCoreTests PDFGeometryTests.swift
+[28/37] Compiling ShufangCoreTests PortableInkPencilTests.swift
+[29/37] Emitting module ShufangCoreTests
+[30/37] Compiling ShufangCoreTests AccountRouteTests.swift
+[31/37] Compiling ShufangCoreTests BookFootnoteTests.swift
+[32/37] Compiling ShufangCoreTests StudyBackupArchiveTests.swift
+[33/37] Compiling ShufangCoreTests StudyBackupSelectionTests.swift
+[34/37] Compiling ShufangCoreTests CoreTests.swift
+[35/37] Compiling ShufangCoreTests HTTPIntegrationTests.swift
+[36/39] Compiling ShufangCorePackageTests runner.swift
+[37/39] Emitting module ShufangCorePackageTests
+[37/39] Write Objects.LinkFileList
+[38/39] Linking ShufangCorePackageTests
+Build complete! (8.97s)

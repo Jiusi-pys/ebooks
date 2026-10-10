@@ -1,0 +1,10 @@
+[
+  {"rating":1,"reps":0,"interval":0,"expectedReps":0,"expectedInterval":0,"expectedLapses":1,"dueOffset":300000},
+  {"rating":2,"reps":0,"interval":0,"expectedReps":1,"expectedInterval":0,"expectedLapses":0,"dueOffset":600000},
+  {"rating":3,"reps":0,"interval":0,"expectedReps":1,"expectedInterval":1,"expectedLapses":0,"dueOffset":86400000},
+  {"rating":4,"reps":0,"interval":0,"expectedReps":1,"expectedInterval":2,"expectedLapses":0,"dueOffset":172800000},
+  {"rating":1,"reps":3,"interval":3,"expectedReps":0,"expectedInterval":0,"expectedLapses":1,"dueOffset":300000},
+  {"rating":2,"reps":3,"interval":3,"expectedReps":4,"expectedInterval":4,"expectedLapses":0,"dueOffset":345600000},
+  {"rating":3,"reps":3,"interval":3,"expectedReps":4,"expectedInterval":7,"expectedLapses":0,"dueOffset":604800000},
+  {"rating":4,"reps":3,"interval":3,"expectedReps":4,"expectedInterval":10,"expectedLapses":0,"dueOffset":864000000}
+]

@@ -1,0 +1,63 @@
+{
+  "noteCount": 47,
+  "apkSha256": "439a0ea6a3ccb12e85f6f0744b8beec09d3fdd5d499265acc8c54fc597ca7c91",
+  "checks": [
+    "Home, process force-stop and cold restart",
+    "Portrait/landscape rotation retains visible native UI",
+    "System Back and reopen",
+    "Cover install preserves every existing test note"
+  ],
+  "coldLaunch": "Starting: Intent { cmp=org.shufang.android/.MainActivity }\r\nStatus: ok\r\nLaunchState: COLD\r\nActivity: org.shufang.android/.MainActivity\r\nTotalTime: 590\r\nWaitTime: 592\r\nComplete",
+  "toolWarnings": [
+    "uiautomator exit 139 after successful hierarchy dump",
+    "uiautomator exit 139 after successful hierarchy dump",
+    "uiautomator exit 139 after successful hierarchy dump",
+    "uiautomator exit 139 after successful hierarchy dump",
+    "uiautomator exit 139 after successful hierarchy dump"
+  ],
+  "screens": {
+    "cold-start": {
+      "display": 46,
+      "size": [
+        1456,
+        2560
+      ]
+    },
+    "process-restart": {
+      "display": 47,
+      "size": [
+        1456,
+        2560
+      ]
+    },
+    "rotated": {
+      "display": 47,
+      "size": [
+        2560,
+        1456
+      ]
+    },
+    "system-back": {
+      "display": 47,
+      "size": [
+        1456,
+        2560
+      ]
+    },
+    "cover-install": {
+      "display": 48,
+      "size": [
+        1456,
+        2560
+      ]
+    }
+  },
+  "restartLaunch": "Starting: Intent { cmp=org.shufang.android/.MainActivity }\r\nStatus: ok\r\nLaunchState: COLD\r\nActivity: org.shufang.android/.MainActivity\r\nTotalTime: 606\r\nWaitTime: 607\r\nComplete",
+  "rotationVerified": true,
+  "device": {
+    "ro.build.version.release": "15",
+    "ro.build.version.sdk": "35",
+    "ro.product.cpu.abilist": "x86_64,arm64-v8a,x86"
+  },
+  "webview": "Current WebView Update Service state\r\n  Current WebView package (name, version): (com.android.webview, 110.0.5481.154.1)\r\n  Minimum targetSdkVersion: 33\r\n  Minimum WebView version code: 548115537\r\n  Number of relros started: 0\r\n  Number of relros finished: 0\r\n  WebView package dirty: false\r\n  Any WebView package installed: true\r\n  Preferred WebView package (name, version): (com.android.webview, 110.0.5481.154.1)\r\n  WebView packages:\r\n    Valid package com.android.webview (versionName: 110.0.5481.154.1, versionCode: 548115537, targetSdkVersion: 33) is  installed/enabled for all users"
+}

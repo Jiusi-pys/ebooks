@@ -1,0 +1,9 @@
+
+org.shufang.android.MindMoveTouchTest:.
+
+Time: 3.707
+
+OK (1 test)
+
+
+

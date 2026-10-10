@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/opt/shufang/hotfix-sync503-20261008/deploy-conditional.py", line 52, in <module>
+    else:raise RuntimeError('Candidate did not become ready')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Candidate did not become ready

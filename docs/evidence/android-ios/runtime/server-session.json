@@ -1,0 +1,17 @@
+{
+  "loginHttp": 200,
+  "/api/auth/session": {
+    "http": 200,
+    "authenticated": true,
+    "configured": true,
+    "hasWorkspace": false,
+    "hasNode": false
+  },
+  "/api/v2/capabilities": {
+    "http": 200,
+    "authenticated": null,
+    "configured": null,
+    "hasWorkspace": true,
+    "hasNode": true
+  }
+}

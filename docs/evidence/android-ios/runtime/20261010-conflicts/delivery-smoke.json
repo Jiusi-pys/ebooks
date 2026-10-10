@@ -1,0 +1,13 @@
+{
+  "serial": "emulator-5560",
+  "package": "org.shufang.android",
+  "apkSha256": "5d6919ecce8bcdca5968523def9f26f2c2813d7188e507f28e3e50d605275557",
+  "installedHashMatches": true,
+  "coldStartStatus": "ok",
+  "libraryUiPresent": true,
+  "processAlive": true,
+  "crashBufferExitCode": 0,
+  "crashBuffer": "",
+  "uiToolExitCode": 0,
+  "scope": "API26 actual delivery APK installation/cold start; full functionality covered separately by acceptance APK"
+}

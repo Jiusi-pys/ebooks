@@ -1,0 +1,18 @@
+{
+  "unitTests": 23,
+  "unitFailures": 0,
+  "unitErrors": 0,
+  "apkSha256": "d2be186ebbe2fbb512bc395e56d89d76df77deb511bf2513c4c350ec65a45265",
+  "sourceManifestSha256": "1ca3e8648e16dddaf82ba3064190c0879ff9338c1188dd151a2f3da1b78f242c",
+  "instrumentation": {
+    "discoveredPerPlatform": 29,
+    "executedPassedPerPlatform": 23,
+    "gatedSkippedPerPlatform": 6,
+    "platforms": [
+      "MuMu API35",
+      "SDK API26",
+      "SDK API28"
+    ]
+  },
+  "fullParityComplete": false
+}

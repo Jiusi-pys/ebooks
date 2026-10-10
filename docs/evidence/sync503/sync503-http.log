@@ -1,0 +1,8 @@
+{
+  "snapshotAfterDisconnect": 201,
+  "pageAfterDisconnect": 200,
+  "pushAfterSecondDisconnect": 200,
+  "repeatOperationDeduplicated": true,
+  "writerConnectionChanged": true,
+  "entities": 1
+}

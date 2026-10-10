@@ -1,0 +1,8 @@
+
+org.shufang.android.IosParityRuntimeTest:.
+
+Time: 0.006
+
+OK (1 test)
+
+

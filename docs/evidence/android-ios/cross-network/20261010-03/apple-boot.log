@@ -1,0 +1,9 @@
+Monitoring boot status for Shufang Android Ink Parity (37DA40C6-93F2-475C-AF03-245F509748FE).
+[2026-10-09 18:08:51 +0000] Status=2, isTerminal=NO, Elapsed=00:01.
+	Waiting on Data Migration
+		Reason:(null)
+		Migration Elapsed:00:00 seconds
+
+[2026-10-09 18:08:55 +0000] Status=4294967295, isTerminal=YES, Elapsed=00:05.
+	Finished
+

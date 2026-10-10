@@ -1,0 +1,8 @@
+
+org.shufang.android.RealServerTest:.
+
+Time: 3.18
+
+OK (1 test)
+
+

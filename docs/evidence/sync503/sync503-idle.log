@@ -1,0 +1,8 @@
+{
+  "idleTimeoutSeconds": 2,
+  "leaseExpiredConfirmed": true,
+  "readWhileWriterExpired": 200,
+  "snapshotAfterIdleTimeout": 201,
+  "pageAfterIdleTimeout": 200,
+  "serverRestartNeededForRecovery": false
+}

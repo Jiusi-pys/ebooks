@@ -1,0 +1,12 @@
+.gradle/
+.kotlin/
+local.properties
+**/build/
+app/src/main/jniLibs/
+app/src/main/assets/reader/
+captures/
+*.jks
+*.keystore
+
+
+web/node_modules/

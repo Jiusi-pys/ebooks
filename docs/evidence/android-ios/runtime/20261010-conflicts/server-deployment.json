@@ -1,0 +1,1 @@
+{"binarySha256": "44574b9fbb2e68d091eab4afa6694d36716ae4baf52797d1722feef13e55d2fb", "conditionalPush": 1, "preflightReadOnlyPassed": true, "before": ["99", "4330", "16"], "after": ["99", "4330", "16"], "rollbackContainer": "shufang-app-before-conditional-20261010", "schemaChanged": false, "image": "sha256:c05ca9a6aab308a549c3318a7b900f35c3b7f7e2d31fc1d16b2d75e46f4e2c04"}

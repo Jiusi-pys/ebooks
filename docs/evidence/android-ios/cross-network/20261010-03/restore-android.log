@@ -1,0 +1,37 @@
+
+org.shufang.android.CrossInkNetworkTest:
+Error in androidRestoresIosZIPWithOriginalAndInk(org.shufang.android.CrossInkNetworkTest):
+java.lang.IllegalStateException: invalid_source_ranges
+	at org.shufang.android.CoreRepository.native(CoreRepository.kt:42)
+	at org.shufang.android.CoreRepository.access$native(CoreRepository.kt:20)
+	at org.shufang.android.CoreRepository$command$2.invokeSuspend(CoreRepository.kt:47)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+
+
+Time: 0.017
+There was 1 failure:
+1) androidRestoresIosZIPWithOriginalAndInk(org.shufang.android.CrossInkNetworkTest)
+java.lang.IllegalStateException: invalid_source_ranges
+	at org.shufang.android.CoreRepository.native(CoreRepository.kt:42)
+	at org.shufang.android.CoreRepository.access$native(CoreRepository.kt:20)
+	at org.shufang.android.CoreRepository$command$2.invokeSuspend(CoreRepository.kt:47)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+
+FAILURES!!!
+Tests run: 1,  Failures: 1
+
+

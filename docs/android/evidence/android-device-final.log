@@ -1,0 +1,7 @@
+Android package service is not ready; start/recover the emulator first
+At C:\Users\17715\Documents\codes\书籍管理\platforms\android\scripts\test-device.ps1:14 char:19
++ ... eadyDevice){throw 'Android package service is not ready; start/recove ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Android package... emulator first:String) [], RuntimeException
+    + FullyQualifiedErrorId : Android package service is not ready; start/recover the emulator first
+ 

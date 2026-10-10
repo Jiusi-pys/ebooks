@@ -1,0 +1,37 @@
+
+org.shufang.android.IosParityRuntimeTest:
+Error in installedRealModelStreamsAndCancelsWithoutServer(org.shufang.android.IosParityRuntimeTest):
+java.lang.IllegalArgumentException: 当前内存不足，先关闭其他应用或选择更小模型
+	at org.shufang.android.LocalAi.checkMemory(LocalAi.kt:33)
+	at org.shufang.android.LocalAi.access$checkMemory(LocalAi.kt:23)
+	at org.shufang.android.LocalAi$install$2.invokeSuspend(LocalAi.kt:28)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+.
+
+Time: 3.05
+There was 1 failure:
+1) installedRealModelStreamsAndCancelsWithoutServer(org.shufang.android.IosParityRuntimeTest)
+java.lang.IllegalArgumentException: 当前内存不足，先关闭其他应用或选择更小模型
+	at org.shufang.android.LocalAi.checkMemory(LocalAi.kt:33)
+	at org.shufang.android.LocalAi.access$checkMemory(LocalAi.kt:23)
+	at org.shufang.android.LocalAi$install$2.invokeSuspend(LocalAi.kt:28)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+
+FAILURES!!!
+Tests run: 2,  Failures: 1
+
+

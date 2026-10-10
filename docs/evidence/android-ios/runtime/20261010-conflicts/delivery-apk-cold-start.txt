@@ -1,0 +1,7 @@
+Starting: Intent { cmp=org.shufang.android/.MainActivity }
+Status: ok
+Activity: org.shufang.android/.MainActivity
+ThisTime: 621
+TotalTime: 621
+WaitTime: 631
+Complete

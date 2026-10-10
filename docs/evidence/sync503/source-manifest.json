@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-08",
+  "branch": "android",
+  "workspaceHead": "40f84d9a17b7ca68e3134f2093afba82fb687c11",
+  "productionBase": "3cbda7f69e1d02f5d9b5c81e7644712b19054c8f",
+  "rustc": "1.93.1",
+  "binarySha256": "1e609bac49799100be9e93e8b59dc109662bae01dc5f7adf0c14efb4e5edc217",
+  "files": {
+    "base/crates/mysql/tests/writer_reconnect.rs": "9d3dd96d6ea37e1b23a0775ccae7ea3b5015d380e58b40ff54c13fe6bc813c13",
+    "base/crates/mysql/src/lib.rs": "154498d0684a0c8333cdb0434fbda74122a43c8f4949739915897eebe4bcd005"
+  }
+}

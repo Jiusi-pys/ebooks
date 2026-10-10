@@ -1,0 +1,32 @@
+{
+  "time": "2026-10-08T00:49:58.923367+00:00",
+  "image": "sha256:9e65280b5b86d6d3e065c2efe4b7d074f2cca93b31d818a655e7a6064fbee06f",
+  "binarySha256": "1e609bac49799100be9e93e8b59dc109662bae01dc5f7adf0c14efb4e5edc217",
+  "snapshotStatus": 201,
+  "snapshotPageStatus": 200,
+  "snapshotEntities": 70,
+  "entityCountAndSequenceBefore": [
+    "70",
+    "4300"
+  ],
+  "entityCountAndSequenceAfter": [
+    "70",
+    "4300"
+  ],
+  "restartCount": 0,
+  "rollbackContainer": "shufang-app-before-sync503-20261008",
+  "backupCompleted": true,
+  "schemaChanged": false,
+  "rollbackRetained": true,
+  "postDeploymentRestartCount": 0,
+  "postDeploymentRunning": true,
+  "backupDirectory": "/opt/shufang/backups/rust-20261008T004844Z-version-d76cdc13-1877-4e7b-97eb-216e60261734",
+  "backupHashesVerified": true,
+  "finalProbe": {
+    "time": "2026-10-08T00:54:42.226696+00:00",
+    "snapshot": 201,
+    "page": 200,
+    "entities": 70,
+    "restartCount": 0
+  }
+}

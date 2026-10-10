@@ -1,0 +1,42 @@
+Test Suite 'Selected tests' started at 2026-10-09 14:08:12.576.
+Test Suite 'ShufangCorePackageTests.xctest' started at 2026-10-09 14:08:12.578.
+Test Suite 'StudyCardCompatibilityTests' started at 2026-10-09 14:08:12.578.
+Test Case '-[ShufangCoreTests.StudyCardCompatibilityTests testPdfCardAcceptsAbsentTextChapterMetadata]' started.
+/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/StudyCardCompatibilityTests.swift:8: error: -[ShufangCoreTests.StudyCardCompatibilityTests testPdfCardAcceptsAbsentTextChapterMetadata] : failed: caught error: "DecodingError.keyNotFound: Key 'chapterId' not found in keyed decoding container. Debug description: No value associated with key CodingKeys(stringValue: "chapterId", intValue: nil) ("chapterId")."
+Test Case '-[ShufangCoreTests.StudyCardCompatibilityTests testPdfCardAcceptsAbsentTextChapterMetadata]' failed (0.055 seconds).
+Test Suite 'StudyCardCompatibilityTests' failed at 2026-10-09 14:08:12.633.
+	 Executed 1 test, with 1 failure (1 unexpected) in 0.055 (0.056) seconds
+Test Suite 'ShufangCorePackageTests.xctest' failed at 2026-10-09 14:08:12.633.
+	 Executed 1 test, with 1 failure (1 unexpected) in 0.055 (0.056) seconds
+Test Suite 'Selected tests' failed at 2026-10-09 14:08:12.633.
+	 Executed 1 test, with 1 failure (1 unexpected) in 0.055 (0.058) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
+[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[2/5] Write swift-version--58304C5D6DBC2206.txt
+[4/20] Compiling ShufangCore BookFootnotes.swift
+[5/20] Compiling ShufangCore Keychain.swift
+[6/20] Compiling ShufangCore APIClient.swift
+[7/20] Compiling ShufangCore AccountRoutes.swift
+[8/20] Compiling ShufangCore StudyStore.swift
+[9/20] Compiling ShufangCore StudyModels.swift
+[10/20] Compiling ShufangCore ReaderNavigation.swift
+[11/20] Compiling ShufangCore StudyBackup.swift
+[12/20] Compiling ShufangCore Models.swift
+[13/20] Compiling ShufangCore PDFGeometry.swift
+[14/20] Compiling ShufangCore StudyRestore.swift
+[15/20] Compiling ShufangCore PortableInk.swift
+[16/20] Compiling ShufangCore PortableInkPencil.swift
+[17/20] Emitting module ShufangCore
+[18/20] Compiling ShufangCore StudyTextSelection.swift
+[19/21] Compiling ShufangCore StudyTree.swift
+[20/24] Emitting module ShufangCoreTests
+[21/24] Compiling ShufangCoreTests NetworkInkParityTests.swift
+[22/24] Compiling ShufangCoreTests StudyCardCompatibilityTests.swift
+[22/24] Write Objects.LinkFileList
+[23/24] Linking ShufangCorePackageTests
+Build complete! (2.09s)

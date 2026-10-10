@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.shufang.android.AccountRoutesTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-08T17:32:24.620Z" hostname="WINDOWS" time="0.027">
+  <properties/>
+  <testcase name="latencyHysteresisManualSelectionAndIdentityAreStable" classname="org.shufang.android.AccountRoutesTest" time="0.024"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

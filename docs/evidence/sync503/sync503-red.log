@@ -1,0 +1,39 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running tests\writer_reconnect.rs (base\target\debug\deps\writer_reconnect-57cb03fcd45445e9.exe)
+
+running 3 tests
+test disconnected_writer_recovers_snapshot_and_mutation_without_duplicate_operations ... FAILED
+test reconnect_does_not_steal_another_writer_lease ... FAILED
+test reconnect_rejects_a_replaced_workspace_epoch ... FAILED
+
+failures:
+
+---- disconnected_writer_recovers_snapshot_and_mutation_without_duplicate_operations stdout ----
+
+thread 'disconnected_writer_recovers_snapshot_and_mutation_without_duplicate_operations' (200332) panicked at crates\mysql\tests\writer_reconnect.rs:36:97:
+called `Result::unwrap()` on an `Err` value: "storage_error: mysql operation failed"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- reconnect_does_not_steal_another_writer_lease stdout ----
+
+thread 'reconnect_does_not_steal_another_writer_lease' (401520) panicked at crates\mysql\tests\writer_reconnect.rs:52:5:
+assertion `left == right` failed
+  left: "storage_error: mysql operation failed"
+ right: "writer_lease_lost"
+
+---- reconnect_rejects_a_replaced_workspace_epoch stdout ----
+
+thread 'reconnect_rejects_a_replaced_workspace_epoch' (346436) panicked at crates\mysql\tests\writer_reconnect.rs:64:5:
+assertion `left == right` failed
+  left: "storage_error: mysql operation failed"
+ right: "writer_identity_changed"
+
+
+failures:
+    disconnected_writer_recovers_snapshot_and_mutation_without_duplicate_operations
+    reconnect_does_not_steal_another_writer_lease
+    reconnect_rejects_a_replaced_workspace_epoch
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+error: test failed, to rerun pass `-p shufang-mysql --test writer_reconnect`

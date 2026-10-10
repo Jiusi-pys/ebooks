@@ -1,0 +1,5 @@
+    Checking shufang-mysql v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\mysql)
+    Checking shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+    Checking shufang-service v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\service)
+    Checking shufang-bindings v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\bindings)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.58s

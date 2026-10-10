@@ -1,0 +1,12 @@
+   Compiling shufang-mysql v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\mysql)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.54s
+     Running tests\repository.rs (base\target\debug\deps\repository-19b5e05791d5d620.exe)
+
+running 4 tests
+test digest_preserves_shared_owner_and_rejects_stale_save ... ok
+test existing_peer_credentials_remain_authoritative_and_revocable ... ok
+test existing_schema_atomic_commands_and_snapshot_lifecycle ... ok
+test restore_retains_operations_and_changes_epoch_then_transfers_writer ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+

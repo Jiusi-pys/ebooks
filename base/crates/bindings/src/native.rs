@@ -10,6 +10,8 @@ use std::{
 #[derive(Deserialize)]
 #[serde(tag = "command")]
 enum Command {
+    #[serde(rename = "sessionConfigureVault")]
+    ConfigureVault { key: String },
     #[serde(rename = "sessionDatabaseVersion")]
     DatabaseVersion { database: PathBuf },
     #[serde(rename = "sessionBackupClosed")]
@@ -48,6 +50,18 @@ enum Command {
 pub fn execute(value: Value) -> Result<Value, String> {
     static SESSIONS: OnceLock<Mutex<BTreeMap<String, Arc<Workspace>>>> = OnceLock::new();
     let command: Command = serde_json::from_value(value).map_err(|_| "invalid_command")?;
+    if let Command::ConfigureVault {key}=command {
+        #[cfg(target_os="android")]
+        {
+            if key.len()!=64 || !key.bytes().all(|b|b.is_ascii_hexdigit()) {return Err("invalid_credential_key".into());}
+            static KEY:OnceLock<String>=OnceLock::new();
+            let prior=KEY.get_or_init(|| {std::env::set_var("SHUFANG_CREDENTIAL_KEY",&key);key.clone()});
+            if prior!=&key {return Err("credential_key_already_initialized".into());}
+            return Ok(Value::Null);
+        }
+        #[cfg(not(target_os="android"))]
+        {let _=key;return Err("android_command_required".into());}
+    }
     if let Command::DatabaseVersion { database } = command {
         if !database.is_absolute() {
             return Err("absolute_path_required".into());

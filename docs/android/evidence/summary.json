@@ -1,0 +1,34 @@
+{
+  "web": {
+    "build": "pass",
+    "skipped": 53,
+    "check": "pass",
+    "passed": 611,
+    "lint": "pass"
+  },
+  "rust": {
+    "ignored": 15,
+    "passed": 168,
+    "clippy": "pass"
+  },
+  "android": {
+    "lintWarnings": 29,
+    "signature": "debug/pass",
+    "blocking": null,
+    "lintErrors": 0,
+    "zip16KiB": "pass",
+    "finalDevice": "18 passed; 2 real-server tests skipped",
+    "elf16KiB": "pass",
+    "jvmPassed": 15,
+    "realHttps": "1 passed; authenticated check skipped",
+    "apkSha256": "439a0ea6a3ccb12e85f6f0744b8beec09d3fdd5d499265acc8c54fc597ca7c91",
+    "sourceManifestSha256": "c101eae5265664523aa710a54769a2e39dd0b8dba8d1392e08308e7d4854d856",
+    "lifecycle": [
+      "Home, process force-stop and cold restart",
+      "Portrait/landscape rotation retains visible native UI",
+      "System Back and reopen",
+      "Cover install preserves every existing test note"
+    ]
+  },
+  "supervisorPassed": 15
+}

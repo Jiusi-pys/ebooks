@@ -1,0 +1,135 @@
+[
+  {
+    "kind": "full-suite",
+    "profile": "n10pro2",
+    "passed": false
+  },
+  {
+    "density": 300,
+    "orientation": "portrait",
+    "profile": "n10pro2",
+    "kind": "ReadingDesignTest",
+    "font": "1.0",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "portrait",
+    "profile": "n10pro2",
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.0",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "portrait",
+    "profile": "n10pro2",
+    "kind": "ReadingDesignTest",
+    "font": "1.3",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "portrait",
+    "profile": "n10pro2",
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.3",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "portrait",
+    "profile": "n10pro2",
+    "kind": "ReadingDesignTest",
+    "font": "2.0",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "portrait",
+    "profile": "n10pro2",
+    "kind": "PdfComparisonTouchTest",
+    "font": "2.0",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "landscape",
+    "profile": "n10pro2",
+    "kind": "ReadingDesignTest",
+    "font": "1.0",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "landscape",
+    "profile": "n10pro2",
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.0",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "landscape",
+    "profile": "n10pro2",
+    "kind": "ReadingDesignTest",
+    "font": "1.3",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "landscape",
+    "profile": "n10pro2",
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.3",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "landscape",
+    "profile": "n10pro2",
+    "kind": "ReadingDesignTest",
+    "font": "2.0",
+    "passed": true
+  },
+  {
+    "density": 300,
+    "orientation": "landscape",
+    "profile": "n10pro2",
+    "kind": "PdfComparisonTouchTest",
+    "font": "2.0",
+    "passed": true
+  },
+  {
+    "density": 240,
+    "orientation": "portrait",
+    "profile": "n10pro2",
+    "kind": "ReadingDesignTest",
+    "font": "1.0",
+    "passed": true
+  },
+  {
+    "density": 240,
+    "orientation": "portrait",
+    "profile": "n10pro2",
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.0",
+    "passed": true
+  },
+  {
+    "density": 320,
+    "orientation": "portrait",
+    "profile": "n10pro2",
+    "kind": "ReadingDesignTest",
+    "font": "1.0",
+    "passed": true
+  },
+  {
+    "density": 320,
+    "orientation": "portrait",
+    "profile": "n10pro2",
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.0",
+    "passed": true
+  }
+]

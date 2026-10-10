@@ -1,0 +1,135 @@
+[
+  {
+    "passed": true,
+    "kind": "full-suite",
+    "profile": "clear7"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "ReadingDesignTest",
+    "font": "1.0",
+    "profile": "clear7",
+    "orientation": "portrait"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.0",
+    "profile": "clear7",
+    "orientation": "portrait"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "ReadingDesignTest",
+    "font": "1.3",
+    "profile": "clear7",
+    "orientation": "portrait"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.3",
+    "profile": "clear7",
+    "orientation": "portrait"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "ReadingDesignTest",
+    "font": "2.0",
+    "profile": "clear7",
+    "orientation": "portrait"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "PdfComparisonTouchTest",
+    "font": "2.0",
+    "profile": "clear7",
+    "orientation": "portrait"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "ReadingDesignTest",
+    "font": "1.0",
+    "profile": "clear7",
+    "orientation": "landscape"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.0",
+    "profile": "clear7",
+    "orientation": "landscape"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "ReadingDesignTest",
+    "font": "1.3",
+    "profile": "clear7",
+    "orientation": "landscape"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.3",
+    "profile": "clear7",
+    "orientation": "landscape"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "ReadingDesignTest",
+    "font": "2.0",
+    "profile": "clear7",
+    "orientation": "landscape"
+  },
+  {
+    "density": 300,
+    "passed": true,
+    "kind": "PdfComparisonTouchTest",
+    "font": "2.0",
+    "profile": "clear7",
+    "orientation": "landscape"
+  },
+  {
+    "density": 240,
+    "passed": true,
+    "kind": "ReadingDesignTest",
+    "font": "1.0",
+    "profile": "clear7",
+    "orientation": "portrait"
+  },
+  {
+    "density": 240,
+    "passed": true,
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.0",
+    "profile": "clear7",
+    "orientation": "portrait"
+  },
+  {
+    "density": 320,
+    "passed": true,
+    "kind": "ReadingDesignTest",
+    "font": "1.0",
+    "profile": "clear7",
+    "orientation": "portrait"
+  },
+  {
+    "density": 320,
+    "passed": true,
+    "kind": "PdfComparisonTouchTest",
+    "font": "1.0",
+    "profile": "clear7",
+    "orientation": "portrait"
+  }
+]

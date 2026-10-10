@@ -1,0 +1,10 @@
+{
+  "baselineCommit": "201a87a69f9eb1c9d7c35cbd6ecc94b0a4720856",
+  "files": {
+    "ios-baseline\\StudyModels.swift": "d9ebf06f08aa7140049ae37f1c4039b9f4ca4519cbb3d5512cb092345774b261",
+    "ios-baseline\\StudyBackup.swift": "d5da60c736368f8d0cc49afbdac64b87db3d6a456aea2ad75c931827c8707768",
+    "ios-baseline\\StudyRestore.swift": "dc230748f2fbd7c79bb0114243c2cc4cb5ce1e491361bb10befa251dff56b8a0",
+    "ios-baseline\\AccountRoutes.swift": "6578bd8b34a6c39c9f71474838dc9d0cbd94754d9515d876ca69a9f4dbe604f2",
+    "001-ios-parity.md": "1ee2387a0c61b94657a8454f97fc50f80eb8fa6455d65e73cd67266b5c66e225"
+  }
+}

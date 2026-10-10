@@ -1,0 +1,98 @@
+[
+  {
+    "passed": false,
+    "actual": {
+      "widthDp": 640,
+      "heightDp": 1125,
+      "fontScale": 1,
+      "widthPixels": 1456,
+      "heightPixels": 2560,
+      "densityDpi": 364
+    },
+    "profile": "w320-font1"
+  },
+  {
+    "passed": false,
+    "actual": {
+      "widthDp": 640,
+      "heightDp": 1125,
+      "fontScale": 2,
+      "widthPixels": 1456,
+      "heightPixels": 2560,
+      "densityDpi": 364
+    },
+    "profile": "w320-font2"
+  },
+  {
+    "passed": false,
+    "actual": {
+      "widthDp": 640,
+      "heightDp": 1125,
+      "fontScale": 1,
+      "widthPixels": 1456,
+      "heightPixels": 2560,
+      "densityDpi": 364
+    },
+    "profile": "w600-font1"
+  },
+  {
+    "passed": false,
+    "actual": {
+      "widthDp": 640,
+      "heightDp": 1125,
+      "fontScale": 2,
+      "widthPixels": 1456,
+      "heightPixels": 2560,
+      "densityDpi": 364
+    },
+    "profile": "w600-font2"
+  },
+  {
+    "passed": false,
+    "actual": {
+      "widthDp": 640,
+      "heightDp": 1125,
+      "fontScale": 1,
+      "widthPixels": 1456,
+      "heightPixels": 2560,
+      "densityDpi": 364
+    },
+    "profile": "w840-font1"
+  },
+  {
+    "passed": false,
+    "actual": {
+      "widthDp": 640,
+      "heightDp": 1125,
+      "fontScale": 2,
+      "widthPixels": 1456,
+      "heightPixels": 2560,
+      "densityDpi": 364
+    },
+    "profile": "w840-font2"
+  },
+  {
+    "passed": false,
+    "actual": {
+      "widthDp": 640,
+      "heightDp": 1125,
+      "fontScale": 1,
+      "widthPixels": 1456,
+      "heightPixels": 2560,
+      "densityDpi": 364
+    },
+    "profile": "w1024-font1"
+  },
+  {
+    "passed": false,
+    "actual": {
+      "widthDp": 640,
+      "heightDp": 1125,
+      "fontScale": 2,
+      "widthPixels": 1456,
+      "heightPixels": 2560,
+      "densityDpi": 364
+    },
+    "profile": "w1024-font2"
+  }
+]

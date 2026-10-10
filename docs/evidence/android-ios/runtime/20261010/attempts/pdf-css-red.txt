@@ -1,0 +1,21 @@
+
+org.shufang.android.ReaderBridgeTest:
+Error in originalPdfBodyCanBeSearchedOfflineWithoutNativePdfium(org.shufang.android.ReaderBridgeTest):
+java.lang.AssertionError: PDF text layer must not duplicate canvas text: "static|rgb(37, 39, 34)"
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.assertTrue(Assert.java:42)
+	at org.shufang.android.ReaderBridgeTest.originalPdfBodyCanBeSearchedOfflineWithoutNativePdfium(ReaderBridgeTest.kt:72)
+
+
+Time: 1.325
+There was 1 failure:
+1) originalPdfBodyCanBeSearchedOfflineWithoutNativePdfium(org.shufang.android.ReaderBridgeTest)
+java.lang.AssertionError: PDF text layer must not duplicate canvas text: "static|rgb(37, 39, 34)"
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.assertTrue(Assert.java:42)
+	at org.shufang.android.ReaderBridgeTest.originalPdfBodyCanBeSearchedOfflineWithoutNativePdfium(ReaderBridgeTest.kt:72)
+
+FAILURES!!!
+Tests run: 1,  Failures: 1
+
+

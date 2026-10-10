@@ -1,0 +1,15 @@
+   Compiling shufang-application v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\application)
+   Compiling shufang-sqlite v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\sqlite)
+   Compiling shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.59s
+     Running tests\study_restore.rs (base\target\debug\deps\study_restore-bcec1f7f5ef1130d.exe)
+
+running 5 tests
+test materialized_optional_null_ranges_survive_backup_validation ... ok
+test restore_validates_staged_references_and_commits_all_or_nothing ... ok
+test untrusted_zip_cannot_escape_staging_or_restore_without_a_complete_manifest ... ok
+test keep_both_rebinds_note_links_without_rewriting_extension_metadata ... ok
+test study_zip_restore_preview_rejects_stale_and_retries_without_duplicates ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+

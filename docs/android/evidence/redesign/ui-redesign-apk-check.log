@@ -1,0 +1,16 @@
+16 KiB ELF: arm64-v8a/libandroidx.graphics.path.so
+16 KiB ELF: x86_64/libandroidx.graphics.path.so
+16 KiB ELF: arm64-v8a/libshufang_jni.so
+16 KiB ELF: x86_64/libshufang_jni.so
+16 KiB ELF: arm64-v8a/libshufang_bindings.so
+16 KiB ELF: x86_64/libshufang_bindings.so
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by org.conscrypt.NativeLibraryUtil in an unnamed module (file:/C:/Users/17715/AppData/Local/Android/Sdk/build-tools/36.0.0/lib/apksigner.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+Algorithm       Hash                                                                   Path
+---------       ----                                                                   ----
+SHA256          44A70ABCC1842860B8975B4CD083CDFD5E4F20B15BCA666AE360E23D2DC8C3E9       C:\Users\17715\Documents\codes\…
+

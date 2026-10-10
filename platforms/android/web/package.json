@@ -1,0 +1,9 @@
+{
+  "name": "shufang-android-reader",
+  "private": true,
+  "version": "0.1.0",
+  "dependencies": {
+    "core-js-pure": "3.45.1",
+    "pdf-lib": "1.17.1"
+  }
+}

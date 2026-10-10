@@ -1,0 +1,9 @@
+{
+  "conditionalPush": 1,
+  "staleWriterRejected": true,
+  "lostReceiptDuplicateRecognized": true,
+  "mysqlDisconnectSnapshotRecovered": true,
+  "conditionalPushAfterRecovery": true,
+  "schemaChanged": false,
+  "isolatedDatabase": "shufang_test_conditional"
+}

@@ -1,0 +1,11 @@
+{
+  "configuration": {
+    "resolution_dpi.custom": "364.000000",
+    "resolution_height.custom": "1456.000000",
+    "resolution_mode": "custom",
+    "resolution_width.custom": "2560.000000"
+  },
+  "size": "Physical size: 1456x2560\r\n",
+  "density": "Physical density: 364\r\nOverride density: 240\r\n",
+  "font": "1.0"
+}

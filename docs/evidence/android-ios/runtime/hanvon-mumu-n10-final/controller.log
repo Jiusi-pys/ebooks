@@ -1,0 +1,17 @@
+n10pro2: full suite
+n10pro2-portrait-font1.0-dpi300 : ReadingDesignTest
+n10pro2-portrait-font1.0-dpi300 : PdfComparisonTouchTest
+n10pro2-portrait-font1.3-dpi300 : ReadingDesignTest
+n10pro2-portrait-font1.3-dpi300 : PdfComparisonTouchTest
+n10pro2-portrait-font2.0-dpi300 : ReadingDesignTest
+n10pro2-portrait-font2.0-dpi300 : PdfComparisonTouchTest
+n10pro2-landscape-font1.0-dpi300 : ReadingDesignTest
+n10pro2-landscape-font1.0-dpi300 : PdfComparisonTouchTest
+n10pro2-landscape-font1.3-dpi300 : ReadingDesignTest
+n10pro2-landscape-font1.3-dpi300 : PdfComparisonTouchTest
+n10pro2-landscape-font2.0-dpi300 : ReadingDesignTest
+n10pro2-landscape-font2.0-dpi300 : PdfComparisonTouchTest
+n10pro2-portrait-font1.0-dpi240 : ReadingDesignTest
+n10pro2-portrait-font1.0-dpi240 : PdfComparisonTouchTest
+n10pro2-portrait-font1.0-dpi320 : ReadingDesignTest
+n10pro2-portrait-font1.0-dpi320 : PdfComparisonTouchTest

@@ -1,0 +1,58 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project .network-ink-harness/NetworkInk.xcodeproj -scheme NetworkInkParityTests -destination "platform=iOS Simulator,id=37DA40C6-93F2-475C-AF03-245F509748FE" -parallel-testing-enabled NO -derivedDataPath .network-ink-harness/DerivedData -resultBundlePath .network-ink-harness/verify-77a84f3742e44cb6ab8c261b3ab0c9ca.xcresult test CODE_SIGNING_ALLOWED=NO
+
+Build settings from command line:
+    CODE_SIGNING_ALLOWED = NO
+
+Writing result bundle at path:
+	/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/verify-77a84f3742e44cb6ab8c261b3ab0c9ca.xcresult
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (1 target)
+    Target 'NetworkInkParityTests' in project 'NetworkInk' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-6cfe768891a92b912361537c460fe42b.sdkstatcache
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/NetworkInk.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -o /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-6cfe768891a92b912361537c460fe42b.sdkstatcache
+
+CpResource /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/network-ink.json /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/network-ink.json (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/network-ink.json /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest
+
+Test Suite 'All tests' started at 2026-10-09 13:30:37.596.
+Test Suite 'NetworkInkParityTests.xctest' started at 2026-10-09 13:30:37.597.
+Test Suite 'NetworkInkParityTests' started at 2026-10-09 13:30:37.597.
+Test Case '-[NetworkInkParityTests.NetworkInkParityTests testRealStudyStoreNetworkAndPencilKitEditing]' started.
+NETWORK_INK_ANDROID_IOS_ANDROID_IOS_PASSED strokes=3
+Test Case '-[NetworkInkParityTests.NetworkInkParityTests testRealStudyStoreNetworkAndPencilKitEditing]' passed (4.324 seconds).
+Test Suite 'NetworkInkParityTests' passed at 2026-10-09 13:30:41.921.
+	 Executed 1 test, with 0 failures (0 unexpected) in 4.324 (4.324) seconds
+Test Suite 'NetworkInkParityTests.xctest' passed at 2026-10-09 13:30:41.921.
+	 Executed 1 test, with 0 failures (0 unexpected) in 4.324 (4.325) seconds
+Test Suite 'All tests' passed at 2026-10-09 13:30:41.921.
+	 Executed 1 test, with 0 failures (0 unexpected) in 4.324 (4.325) seconds
+
+Test session results, code coverage, and logs:
+	/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/verify-77a84f3742e44cb6ab8c261b3ab0c9ca.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started
+2026-10-09 13:30:42.208 xcodebuild[10857:36079310] [MT] IDETestOperationsObserverDebug: 5.399 elapsed -- Testing started completed.
+2026-10-09 13:30:42.208 xcodebuild[10857:36079310] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-09 13:30:42.208 xcodebuild[10857:36079310] [MT] IDETestOperationsObserverDebug: 5.399 sec, +5.399 sec -- end

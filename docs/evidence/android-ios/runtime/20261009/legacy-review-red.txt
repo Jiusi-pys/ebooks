@@ -1,0 +1,26 @@
+   Compiling shufang-application v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\application)
+   Compiling shufang-sqlite v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\sqlite)
+   Compiling shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.60s
+     Running tests\android_merge.rs (base\target\debug\deps\android_merge-642f2efa0490439e.exe)
+
+running 3 tests
+test unknown_plan_version_rejects_before_new_business_operations ... ok
+test merging_ink_copies_opaque_attachments_and_keeps_the_mapped_page_identity ... ok
+test merging_two_workspaces_keeps_references_and_retries_without_duplicates ... FAILED
+
+failures:
+
+---- merging_two_workspaces_keeps_references_and_retries_without_duplicates stdout ----
+
+thread 'merging_two_workspaces_keeps_references_and_retries_without_duplicates' (450444) panicked at crates\native\tests\android_merge.rs:148:152:
+called `Result::unwrap_err()` on an `Ok` value: Object {"completed": Bool(true), "entities": Number(8), "batch": String("94ae6608d9e077e19d3593b5c789a3b1676ce0cbe1b30821341d195c3b66280a")}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    merging_two_workspaces_keeps_references_and_retries_without_duplicates
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+error: test failed, to rerun pass `-p shufang-native --test android_merge`

@@ -1,0 +1,15 @@
+
+org.shufang.android.AndroidMergeTest:.
+org.shufang.android.AndroidSyncTest:..
+org.shufang.android.CrossInkNetworkTest:
+org.shufang.android.CrossInkNetworkTest:
+org.shufang.android.DocumentParserTest:.....
+org.shufang.android.FeatureFlowTest:.
+org.shufang.android.ImportBoundaryTest:.
+org.shufang.android.ImportTouchTest:.
+org.shufang.android.IosParityRuntimeTest:
+org.shufang.android.IosParityRuntimeTest:..
+org.shufang.android.LibraryOperationsTest:.
+org.shufang.android.LibraryUiTest:INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0
+

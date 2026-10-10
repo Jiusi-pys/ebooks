@@ -1,0 +1,748 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project .network-ink-harness/NetworkInk.xcodeproj -scheme NetworkInkParityTests -destination "platform=iOS Simulator,id=37DA40C6-93F2-475C-AF03-245F509748FE" -parallel-testing-enabled NO -derivedDataPath .network-ink-harness/DerivedData -resultBundlePath .network-ink-harness/edit-03eb9b3e5be04cf5aea80f6793e56323.xcresult test CODE_SIGNING_ALLOWED=NO
+
+Build settings from command line:
+    CODE_SIGNING_ALLOWED = NO
+
+Writing result bundle at path:
+	/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/edit-03eb9b3e5be04cf5aea80f6793e56323.xcresult
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (1 target)
+    Target 'NetworkInkParityTests' in project 'NetworkInk' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+Build description signature: 59cc3ab29981ed247d82c3d7f17cb215
+Build description path: /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/XCBuildData/59cc3ab29981ed247d82c3d7f17cb215.xcbuilddata
+CreateBuildDirectory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/NetworkInk.xcodeproj
+    builtin-create-build-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products
+
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-6cfe768891a92b912361537c460fe42b.sdkstatcache
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/NetworkInk.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -o /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-6cfe768891a92b912361537c460fe42b.sdkstatcache
+
+CreateBuildDirectory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/NetworkInk.xcodeproj
+    builtin-create-build-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex
+
+CreateBuildDirectory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/NetworkInk.xcodeproj
+    builtin-create-build-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+
+CreateBuildDirectory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/ExplicitPrecompiledModules
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/NetworkInk.xcodeproj
+    builtin-create-build-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/ExplicitPrecompiledModules
+
+CreateBuildDirectory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/NetworkInk.xcodeproj
+    builtin-create-build-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInk-41b33c16d95af1d8c4d0f34c79b36caa-VFS-iphonesimulator/all-product-headers.yaml
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/NetworkInk.xcodeproj
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInk-41b33c16d95af1d8c4d0f34c79b36caa-VFS-iphonesimulator/all-product-headers.yaml
+
+CreateBuildDirectory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/NetworkInk.xcodeproj
+    builtin-create-build-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/empty-NetworkInkParityTests.plist (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/empty-NetworkInkParityTests.plist
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.LinkFileList (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.LinkFileList
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests_const_extract_protocols.json (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests_const_extract_protocols.json
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.LinkFileList (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.LinkFileList
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests_const_extract_protocols.json (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests_const_extract_protocols.json
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-OutputFileMap.json (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-OutputFileMap.json
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.SwiftConstValuesFileList (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.SwiftConstValuesFileList
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.SwiftFileList (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.SwiftFileList
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.SwiftFileList (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.SwiftFileList
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.SwiftConstValuesFileList (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.SwiftConstValuesFileList
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-OutputFileMap.json (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-OutputFileMap.json
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests.hmap (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests.hmap
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests.DependencyStaticMetadataFileList (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests.DependencyStaticMetadataFileList
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests.DependencyMetadataFileList (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests.DependencyMetadataFileList
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-project-headers.hmap (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-project-headers.hmap
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-own-target-headers.hmap (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-own-target-headers.hmap
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-generated-files.hmap (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-generated-files.hmap
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-all-target-headers.hmap (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-all-target-headers.hmap
+
+WriteAuxiliaryFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-all-non-framework-target-headers.hmap (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    write-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-all-non-framework-target-headers.hmap
+
+MkDir /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    /bin/mkdir -p /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest
+
+CpResource /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/network-ink.json /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/network-ink.json (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/network-ink.json /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest
+
+ProcessInfoPlistFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/Info.plist /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/empty-NetworkInkParityTests.plist (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-infoPlistUtility /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/empty-NetworkInkParityTests.plist -producttype com.apple.product-type.bundle.unit-test -expandbuildsettings -format binary -platform iphonesimulator -o /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/Info.plist
+
+SwiftDriver NetworkInkParityTests normal x86_64 com.apple.xcode.tools.swift.compiler (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name NetworkInkParityTests -O @/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target x86_64-apple-ios17.0-simulator -g -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -c -j10 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-6cfe768891a92b912361537c460fe42b.sdkstatcache -output-file-map /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-generated-files.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-own-target-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-project-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources-normal/x86_64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources/x86_64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-Swift.h -working-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness -experimental-emit-module-separately -disable-cmo
+
+SwiftDriver NetworkInkParityTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name NetworkInkParityTests -O @/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -c -j10 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-6cfe768891a92b912361537c460fe42b.sdkstatcache -output-file-map /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-generated-files.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-own-target-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-project-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources/arm64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-Swift.h -working-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness -experimental-emit-module-separately -disable-cmo
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_stdarg-51FSCQWQA6BZIYJYZ2NDIIS1V.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_float-6BQAQP6DILF9FCZCY08DNI2RD.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_stdbool-7IE5N6WG9HXLZJRT7CWSUK8UW.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_float-4VWC39P90I91YBBWNU4ESJ0J8.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/SwiftShims-CZXVOVBBHFAK98OXYPCUX7W1Z.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_stddef-DN9P7YKUYYNBSYSLFVODJ56H4.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_stddef-CRGAYTY744YTQ65PTJ3PTQXJJ.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_SwiftConcurrencyShims-A20YBJMRRIX3A2AODM4ML7410.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/DeveloperToolsSupport-DBQTJN7FILRT4VG81UM3WV87Z.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/ptrcheck-D85SY3C4R8LTD0E1W26PO0UNV.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_stdbool-8SOZ63VKY5SMRYPIOZNBOPVI4.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_SwiftConcurrencyShims-BWD08JQMG20PV9S4WBZQOSPPD.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/SwiftShims-4FLCOYTC5BLSGTB3M9FVG2BME.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_AvailabilityInternal-A3VQYDMSQ031M5MCJT0SKIU1H.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/ptrcheck-DLPHR7XBCMUUTT09Z9X33QC9E.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_AvailabilityInternal-EA52SHRY18NX1P4PX8DIPI86Q.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/DeveloperToolsSupport-6LY84LWT2Y4JQYDNKSW77YFAG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_stdarg-2911H2ZHYVABJ2WS0SX6I7WWA.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/ptrauth-7VGMQL8ZZKZPG17AL1C2QHZAI.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/ptrauth-9V6DYMXWYXGY3V7AFDVNQARGS.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_DarwinFoundation1-BSXKB23TMKAHWYM84EIKT0IEL.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_DarwinFoundation1-DJLP5G44V1283TIO32FAGL3C9.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_DarwinFoundation2-AXVJSTXOOLWR05ROHAUI1HV1K.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_limits-3T9QICTAQT5LOEWIYZINOQIU7.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_limits-2VTXO8XTE8O6R9OPN1E6T14I1.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_DarwinFoundation2-R4GE9FYYEMBG0XLT6B6SNXS8.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_tgmath-48BUTYBUKYBI3Q35KDOB9XF9N.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_stdint-91BRARO5X6P0QXU2V5Y5X9TU8.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/sys_types-2VMSDA23M5KWJ3WTGFFP3HKP0.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_stdint-53QEJJJAINPLH3KDCP4W5885S.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_tgmath-AVWYV63W4MCRYTG3JL3UFOK83.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/sys_types-291J8O8US2VUMWCK6XE3Y6F30.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_stdatomic-SRAMF8A2VTLNDIKAAOPAXDIC.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_DarwinFoundation3-AHP1OTJH2F374JW1UV1M0HUTQ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_DarwinFoundation3-175MZS51VYZM71MCBD0ZXB0HW.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_stdatomic-LHC9Z6VOBFBTQ6CUVSESKC90.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_intrinsics-5OIHJ8MLSIZHD0A4IM3OPQ6TM.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_inttypes-6MQEZ1M7SUIJ4VAC2UT8KZL3Y.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_intrinsics-TFKCC4ATPDET5L4YYII69V4J.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/_Builtin_inttypes-6R7BQP4PCPVO1H2WS2C43MGWR.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Darwin-7NP5HCBG9Z7D24DCMBNOGMNKG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Darwin-52YODV092MPSXL3971QO4ZBAZ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/simd-XS3D8PTK3LRC2304AKQ49UXB.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/MachO-8X4ECP4NC9BQIBRPBC8TBWGXT.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/ObjectiveC-637CMJU053HXPBXM2V8IJM8QU.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/simd-TKFRJRUBO5KB41U0M0P60IID.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/os_object-EFJOZXCT33GDZ3W60Z8UDZWRO.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/MachO-1ZE3K1AOGTIUI4I2Q6MCVEUF9.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/ObjectiveC-2O7V8B6XIR28UYTFTM4Y5S58A.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/os_workgroup-5N6G0J251HVXJBPUTA4RLP59R.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/os_object-14G3BQQTY8VQTL4QGBRZI65PW.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Dispatch-BBQ6FDIL22249ICUMZNGE0UEF.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/os_workgroup-RYNLTC097KRNNVCM9IPSPCFQ.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreFoundation-8GPEHPY02DXQVZQX1C2XLOG8T.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/XPC-9XR93EZ4FILGIANJUB14RAWXB.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Spatial-B5NTZGJC5JCWIBJFR2R7M0RMA.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Dispatch-487YP8YPWAS0Q9J3IXUJHUX7P.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/os-3HQJJ427CYMO4JMQD4XPKL7YK.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreFoundation-4AG6IG0MPDARC5HN48Y7MSEAP.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/XPC-E5ZVNBBCFH3HFT2Q44MG9PDRO.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreGraphics-59DZOXWKM5534K8DXOTCDM85Y.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CFNetwork-3E57MTPJ3W2R2QI4QFZPWJ92T.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Security-OD6DLQKZCL31BVYAZR9EU8DG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/os-EKXKSJEMA8QT5Q9MGFPIEKI8W.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Foundation-6ZNHVE9MGDIJ17VRZF5HAGM4G.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Spatial-CQKA0WAIO23B3ENL3OX8K8W2I.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreText-4U70NRIWN37VXJ39NR5XAB152.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/ImageIO-4J4DKQJKYX7RPB1DCKOQ6JWDA.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Security-8WWQDFRUMWMGUOMEVWTCCK2ML.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreGraphics-B8ZN7CF2HQ8OOX58NOQG1TJP.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CFNetwork-CXTPIZFH5XHCT571PAUBRT2MR.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Foundation-9MLRELTH4F0P3XQXH3WXD1RYR.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/ImageIO-39L79DDF6RMK6ARG7BTXZI7Y4.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreText-BX5ZBDACN33P4K3VY5AO6DHTO.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreTransferable-ASJTQ67Z87R7T4X3536B25K49.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/DataDetection-DUSQFDUOB66GO1T1DA4A86QBN.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/UserNotifications-554OGOP6QDD6AHAN7ID1C96GZ.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Symbols-2VFZEFQFEA2YEBSN1L0I2BVF1.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/UIUtilities-EFGCA61MY0G6HOSG4FY7GXB3L.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/ModelIO-AIZFSCE2ZI93HMCI752PV0S3V.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Accessibility-C6JBWD8GVCCK55BAGZ34BUWFG.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/IOSurface-B2GH9MK4GN3SN1O8MG40XSP8P.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/LocalAuthentication-DUOPQR3JMEXJF5OK2L59Q8OP8.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/UniformTypeIdentifiers-AFD679ACFBG8WAWACZZH4SZ87.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/OSLog-D7LXKZATJHM1I5RP2DY74SO4A.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/OpenGLES-ECS350P5JXXQPJUUM9Y7NBA0J.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/FileProvider-8F0N189J7Z220BGDXHXS5V9F5.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Metal-5W36RCBXOHAYM3FV0WDSLTAXF.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Accessibility-ACO5VNX26IPFXD2F60I8Z7KAI.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Symbols-DZWB828G0WZ4DJY6FP8M06PXQ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/OSLog-7LND0CTOVX93GP0G8ICB9Y31N.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/UserNotifications-A2A0CB4NPDW6CXA6D4AKYJGOZ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/ModelIO-BF0R33A22SN12IUK19ET8BV4H.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/IOSurface-83OF5753MF7NDKMDVOPHTI03K.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/LocalAuthentication-14DS3LO0MA60ZBQFHJDM7DS85.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/UIUtilities-1WBONULU8H8O53P5GPAJNSGC5.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/FileProvider-AAP0B5TJ9MVJXCDHN2JUMLGRT.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/DataDetection-7RFSQIZF5Z277UW28KMDLWUKT.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreTransferable-5N7FXGQAY4FFA94C3TVLILR68.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/OpenGLES-AN6M9EO0T6CFHEVW14TYJDFPF.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/UniformTypeIdentifiers-58LSVZQY6G54IXNYYUEGBHNQG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Metal-CFHC6ZZEZ5UWBK5W13H0RIZTS.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreVideo-D9TUU0FRH3PG6T8Q8GH33K77N.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/QuartzCore-F2LHJA27QC446EEBGJ864E7LB.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreImage-A78WAFHR666MX6N9U3O6UVCEK.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreVideo-9C1RNNKP3B2VBOOW28IXBI1V2.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/QuartzCore-1F9J4PNVYEVAOUGJ5TDMVGGPJ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/CoreImage-9CL7EJXXTH5CHQQVZ3W6QO4YT.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/SwiftUICore-E955FN16RXO8RUMYHJLLSHFQ.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/UIKit-9RWFT43HFUVKSPHJDMZOGCLAR.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/SwiftUICore-8OOQZOSBDNDTB232NXAIUL1B0.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/UIKit-U97KIV69VF5S5IBJZYM997WP.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCUIAutomation-7ZEME455TFGOD1RZMW0UYTV6U.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/PencilKit-7MA0ZFXQ44FYA7SH3HO3PTIRR.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/MetalKit-7E3WHMCY5EJXOJR42H4G8LJ07.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCUIAutomation-354TRJS6RVFV5ZYX571JLS9AD.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/MetalKit-4X1U6VAR3P7NHTK43UUFC21ZW.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/PencilKit-DLPM35QPAGTIB25TTKEEVMPKQ.pcm
+
+SwiftExplicitDependencyGeneratePcm x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCTest-BMLHYP6ZMKBRXY50GGNY2PGAW.pcm
+
+SwiftExplicitDependencyCompileModuleFromInterface x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCUIAutomation-KOXQC1GVANMY.swiftmodule
+
+SwiftExplicitDependencyCompileModuleFromInterface arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCUIAutomation-GQV7JT50HYQF.swiftmodule
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCTest-21EVPX3WZMO83JHDRPRXJB49C.pcm
+
+SwiftExplicitDependencyCompileModuleFromInterface x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCTest-1CFB5SZ9T372P.swiftmodule
+
+SwiftExplicitDependencyCompileModuleFromInterface arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCTest-T2Y80WD5GXQ1.swiftmodule
+
+SwiftEmitModule normal x86_64 Emitting\ module\ for\ NetworkInkParityTests (in target 'NetworkInkParityTests' from project 'NetworkInk')
+EmitSwiftModule normal x86_64 (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 Compiling\ NetworkInkParityTests.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/NetworkInkParityTests.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/NetworkInkParityTests.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 Compiling\ StudyTree.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyTree.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyTree.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 Compiling\ StudyModels.swift,\ StudyRestore.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyModels.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyRestore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyModels.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyRestore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 Compiling\ StudyStore.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyStore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyStore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 Compiling\ ReaderNavigation.swift,\ StudyBackup.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/ReaderNavigation.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyBackup.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/ReaderNavigation.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyBackup.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 Compiling\ PortableInk.swift,\ PortableInkPencil.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PortableInk.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PortableInkPencil.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PortableInk.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PortableInkPencil.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 Compiling\ StudyTextSelection.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyTextSelection.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyTextSelection.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 Compiling\ Models.swift,\ PDFGeometry.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/Models.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PDFGeometry.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/Models.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PDFGeometry.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 Compiling\ BookFootnotes.swift,\ Keychain.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/BookFootnotes.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/Keychain.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/BookFootnotes.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/Keychain.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ NetworkInkParityTests (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+EmitSwiftModule normal arm64 (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling StudyTextSelection.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 Compiling\ NetworkInkParityTests.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/NetworkInkParityTests.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/ShufangTests/NetworkInkParityTests.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftDriverJobDiscovery normal x86_64 Emitting module for NetworkInkParityTests (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriver\ Compilation\ Requirements NetworkInkParityTests normal x86_64 com.apple.xcode.tools.swift.compiler (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name NetworkInkParityTests -O @/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target x86_64-apple-ios17.0-simulator -g -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -c -j10 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-6cfe768891a92b912361537c460fe42b.sdkstatcache -output-file-map /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-generated-files.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-own-target-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-project-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources-normal/x86_64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources/x86_64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-Swift.h -working-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness -experimental-emit-module-separately -disable-cmo
+
+SwiftDriverJobDiscovery normal x86_64 Compiling NetworkInkParityTests.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 Compiling\ StudyModels.swift,\ StudyRestore.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyModels.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyRestore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyModels.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyRestore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftDriverJobDiscovery normal arm64 Emitting module for NetworkInkParityTests (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+Copy /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/x86_64-apple-ios-simulator.swiftmodule /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.swiftmodule (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.swiftmodule /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/x86_64-apple-ios-simulator.swiftmodule
+
+SwiftDriver\ Compilation\ Requirements NetworkInkParityTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name NetworkInkParityTests -O @/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -c -j10 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-6cfe768891a92b912361537c460fe42b.sdkstatcache -output-file-map /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-generated-files.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-own-target-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-project-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources/arm64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-Swift.h -working-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness -experimental-emit-module-separately -disable-cmo
+
+Copy /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/x86_64-apple-ios-simulator.swiftdoc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.swiftdoc (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.swiftdoc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/x86_64-apple-ios-simulator.swiftdoc
+
+Copy /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/x86_64-apple-ios-simulator.abi.json /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.abi.json (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.abi.json /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/x86_64-apple-ios-simulator.abi.json
+
+SwiftMergeGeneratedHeaders /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources/NetworkInkParityTests-Swift.h /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-Swift.h /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-Swift.h (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-swiftHeaderTool -arch arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-Swift.h -arch x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-Swift.h -o /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources/NetworkInkParityTests-Swift.h
+
+Copy /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/arm64-apple-ios-simulator.swiftmodule /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.swiftmodule (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.swiftmodule /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/arm64-apple-ios-simulator.swiftmodule
+
+Copy /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/arm64-apple-ios-simulator.swiftdoc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.swiftdoc (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.swiftdoc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/arm64-apple-ios-simulator.swiftdoc
+
+Copy /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/arm64-apple-ios-simulator.abi.json /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.abi.json (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.abi.json /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/arm64-apple-ios-simulator.abi.json
+
+Copy /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/Project/x86_64-apple-ios-simulator.swiftsourceinfo /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.swiftsourceinfo (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.swiftsourceinfo /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/Project/x86_64-apple-ios-simulator.swiftsourceinfo
+
+Copy /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.swiftsourceinfo (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -strip-unsigned-binaries -strip-deterministic -strip-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/strip -resolve-src-symlinks -rename /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.swiftsourceinfo /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo
+
+SwiftCompile normal arm64 Compiling\ BookFootnotes.swift,\ Keychain.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/BookFootnotes.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/Keychain.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/BookFootnotes.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/Keychain.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal arm64 Compiling\ APIClient.swift,\ AccountRoutes.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/APIClient.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/AccountRoutes.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/APIClient.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/AccountRoutes.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling BookFootnotes.swift, Keychain.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriverJobDiscovery normal arm64 Compiling NetworkInkParityTests.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 Compiling\ ReaderNavigation.swift,\ StudyBackup.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/ReaderNavigation.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyBackup.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/ReaderNavigation.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyBackup.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal arm64 Compiling\ StudyStore.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyStore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyStore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling StudyTree.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 Compiling\ Models.swift,\ PDFGeometry.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/Models.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PDFGeometry.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/Models.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PDFGeometry.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling PortableInk.swift, PortableInkPencil.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 Compiling\ StudyTree.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyTree.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyTree.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling BookFootnotes.swift, Keychain.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal x86_64 Compiling\ APIClient.swift,\ AccountRoutes.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/APIClient.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/AccountRoutes.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/APIClient.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal x86_64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/AccountRoutes.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling StudyModels.swift, StudyRestore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 Compiling\ PortableInk.swift,\ PortableInkPencil.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PortableInk.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PortableInkPencil.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PortableInk.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/PortableInkPencil.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling ReaderNavigation.swift, StudyBackup.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 Compiling\ StudyTextSelection.swift /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyTextSelection.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftCompile normal arm64 /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/Shufang/Core/StudyTextSelection.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling Models.swift, PDFGeometry.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriverJobDiscovery normal arm64 Compiling StudyTree.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriverJobDiscovery normal arm64 Compiling StudyModels.swift, StudyRestore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriverJobDiscovery normal arm64 Compiling ReaderNavigation.swift, StudyBackup.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriverJobDiscovery normal arm64 Compiling StudyTextSelection.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriverJobDiscovery normal arm64 Compiling APIClient.swift, AccountRoutes.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriverJobDiscovery normal arm64 Compiling PortableInk.swift, PortableInkPencil.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriverJobDiscovery normal arm64 Compiling Models.swift, PDFGeometry.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriverJobDiscovery normal x86_64 Compiling APIClient.swift, AccountRoutes.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriverJobDiscovery normal x86_64 Compiling StudyStore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriver\ Compilation NetworkInkParityTests normal x86_64 com.apple.xcode.tools.swift.compiler (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name NetworkInkParityTests -O @/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target x86_64-apple-ios17.0-simulator -g -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -c -j10 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-6cfe768891a92b912361537c460fe42b.sdkstatcache -output-file-map /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-generated-files.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-own-target-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-project-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources-normal/x86_64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources/x86_64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-Swift.h -working-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness -experimental-emit-module-separately -disable-cmo
+
+Ld /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/Binary/NetworkInkParityTests normal x86_64 (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target x86_64-apple-ios17.0-simulator -bundle -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -Os -L/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -L/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -L/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -F/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -iframework /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -iframework /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -filelist /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.LinkFileList -Xlinker -rpath -Xlinker /usr/lib/swift -Xlinker -rpath -Xlinker @loader_path/Frameworks -Xlinker -dead_strip -Xlinker -object_path_lto -Xlinker /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests_lto.o -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -dependency_info -Xlinker /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests_dependency_info.dat -fobjc-link-runtime -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.swiftmodule @/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests-linker-args.resp -Xlinker -needed_framework -Xlinker XCTest -framework XCTest -Xlinker -needed-lXCTestSwiftSupport -lXCTestSwiftSupport -o /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/Binary/NetworkInkParityTests
+
+SwiftDriverJobDiscovery normal arm64 Compiling StudyStore.swift (in target 'NetworkInkParityTests' from project 'NetworkInk')
+
+SwiftDriver\ Compilation NetworkInkParityTests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name NetworkInkParityTests -O @/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.SwiftFileList -DDEBUG -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -c -j10 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-6cfe768891a92b912361537c460fe42b.sdkstatcache -output-file-map /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-generated-files.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-own-target-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests-project-headers.hmap -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources-normal/arm64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources/arm64 -Xcc -I/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-Swift.h -working-directory /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness -experimental-emit-module-separately -disable-cmo
+
+Ld /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/Binary/NetworkInkParityTests normal arm64 (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios17.0-simulator -bundle -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -Os -L/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -L/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -L/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -F/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator -iframework /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -iframework /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -filelist /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.LinkFileList -Xlinker -rpath -Xlinker /usr/lib/swift -Xlinker -rpath -Xlinker @loader_path/Frameworks -Xlinker -dead_strip -Xlinker -object_path_lto -Xlinker /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests_lto.o -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -dependency_info -Xlinker /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests_dependency_info.dat -fobjc-link-runtime -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.swiftmodule @/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests-linker-args.resp -Xlinker -needed_framework -Xlinker XCTest -framework XCTest -Xlinker -needed-lXCTestSwiftSupport -lXCTestSwiftSupport -o /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/Binary/NetworkInkParityTests
+
+CreateUniversalBinary /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/NetworkInkParityTests normal arm64\ x86_64 (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo -create /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/Binary/NetworkInkParityTests /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/Binary/NetworkInkParityTests -output /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/NetworkInkParityTests
+
+CopySwiftLibs /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-swiftStdLibTool --copy --verbose --scan-executable /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/NetworkInkParityTests --scan-folder /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/Frameworks --scan-folder /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/PlugIns --scan-folder /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/SystemExtensions --scan-folder /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/Extensions --platform iphonesimulator --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/Frameworks --strip-bitcode --scan-executable /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+Ignoring --strip-bitcode because --sign was not passed
+
+ExtractAppIntentsMetadata (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --module-name NetworkInkParityTests --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk --xcode-version 17F113 --platform-family iOS --deployment-target 17.0 --bundle-identifier org.shufang.parity.networkink --output /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest --target-triple arm64-apple-ios17.0-simulator --target-triple x86_64-apple-ios17.0-simulator --binary-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/NetworkInkParityTests --dependency-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests_dependency_info.dat --dependency-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests_dependency_info.dat --stringsdata-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --stringsdata-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.SwiftFileList --source-file-list /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.SwiftFileList --metadata-file-list /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests.DependencyMetadataFileList --static-metadata-file-list /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests.DependencyStaticMetadataFileList --swift-const-vals-list /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/arm64/NetworkInkParityTests.SwiftConstValuesFileList --swift-const-vals-list /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/Objects-normal/x86_64/NetworkInkParityTests.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-10-09 13:30:26.731 appintentsmetadataprocessor[10827:36078674] Starting appintentsmetadataprocessor export
+2026-10-09 13:30:26.749 appintentsmetadataprocessor[10827:36078674] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
+GenerateDSYMFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest.dSYM /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/NetworkInkParityTests (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/dsymutil /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/NetworkInkParityTests -o /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest.dSYM
+
+AppIntentsSSUTraining (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsnltrainingprocessor --infoplist-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/Info.plist --temp-dir-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/ssu --bundle-id org.shufang.parity.networkink --product-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest --extracted-metadata-path /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/Metadata.appintents --metadata-file-list /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Intermediates.noindex/NetworkInk.build/Debug-iphonesimulator/NetworkInkParityTests.build/NetworkInkParityTests.DependencyMetadataFileList --source-file /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest/Info.plist --archive-ssu-assets
+2026-10-09 13:30:26.774 appintentsnltrainingprocessor[10829:36078690] Parsing options for appintentsnltrainingprocessor
+2026-10-09 13:30:26.775 appintentsnltrainingprocessor[10829:36078690] Starting AppIntents SSU YAML Generation
+2026-10-09 13:30:26.777 appintentsnltrainingprocessor[10829:36078690] No AppShortcuts found - Skipping.
+
+RegisterExecutionPolicyException /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    builtin-RegisterExecutionPolicyException /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest
+
+Touch /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest (in target 'NetworkInkParityTests' from project 'NetworkInk')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness
+    /usr/bin/touch -c /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/DerivedData/Build/Products/Debug-iphonesimulator/NetworkInkParityTests.xctest
+
+Test Suite 'All tests' started at 2026-10-09 13:30:28.918.
+Test Suite 'NetworkInkParityTests.xctest' started at 2026-10-09 13:30:28.918.
+Test Suite 'NetworkInkParityTests' started at 2026-10-09 13:30:28.918.
+Test Case '-[NetworkInkParityTests.NetworkInkParityTests testRealStudyStoreNetworkAndPencilKitEditing]' started.
+2026-10-09 13:30:33.463443-0400 xctest[10833:36078786] fopen failed for data file: errno = 2 (No such file or directory)
+2026-10-09 13:30:33.664003-0400 xctest[10833:36078786] fopen failed for data file: errno = 2 (No such file or directory)
+NETWORK_INK_IOS_UPLOAD_PASSED strokes=2
+Test Case '-[NetworkInkParityTests.NetworkInkParityTests testRealStudyStoreNetworkAndPencilKitEditing]' passed (5.170 seconds).
+Test Suite 'NetworkInkParityTests' passed at 2026-10-09 13:30:34.089.
+	 Executed 1 test, with 0 failures (0 unexpected) in 5.170 (5.171) seconds
+Test Suite 'NetworkInkParityTests.xctest' passed at 2026-10-09 13:30:34.089.
+	 Executed 1 test, with 0 failures (0 unexpected) in 5.170 (5.171) seconds
+Test Suite 'All tests' passed at 2026-10-09 13:30:34.089.
+	 Executed 1 test, with 0 failures (0 unexpected) in 5.170 (5.172) seconds
+2026-10-09 13:30:34.407 xcodebuild[10551:36076115] [MT] IDETestOperationsObserverDebug: 7.507 elapsed -- Testing started completed.
+2026-10-09 13:30:34.407 xcodebuild[10551:36076115] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-09 13:30:34.407 xcodebuild[10551:36076115] [MT] IDETestOperationsObserverDebug: 7.507 sec, +7.507 sec -- end
+
+Test session results, code coverage, and logs:
+	/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.network-ink-harness/edit-03eb9b3e5be04cf5aea80f6793e56323.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started

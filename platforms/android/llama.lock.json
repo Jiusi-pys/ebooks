@@ -1,0 +1,1 @@
+{"repository":"https://github.com/ggml-org/llama.cpp","commit":"4f92965a7bfa9e8eb6519908ff962e23c2cb7b93","backend":"CPU","context":2048,"threads":2,"minApi":28}

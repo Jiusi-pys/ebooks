@@ -1,0 +1,16 @@
+npm notice run my-app@0.1.0 pretest
+npm notice run npm run core:build
+npm notice run my-app@0.1.0 core:build
+npm notice run node scripts/build-core.mjs
+    Finished `release` profile [optimized] target(s) in 0.14s
+npm notice run my-app@0.1.0 test
+npm notice run vitest run
+
+ RUN  v4.1.11 C:/Users/17715/Documents/codes/书籍管理/app
+
+
+ Test Files  125 passed | 8 skipped (133)
+      Tests  624 passed | 53 skipped (677)
+   Start at  09:09:49
+   Duration  17.65s (transform 11.78s, setup 0ms, import 68.26s, tests 27.59s, environment 203.86s)
+

@@ -1,0 +1,23 @@
+   Compiling shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.76s
+     Running tests\review_parity.rs (base\target\debug\deps\review_parity-200111801b0a6635.exe)
+
+running 2 tests
+test imported_review_preserves_swift_numeric_dates_and_rejects_overwrite ... FAILED
+test ios_and_android_share_review_state_and_atomic_events ... ok
+
+failures:
+
+---- imported_review_preserves_swift_numeric_dates_and_rejects_overwrite stdout ----
+
+thread 'imported_review_preserves_swift_numeric_dates_and_rejects_overwrite' (463216) panicked at crates\native\tests\review_parity.rs:11:97:
+called `Result::unwrap()` on an `Err` value: "invalid_review_event"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    imported_review_preserves_swift_numeric_dates_and_rejects_overwrite
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+error: test failed, to rerun pass `-p shufang-native --test review_parity`

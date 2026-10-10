@@ -1,0 +1,9 @@
+
+org.shufang.android.PdfComparisonTouchTest:.
+
+Time: 3.213
+
+OK (1 test)
+
+
+

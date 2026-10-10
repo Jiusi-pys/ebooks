@@ -7,11 +7,11 @@ impl ReplicationRepository for SqliteRepository {
         commits: &[Commit],
         locals: &[LocalCommit],
     ) -> Result<()> {
-        self.commit_local_batch(clock, commits, locals, true)
+        self.commit_local_batch(clock, commits, locals, true, None)
     }
 
     fn mutation_batch(&mut self, expected_clock: &str, commits: &[Commit]) -> Result<()> {
-        self.commit_local_batch(expected_clock, commits, &[], true)
+        self.commit_local_batch(expected_clock, commits, &[], true, None)
     }
     fn replication_entities(&self, kind: Option<&str>, after: &str) -> Result<Vec<EntityState>> {
         let mut q=self.connection.prepare("SELECT state_json FROM entities WHERE (?1 IS NULL OR kind=?1) AND kind||':'||id>?2 ORDER BY kind,id LIMIT 100").map_err(failure)?;

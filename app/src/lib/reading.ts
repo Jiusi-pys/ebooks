@@ -311,31 +311,8 @@ export function horizontalReaderPageState(
 
 /* ---------- 划线配色 ---------- */
 
-export interface SwatchColor {
-  id: string;
-  name: string;
-  /** 下划线/字色用的主色 */
-  solid: string;
-  /** 背景色用的浅色 */
-  soft: string;
-}
-
-export const SWATCH_COLORS: SwatchColor[] = [
-  { id: "orange", name: "橙", solid: "#f54001", soft: "rgba(245,64,1,0.16)" },
-  { id: "yellow", name: "黄", solid: "#c99908", soft: "rgba(255,193,60,0.35)" },
-  { id: "green", name: "绿", solid: "#4f7a3a", soft: "rgba(122,168,92,0.30)" },
-  { id: "blue", name: "蓝", solid: "#3a6a9e", soft: "rgba(96,148,196,0.28)" },
-  {
-    id: "purple",
-    name: "紫",
-    solid: "#7a5a9e",
-    soft: "rgba(150,116,190,0.26)",
-  },
-];
-
-export function swatch(id: string): SwatchColor {
-  return SWATCH_COLORS.find(c => c.id === id) ?? SWATCH_COLORS[0];
-}
+export { SWATCH_COLORS, swatch } from "./readingPalette";
+export type { SwatchColor } from "./readingPalette";
 
 /* ---------- 书摘定位与渲染分段 ---------- */
 

@@ -1,0 +1,22 @@
+   Compiling shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.04s
+     Running tests\study_restore.rs (base\target\debug\deps\study_restore-bcec1f7f5ef1130d.exe)
+
+running 1 test
+test materialized_optional_null_ranges_survive_backup_validation ... FAILED
+
+failures:
+
+---- materialized_optional_null_ranges_survive_backup_validation stdout ----
+
+thread 'materialized_optional_null_ranges_survive_backup_validation' (26616) panicked at crates\native\tests\study_restore.rs:23:317:
+called `Result::unwrap()` on an `Err` value: "invalid_source_ranges"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    materialized_optional_null_ranges_survive_backup_validation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p shufang-native --test study_restore`

@@ -1,0 +1,31 @@
+
+org.shufang.android.AndroidMergeTest:.
+org.shufang.android.AndroidSyncTest:..
+org.shufang.android.CrossInkNetworkTest:
+org.shufang.android.CrossInkNetworkTest:
+org.shufang.android.DocumentParserTest:.....
+org.shufang.android.FeatureFlowTest:.
+org.shufang.android.ImportBoundaryTest:.
+org.shufang.android.ImportTouchTest:.
+org.shufang.android.IosParityRuntimeTest:
+org.shufang.android.IosParityRuntimeTest:..
+org.shufang.android.LibraryOperationsTest:.
+org.shufang.android.LibraryUiTest:.
+org.shufang.android.MergeAttachmentDeviceTest:.
+org.shufang.android.MindMoveTouchTest:.
+org.shufang.android.NativeContractTest:....
+org.shufang.android.PdfComparisonTouchTest:.
+org.shufang.android.ReaderBridgeTest:..
+org.shufang.android.ReadingDesignTest:.
+org.shufang.android.RealServerTest:
+org.shufang.android.RealServerTest:
+org.shufang.android.SaveConflictTouchTest:.
+org.shufang.android.StudyBackupDeviceTest:.
+org.shufang.android.StudyBackupTouchTest:.
+
+Time: 60.267
+
+OK (37 tests)
+
+
+

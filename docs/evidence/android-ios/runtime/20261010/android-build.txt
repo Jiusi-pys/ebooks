@@ -1,0 +1,123 @@
+
+added 6 packages, and audited 7 packages in 10s
+
+1 package is looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+Bundled existing Web format parsers and Android reader assets.
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.6.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+WARNING: The option setting 'android.overridePathCheck=true' is experimental.
+The current default is 'false'.
+Add android.sync.suppressAgpWarnings=UNSUPPORTED_PROJECT_OPTION_USE to the gradle.properties file to suppress this warning.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:generateDebugGlobalSynthetics UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/17715/Documents/codes/书籍管理/platforms/android/app/src/main/java/org/shufang/android/MainActivity.kt:103:114 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///C:/Users/17715/Documents/codes/书籍管理/platforms/android/app/src/main/java/org/shufang/android/MainActivity.kt:353:71 'val Icons.Filled.List: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.List.
+w: file:///C:/Users/17715/Documents/codes/书籍管理/platforms/android/app/src/main/java/org/shufang/android/MainActivity.kt:361:203 Unnecessary non-null assertion (!!) on a non-null receiver of type 'JSONObject'.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:generateDebugAndroidTestLintModel
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes UP-TO-DATE
+> Task :app:testDebugUnitTest
+> Task :app:generateDebugLintReportModel
+> Task :app:generateDebugUnitTestLintModel
+> Task :app:lintAnalyzeDebugAndroidTest
+> Task :app:lintAnalyzeDebugUnitTest
+> Task :app:mergeDebugJavaResource UP-TO-DATE
+> Task :app:dexBuilderDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+> Task :app:lintAnalyzeDebug
+
+> Task :app:lintReportDebug
+Wrote HTML report to file:///C:/Users/17715/AppData/Local/Shufang/android-build/app/reports/lint-results-debug.html
+Wrote SARIF report to file:///C:/Users/17715/AppData/Local/Shufang/android-build/app/reports/lint-results-debug.sarif
+
+> Task :app:lintDebug
+
+[Incubating] Problems report is available at: file:///C:/Users/17715/AppData/Local/Shufang/android-build/ShufangAndroid/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 1m 1s
+53 actionable tasks: 26 executed, 27 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.6.0/userguide/configuration_cache_enabling.html
+16 KiB ELF: arm64-v8a/libandroidx.graphics.path.so
+16 KiB ELF: arm64-v8a/libmlkit_google_ocr_pipeline.so
+16 KiB ELF: arm64-v8a/libshufang_bindings.so
+16 KiB ELF: arm64-v8a/libshufang_jni.so
+16 KiB ELF: arm64-v8a/libshufang_llm.so
+16 KiB ELF: x86_64/libandroidx.graphics.path.so
+16 KiB ELF: x86_64/libmlkit_google_ocr_pipeline.so
+16 KiB ELF: x86_64/libshufang_bindings.so
+16 KiB ELF: x86_64/libshufang_jni.so
+16 KiB ELF: x86_64/libshufang_llm.so
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by org.conscrypt.NativeLibraryUtil in an unnamed module (file:/C:/Users/17715/AppData/Local/Android/Sdk/build-tools/36.0.0/lib/apksigner.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+Algorithm       Hash                                                                   Path
+---------       ----                                                                   ----
+SHA256          0C553A70A0487FEA8DBE65874C71D77588DC3F458CD3E587E82B24B9E01CCCFE       C:\Users\17715\Documents\codes\…
+warning: in the working copy of '.gitattributes', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'base/Cargo.lock', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'base/crates/application/src/library.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'base/crates/bindings/Cargo.toml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'base/crates/bindings/src/native.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'base/crates/mysql/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'base/crates/native/tests/ai_result.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'base/crates/service/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'base/crates/service/src/replication.rs', LF will be replaced by CRLF the next time Git touches it
+Build receipt: C:\Users\17715\Documents\codes\�鼮����\platforms\android\app\build\outputs\apk\debug\build-receipt.json
+Source manifest SHA-256: 4aae8a62c2f8a8b1e342b0e58c69d1d23f1b9cd2aaa64a4db37173d8dc89c060
+

@@ -28,7 +28,7 @@ pub fn create(database: &Path, destination: &Path) -> Result<()> {
     let root = database.parent().ok_or("invalid_workspace")?;
     let blobs = crate::sync_blobs::BlobStore::new(&root.join("sync-blobs"));
     let _blob_lock = blobs.lock()?;
-    let temp = tempfile::tempdir().map_err(|e| e.to_string())?;
+    let temp = tempfile::tempdir_in(root).map_err(|e| e.to_string())?;
     let snapshot = temp.path().join("library.sqlite3");
     shufang_sqlite::SqliteRepository::snapshot(database, &snapshot)?;
     create_archive(root, destination, &snapshot, "library.sqlite3", 1)
@@ -43,6 +43,7 @@ fn create_archive(
     let mut paths = vec![(database_name.to_owned(), snapshot.to_path_buf())];
     // Original resources are content addressed and never modified or collected during backup.
     for folder in ["files", "credentials", "auth"] {
+        if cfg!(target_os="android") && ["credentials","auth"].contains(&folder) {continue;}
         let directory = root.join(folder);
         if directory.exists() {
             for entry in std::fs::read_dir(directory).map_err(|e| e.to_string())? {

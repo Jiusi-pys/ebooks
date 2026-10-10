@@ -40,6 +40,22 @@ pub fn save_result(workspace: &Workspace, args: &Value) -> Result<Value> {
                 .iter()
                 .map(|v| node(v, 0, &mut count))
                 .collect::<Result<Vec<_>>>()?;
+            if let Some(id)=args["mindMapId"].as_str() {
+                let map=core.entity("mindMaps",id)?;
+                let expected=args["expected"].as_u64().ok_or("expected_revision_required")?;
+                if expected!=map.revision {return Err("revision_conflict".into());}
+                let book_id=map.value["bookId"].as_str().ok_or("mindmap_book_required")?;
+                if args["bookId"]!=book_id {return Err("mindmap_book_mismatch".into());}
+                let chapter_id=args["anchor"]["chapterId"].as_str().ok_or("chapter_required")?;
+                let book=core.entity("books",book_id)?;
+                let chapter=book.value["chapters"].as_array().and_then(|items|items.iter().find(|c|c["id"]==chapter_id)).ok_or("unknown_chapter")?;
+                let mut root=map.value["root"].clone();
+                let nodes=root["children"].as_array_mut().ok_or("invalid_mindmap")?;
+                let index=nodes.iter().position(|n|n["chapterId"]==chapter_id).unwrap_or_else(||{nodes.push(json!({"id":uuid::Uuid::new_v4().to_string(),"text":chapter["title"],"chapterId":chapter_id,"children":[]}));nodes.len()-1});
+                nodes[index]["collapsed"]=false.into();
+                nodes[index]["children"].as_array_mut().ok_or("invalid_mindmap")?.extend(children);
+                return serde_json::to_value(core.save_entity("mindMaps",id,json!({"root":root}),vec![],expected)?).map_err(|e|e.to_string());
+            }
             patch = json!({"title":title,"root":{"id":uuid::Uuid::new_v4().to_string(),"text":title,"children":children}});
             if args["bookId"].is_string() {
                 patch["bookId"] = args["bookId"].clone();
@@ -152,6 +168,7 @@ pub fn run_with_config(
     job: &Job,
 ) -> Result<Value> {
     config.validate()?;
+    if cfg!(target_os="android") && config.provider=="codex" {return Err("remote_codex_required".into());}
     job.check()?;
     let resolve_secret = || match &override_key {
         Some(secret) if !secret.trim().is_empty() => Ok(secret.clone()),

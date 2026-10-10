@@ -1,0 +1,19 @@
+   Compiling shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.75s
+     Running tests\android_merge.rs (base\target\debug\deps\android_merge-642f2efa0490439e.exe)
+
+running 3 tests
+test unknown_plan_version_rejects_before_new_business_operations ... ok
+test merging_ink_copies_opaque_attachments_and_keeps_the_mapped_page_identity ... ok
+test merging_two_workspaces_keeps_references_and_retries_without_duplicates ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests\review_parity.rs (base\target\debug\deps\review_parity-200111801b0a6635.exe)
+
+running 2 tests
+test imported_review_preserves_swift_numeric_dates_and_rejects_overwrite ... ok
+test ios_and_android_share_review_state_and_atomic_events ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+

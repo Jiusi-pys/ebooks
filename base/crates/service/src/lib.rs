@@ -3,7 +3,7 @@ pub mod browser_auth;
 pub mod browser_session;
 pub mod codex_auth;
 pub mod credentials;
-mod incoming_snapshot;
+
 pub mod legacy;
 mod legacy_validation;
 mod library;
@@ -735,7 +735,7 @@ async fn mcp_http(
     }
 }
 
-mod replication_files;
+
 
 async fn sync_configuration(State(host): State<Arc<Host>>) -> ApiResult {
     let config = call(host.clone(), "syncConfig", json!({})).await?.0;

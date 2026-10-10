@@ -1,0 +1,104 @@
+diff --git a/base/crates/mysql/src/lib.rs b/base/crates/mysql/src/lib.rs
+index 93a1ca1..9703acd 100644
+--- a/base/crates/mysql/src/lib.rs
++++ b/base/crates/mysql/src/lib.rs
+@@ -22,6 +22,8 @@ pub struct MysqlRepository {
+     read_only: bool,
+     writer: Option<std::sync::Mutex<Conn>>,
+     lock_name: String,
++    connection_opts: Opts,
++    lease_epoch: String,
+ }
+ pub(crate) fn database_gate(db: &mut Conn) -> Result<()> {
+     let database: String = db
+@@ -198,9 +200,12 @@ impl MysqlRepository {
+         let opts = Opts::from_url(url).map_err(|_| "invalid_database_url")?;
+         let mut gate = Conn::new(opts.clone()).map_err(failure)?;
+         database_gate(&mut gate)?;
+-        let opts = OptsBuilder::from_opts(opts).pool_opts(
+-            PoolOpts::default().with_constraints(PoolConstraints::new(0, 3).ok_or("invalid_pool")?),
+-        );
++        let opts: Opts = OptsBuilder::from_opts(opts)
++            .pool_opts(
++                PoolOpts::default()
++                    .with_constraints(PoolConstraints::new(0, 3).ok_or("invalid_pool")?),
++            )
++            .into();
+         let pool = Pool::new(opts.clone()).map_err(failure)?;
+         let mut db = pool.get_conn().map_err(failure)?;
+         // Migrations are executed by the versioned release migrator, not startup.
+@@ -223,7 +228,7 @@ impl MysqlRepository {
+         let writer = if read_only {
+             None
+         } else {
+-            let mut conn = Conn::new(opts).map_err(failure)?;
++            let mut conn = Conn::new(opts.clone()).map_err(failure)?;
+             let acquired: Option<u8> = conn
+                 .exec_first("SELECT GET_LOCK(?,0)", (&lock_name,))
+                 .map_err(failure)?;
+@@ -237,13 +242,13 @@ impl MysqlRepository {
+             .map_err(failure)?;
+             Some(std::sync::Mutex::new(conn))
+         };
+-        let actual: Option<String> = db
++        let actual: Option<(String, String)> = db
+             .exec_first(
+-                "SELECT node_id FROM sync_heads WHERE workspace=?",
++                "SELECT node_id,epoch FROM sync_heads WHERE workspace=?",
+                 (workspace,),
+             )
+             .map_err(failure)?;
+-        let actual = actual.ok_or("workspace_not_found")?;
++        let (actual, lease_epoch) = actual.ok_or("workspace_not_found")?;
+         if !read_only && actual != node {
+             return Err("node_identity_mismatch".into());
+         }
+@@ -254,17 +259,46 @@ impl MysqlRepository {
+             read_only,
+             writer,
+             lock_name,
++            connection_opts: opts,
++            lease_epoch,
+         })
+     }
+     fn writer_connection(&self) -> Result<std::sync::MutexGuard<'_, Conn>> {
+         if self.read_only {
+             return Err("read_only_replica".into());
+         }
+-        self.writer
++        let mut writer = self
++            .writer
+             .as_ref()
+             .ok_or("writer_lease_lost")?
+             .lock()
+-            .map_err(|_| "writer_lease_lost".into())
++            .map_err(|_| "writer_lease_lost")?;
++        // A dedicated lease connection can expire while pooled reads keep working.
++        // Recover only before starting a transaction; never replay a failed commit.
++        if writer.ping().is_err() {
++            // Keep the restore gate on a separate connection so it is released
++            // when recovery finishes, rather than for the writer's lifetime.
++            let mut gate = Conn::new(self.connection_opts.clone()).map_err(failure)?;
++            database_gate(&mut gate)?;
++            let mut replacement = Conn::new(self.connection_opts.clone()).map_err(failure)?;
++            let acquired: Option<u8> = replacement
++                .exec_first("SELECT GET_LOCK(?,0)", (&self.lock_name,))
++                .map_err(failure)?;
++            if acquired != Some(1) {
++                return Err("writer_lease_lost".into());
++            }
++            let identity: Option<(String, String)> = replacement
++                .exec_first(
++                    "SELECT node_id,epoch FROM sync_heads WHERE workspace=?",
++                    (&self.workspace,),
++                )
++                .map_err(failure)?;
++            if identity.as_ref() != Some(&(self.node.clone(), self.lease_epoch.clone())) {
++                return Err("writer_identity_changed".into());
++            }
++            *writer = replacement;
++        }
++        Ok(writer)
+     }
+     fn writable(&self) -> Result<()> {
+         let mut writer = self.writer_connection()?;

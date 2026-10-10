@@ -1,0 +1,36 @@
+INK_EXIT=0
+ProcessInfoPlistFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest/Info.plist /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Intermediates.noindex/InkParity.build/Debug-iphonesimulator/ShufangInkParityTests.build/empty-ShufangInkParityTests.plist (in target 'ShufangInkParityTests' from project 'InkParity')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness
+    builtin-infoPlistUtility /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Intermediates.noindex/InkParity.build/Debug-iphonesimulator/ShufangInkParityTests.build/empty-ShufangInkParityTests.plist -producttype com.apple.product-type.bundle.unit-test -expandbuildsettings -format binary -platform iphonesimulator -o /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest/Info.plist
+
+CopySwiftLibs /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest (in target 'ShufangInkParityTests' from project 'InkParity')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness
+    builtin-swiftStdLibTool --copy --verbose --scan-executable /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest/ShufangInkParityTests --scan-folder /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest/Frameworks --scan-folder /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest/PlugIns --scan-folder /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest/SystemExtensions --scan-folder /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest/Extensions --platform iphonesimulator --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest/Frameworks --strip-bitcode --scan-executable /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Intermediates.noindex/InkParity.build/Debug-iphonesimulator/ShufangInkParityTests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+Ignoring --strip-bitcode because --sign was not passed
+
+GenerateDSYMFile /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest.dSYM /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest/ShufangInkParityTests (in target 'ShufangInkParityTests' from project 'InkParity')
+    cd /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/dsymutil /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest/ShufangInkParityTests -o /Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/DerivedData/Build/Products/Debug-iphonesimulator/ShufangInkParityTests.xctest.dSYM
+
+Test Suite 'All tests' started at 2026-10-08 11:07:53.525.
+Test Suite 'ShufangInkParityTests.xctest' started at 2026-10-08 11:07:53.526.
+Test Suite 'PortableInkPencilTests' started at 2026-10-08 11:07:53.526.
+Test Case '-[ShufangInkParityTests.PortableInkPencilTests testAndroidStrokeRemainsEditableWithIdentityAndPressure]' started.
+PORTABLE_INK_OUTPUT=/Users/jiusi/Library/Developer/CoreSimulator/Devices/37DA40C6-93F2-475C-AF03-245F509748FE/data/Documents/ios-edited-ink.json
+Test Case '-[ShufangInkParityTests.PortableInkPencilTests testAndroidStrokeRemainsEditableWithIdentityAndPressure]' passed (0.024 seconds).
+Test Suite 'PortableInkPencilTests' passed at 2026-10-08 11:07:53.551.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.024 (0.025) seconds
+Test Suite 'ShufangInkParityTests.xctest' passed at 2026-10-08 11:07:53.551.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.024 (0.025) seconds
+Test Suite 'All tests' passed at 2026-10-08 11:07:53.551.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.024 (0.026) seconds
+2026-10-08 11:07:53.842 xcodebuild[76798:34660506] [MT] IDETestOperationsObserverDebug: 1.383 elapsed -- Testing started completed.
+2026-10-08 11:07:53.842 xcodebuild[76798:34660506] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-08 11:07:53.842 xcodebuild[76798:34660506] [MT] IDETestOperationsObserverDebug: 1.383 sec, +1.383 sec -- end
+
+Test session results, code coverage, and logs:
+	/Users/jiusi/CodexAcceptance-android-d4e834cc4d/ios/.parity-harness/ink-green.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started

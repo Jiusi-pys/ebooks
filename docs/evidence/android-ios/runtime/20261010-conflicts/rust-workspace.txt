@@ -1,0 +1,714 @@
+   Compiling shufang-application v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\application)
+   Compiling shufang-sqlite v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\sqlite)
+   Compiling shufang-mysql v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\mysql)
+   Compiling shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+   Compiling shufang-service v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\service)
+   Compiling shufang-bindings v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\bindings)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 15s
+     Running unittests src\lib.rs (base\target\debug\deps\shufang_application-ba5ab4f57c626d72.exe)
+
+running 1 test
+test offline_copy::tests::references_do_not_rewrite_ids_with_a_shared_prefix ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\externalize.rs (base\target\debug\deps\externalize-a108539a1bd7e68f.exe)
+
+running 3 tests
+test invalid_blob_shaped_extension_values_remain_ordinary_json ... ok
+test threshold_is_encoded_bytes_and_existing_references_are_preserved ... ok
+test fields_are_externalized_before_operation_commit_without_changing_utf16 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src\lib.rs (base\target\debug\deps\shufang_bindings-35a930af68b447a3.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\android_contract.rs (base\target\debug\deps\android_contract-dd2b5644d363fef1.exe)
+
+running 4 tests
+test android_paged_reads_keep_revisions_and_reject_invalid_limits ... ok
+test search_lists_each_matching_passage_and_does_not_search_missing_json_fields ... ok
+test parsed_import_commits_source_and_book_once_and_survives_reopen ... ok
+test large_android_edits_use_staged_requests_without_exceeding_json_abi_limit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.07s
+
+     Running tests\commands.rs (base\target\debug\deps\commands-102d7562a8d32a63.exe)
+
+running 2 tests
+test buffer_lifecycle_rejects_stale_handles_and_double_free ... ok
+test versioned_dispatch_rejects_unknown_commands_and_malformed_payloads ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (base\target\debug\deps\shufang_domain-b1fac2727a7b3bc7.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\associations.rs (base\target\debug\deps\associations-95576babcbec9984.exe)
+
+running 1 test
+test pair_identity_matches_existing_javascript_wire_encoding ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\decimal_compatibility.rs (base\target\debug\deps\decimal_compatibility-acdd40c75a4de283.exe)
+
+running 1 test
+test ordinary_operation_reader_preserves_js_binary64_decimals_exactly ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\lossless_json.rs (base\target\debug\deps\lossless_json-01b0ebcb2d94e72f.exe)
+
+running 3 tests
+test canonical_order_is_utf16_and_numbers_are_javascript_numbers ... ok
+test utf16_units_keys_and_duplicate_keys_roundtrip_without_markers ... ok
+test malformed_json_is_rejected_and_deep_documents_do_not_use_recursive_parsing ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\lossless_sync.rs (base\target\debug\deps\lossless_sync-a49cd23cde07b11e.exe)
+
+running 4 tests
+test overwritten_nonfinite_values_are_discarded_but_live_nonfinite_payloads_rejected ... ok
+test snapshot_states_reject_invalid_identity_versions_and_payloads ... ok
+test operation_and_state_preserve_surrogate_keys_text_and_immutable_versions ... ok
+test unsets_and_progress_truthiness_match_the_shared_field_rule ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\sync.rs (base\target\debug\deps\sync-549a8e614f412d3a.exe)
+
+running 8 tests
+test counter_rollover_preserves_a_monotonic_representable_clock ... ok
+test received_clock_rejects_future_and_terminal_values_but_preserves_offline_history ... ok
+test exact_clocks_and_monotonicity ... ok
+test validates_untrusted_operations_and_entity_identity ... ok
+test preserves_unacknowledged_fields_and_converges ... ok
+test never_resurrects_a_tombstone ... ok
+test explicit_null_survives_a_json_round_trip ... ok
+test deep_mind_maps_fail_explicitly_instead_of_silently_truncating ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (base\target\debug\deps\shufang_mysql-8d6b61074e438a9c.exe)
+
+running 1 test
+test migrations::tests::recognizes_only_the_verified_historical_bytes_and_keeps_source_validation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\migrations.rs (base\target\debug\deps\migrations-b66273db8e11a826.exe)
+
+running 1 test
+test rust_runner_initializes_upgrades_repeats_and_recovers_partial_ddl ... ignored, requires isolated MySQL with create/drop access to rust_acceptance namespaces
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\repository.rs (base\target\debug\deps\repository-cd97777142268279.exe)
+
+running 4 tests
+test digest_preserves_shared_owner_and_rejects_stale_save ... ignored, requires isolated migrated MySQL
+test existing_peer_credentials_remain_authoritative_and_revocable ... ignored, requires isolated migrated MySQL
+test existing_schema_atomic_commands_and_snapshot_lifecycle ... ignored, requires isolated MySQL with migrations 0000-0015
+test restore_retains_operations_and_changes_epoch_then_transfers_writer ... ignored, requires a second fully migrated, empty isolated MySQL database
+
+test result: ok. 0 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\writer_reconnect.rs (base\target\debug\deps\writer_reconnect-b1be86d3ab2bca0a.exe)
+
+running 5 tests
+test disconnected_writer_recovers_snapshot_and_mutation_without_duplicate_operations ... ignored, requires isolated migrated MySQL
+test reconnect_does_not_steal_another_writer_lease ... ignored, requires isolated migrated MySQL
+test reconnect_rejects_a_replaced_node ... ignored, requires isolated migrated MySQL
+test reconnect_rejects_a_replaced_workspace_epoch ... ignored, requires isolated migrated MySQL
+test reconnect_respects_and_releases_the_restore_gate ... ignored, requires isolated migrated MySQL
+
+test result: ok. 0 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (base\target\debug\deps\shufang_native-66cbf91a1303c5b6.exe)
+
+running 3 tests
+test ai::tests::rejects_unknown_tasks_and_large_context ... ok
+test ai::tests::streaming_provider_uses_auth_and_preserves_unicode_chunks ... ok
+test ai::tests::incomplete_stream_and_http_auth_failures_are_not_successful_answers ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\ai_result.rs (base\target\debug\deps\ai_result-e1d573d7babf6c4e.exe)
+
+running 2 tests
+test generated_results_are_validated_before_any_record_is_created ... ok
+test ai_chapter_expansion_updates_existing_map_and_rejects_stale_revision ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\android_auth.rs (base\target\debug\deps\android_auth-33f7fc2c43cc2a82.exe)
+
+running 1 test
+test browser_and_machine_auth_headers_are_separate ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\android_citations.rs (base\target\debug\deps\android_citations-67d3ed91218e2676.exe)
+
+running 5 tests
+test ios_multi_paragraph_card_keeps_one_identity_and_validates_all_utf16_ranges ... ok
+test web_original_pdf_without_extracted_chapters_accepts_geometric_page_anchors ... ok
+test review_state_and_ios_history_event_commit_together ... ok
+test canonical_web_book_and_chapter_citations_validate_and_generate_matching_notes ... ok
+test unlink_preserves_enriched_quotes_and_deletes_citation_only_anchors ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\android_merge.rs (base\target\debug\deps\android_merge-44d24c2828303d22.exe)
+
+running 3 tests
+test unknown_plan_version_rejects_before_new_business_operations ... ok
+test merging_ink_copies_opaque_attachments_and_keeps_the_mapped_page_identity ... ok
+test merging_two_workspaces_keeps_references_and_retries_without_duplicates ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests\attachment_interop.rs (base\target\debug\deps\attachment_interop-29b9c41ed7779459.exe)
+
+running 4 tests
+test ios_binary_references_are_collected_without_json_decoding ... ok
+test ios_review_events_can_be_read_by_android_startup ... ok
+test binary_attachment_survives_restart_and_checks_expected_hash ... ok
+test multi_chunk_binary_attachment_is_exact ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\backup.rs (base\target\debug\deps\backup-a44fba3e775416fe.exe)
+
+running 2 tests
+test backup_restores_committed_wal_and_files_without_overwriting_a_workspace ... ok
+test backup_preserves_verified_blobs_and_incomplete_chunks_for_restart_resume ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests\books.rs (base\target\debug\deps\books-586466e5da9415f9.exe)
+
+running 4 tests
+test plain_text_and_fb2_keep_unicode_chapter_text ... ok
+test epub_two_ncx_imports_nested_fragment_outline ... ok
+test epub_uses_spine_order_and_ignores_script_contents ... ok
+test epub_rendition_resolves_local_images_and_non_spine_footnotes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+
+     Running tests\credentials.rs (base\target\debug\deps\credentials-54f8403062e5ac63.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\externalize.rs (base\target\debug\deps\externalize-324d369b360e7d9e.exe)
+
+running 2 tests
+test workspace_externalizes_before_operation_commit_and_reads_hydrated_values_after_restart ... ok
+test disk_field_objects_are_lossless_hydratable_and_corruption_is_repairable ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s
+
+     Running tests\live_ai.rs (base\target\debug\deps\live_ai-7fdbbe4c52b368f0.exe)
+
+running 1 test
+test codex_live_question_uses_the_native_job_and_persists_result ... ignored, requires a logged-in Codex CLI and explicitly selected live model
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\local_download.rs (base\target\debug\deps\local_download-05e45052bfc02ce9.exe)
+
+running 1 test
+test removing_download_requires_verified_remote_bytes_and_keeps_entities ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\metadata.rs (base\target\debug\deps\metadata-ef675a64a0ceea2f.exe)
+
+running 3 tests
+test live_metadata_lookup_uses_native_job ... ignored, explicit network acceptance against Open Library
+test automatic_metadata_is_bounded_and_normalized_to_shared_format ... ok
+test changing_book_invalidates_digest_atomically ... ok
+
+test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\mysql_versions.rs (base\target\debug\deps\mysql_versions-ee46ad610a7a6430.exe)
+
+running 1 test
+test mysql_version_single_record_restore_and_manual_deletion ... ignored, requires isolated migrated MySQL
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\native_parsers.rs (base\target\debug\deps\native_parsers-2ed4d75a2d274bfa.exe)
+
+running 2 tests
+test kindle_converter_reads_the_upstream_ncx_sample ... ignored, requires packaged mobitool and upstream fixture checkout
+test pdfium_reads_a_real_pdf_document ... ignored, requires packaged PDFium native dependency
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\offline_conflicts.rs (base\target\debug\deps\offline_conflicts-ebe39316e65616e5.exe)
+
+running 5 tests
+test offline_edits_capture_base_atomically_and_emit_only_changed_fields ... ok
+test conditional_push_checks_state_but_recognizes_a_lost_reply ... ok
+test stale_preview_rejects_decision_and_copy_preserves_both_versions ... ok
+test deleted_remote_book_keeps_local_learning_dependency_graph_as_new_identities ... ok
+test different_fields_merge_but_same_field_persists_and_remote_choice_withdraws_history ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\outline.rs (base\target\debug\deps\outline-62d1ebd801f2c405.exe)
+
+running 2 tests
+test outline_commands_preserve_chapters_and_reject_stale_edits ... ok
+test outline_moves_complete_subtrees_and_deletion_promotes_children ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\review_parity.rs (base\target\debug\deps\review_parity-811024503b1843e1.exe)
+
+running 3 tests
+test imported_review_preserves_swift_numeric_dates_and_rejects_overwrite ... ok
+test locally_graded_and_restored_review_events_are_accepted_by_a_real_peer_core ... ok
+test ios_and_android_share_review_state_and_atomic_events ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests\study_restore.rs (base\target\debug\deps\study_restore-8b2086c74abcf3a4.exe)
+
+running 5 tests
+test restore_validates_staged_references_and_commits_all_or_nothing ... ok
+test materialized_optional_null_ranges_survive_backup_validation ... ok
+test untrusted_zip_cannot_escape_staging_or_restore_without_a_complete_manifest ... ok
+test keep_both_rebinds_note_links_without_rewriting_extension_metadata ... ok
+test study_zip_restore_preview_rejects_stale_and_retries_without_duplicates ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\sync_blobs.rs (base\target\debug\deps\sync_blobs-75b0c24fb58bfba0.exe)
+
+running 2 tests
+test browser_source_chunks_are_immutable_and_complete_only_after_integrity_validation ... ok
+test chunks_resume_after_restart_and_commit_checks_content_not_only_size ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests\sync_config.rs (base\target\debug\deps\sync_config-2fd36e23b11e7bd9.exe)
+
+running 4 tests
+test peer_url_allows_a_safe_https_proxy_prefix ... ok
+test external_environment_credentials_are_referenced_not_copied_or_replicated ... ok
+test remove_and_manual_request_are_local_revision_checked_operations ... ok
+test peer_credentials_are_private_and_config_revisions_are_checked ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\workspace.rs (base\target\debug\deps\workspace-735c998a0312294b.exe)
+
+running 10 tests
+test update_lease_blocks_new_sessions_before_database_open ... ok
+test completed_background_job_can_be_read_after_reopening ... ok
+test received_book_opens_a_verified_original_without_platform_local_path ... ok
+test importing_is_asynchronous_and_persists_an_immutable_original ... ok
+test version_snapshot_restores_one_record_and_can_be_deleted ... ok
+test cancellation_cannot_report_a_successful_result ... ok
+test whole_version_restore_creates_a_separate_workspace_and_safety_backup ... ok
+test replica_command_preserves_production_fields_and_deduplicates_large_payloads ... ok
+test invalid_cover_never_mutates_book_metadata ... ok
+test completed_jobs_do_not_exhaust_running_job_capacity ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.45s
+
+     Running unittests src\lib.rs (base\target\debug\deps\shufang_service-05a84129c4e2e4e6.exe)
+
+running 4 tests
+test browser_auth::proxy_tests::real_ip_requires_a_single_overwritten_header_from_loopback ... ok
+test replication::peer_url_tests::accepts_a_https_reverse_proxy_prefix_for_an_isolated_peer ... ok
+test sync_v2::page_tests::bounds_snapshot_response_by_serialized_bytes ... ok
+test ai_rpc::tests::cancelling_http_cancels_job_and_releases_admission ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running unittests src\main.rs (base\target\debug\deps\shufang_service-92bfe52e5d205290.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\ai_rpc.rs (base\target\debug\deps\ai_rpc-dfbcdb9dfdb84c25.exe)
+
+running 1 test
+test ai_procedures_keep_wire_shapes_and_never_persist_transient_keys ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests\android_account_sync.rs (base\target\debug\deps\android_account_sync-fe2bea1a9f7f104d.exe)
+
+running 1 test
+test android_shared_transport_uses_account_cookie_for_bidirectional_sync_and_rejects_expiry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.42s
+
+     Running tests\browser_auth.rs (base\target\debug\deps\browser_auth-b4fe218882e35a2a.exe)
+
+running 1 test
+test bootstrap_setup_login_profile_and_old_cookie_revocation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.15s
+
+     Running tests\browser_session.rs (base\target\debug\deps\browser_session-b0f8069d33fae870.exe)
+
+running 1 test
+test accepts_node_session_and_rejects_expiration_tampering_and_weak_configuration ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\codex_auth.rs (base\target\debug\deps\codex_auth-d8488a230494c228.exe)
+
+running 1 test
+test concurrent_login_is_singleton_and_logout_never_overlaps_login ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\credentials.rs (base\target\debug\deps\credentials-e548754ffbf74bec.exe)
+
+running 1 test
+test node_credentials_survive_rust_migration_and_reject_corruption ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.39s
+
+     Running tests\http.rs (base\target\debug\deps\http-5a3c545efc139b52.exe)
+
+running 6 tests
+test mcp_initializes_and_rejects_unknown_tools_without_running_commands ... ok
+test modern_mcp_requires_matching_routing_headers ... ok
+test rest_requires_auth_and_calls_the_same_local_use_cases ... ok
+test review_enrollment_and_due_queue_use_shared_core_and_revision_checks ... ok
+test multipart_import_preserves_filename_and_commits_before_job_success ... ok
+test version_endpoints_require_owner_and_restore_selected_record ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests\initialization.rs (base\target\debug\deps\initialization-e1173ebe62ec4723.exe)
+
+running 1 test
+test initialization_finishes_without_claiming_listener_or_starting_workers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests\legacy.rs (base\target\debug\deps\legacy-e61ff329ebd5f6aa.exe)
+
+running 7 tests
+test legacy_webhook_creation_patch_and_test_deliver_signed_payload ... ok
+test structured_author_and_chapter_limits_match_old_clients ... ok
+test repeated_delete_events_with_distinct_deliveries_are_idempotent ... ok
+test events_are_idempotent_and_chunk_completion_is_atomic ... ok
+test association_identity_and_unrelated_filters_match_old_rest ... ok
+test old_rest_shapes_upserts_filters_and_utf16_counts ... ok
+test due_digest_and_ai_routes_have_old_contracts_and_safe_failure ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests\live_ai.rs (base\target\debug\deps\live_ai-c27fad74d958b143.exe)
+
+running 1 test
+test live_rest_ask_and_translate_persist_through_shared_core ... ignored, explicit live provider acceptance; consumes authenticated Codex quota
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\machine_auth.rs (base\target\debug\deps\machine_auth-dde5faf93d5b71f0.exe)
+
+running 1 test
+test production_api_key_preserves_clients_without_granting_process_control ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\mcp_contract.rs (base\target\debug\deps\mcp_contract-baabe7da309b5a07.exe)
+
+running 3 tests
+test native_mcp_discovers_modern_revision_without_a_session ... ok
+test production_mcp_refuses_incomplete_blob_values ... ok
+test native_mcp_uses_the_shared_snake_case_tool_contract ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\mcp_user_capabilities.rs (base\target\debug\deps\mcp_user_capabilities-4a6ee3b975535279.exe)
+
+running 9 tests
+test real_mysql_mcp_mutations_and_single_entity_restore ... ignored, requires isolated fully migrated MySQL
+test catalogue_has_user_actions_and_never_control_actions ... ok
+test readonly_host_and_unknown_actions_cannot_mutate ... ok
+test oauth_read_grants_cannot_write_or_reach_control_routes ... ok
+test import_and_source_pagination_are_complete_and_retries_do_not_duplicate ... ok
+test review_citation_reading_and_version_restore_are_real_business_operations ... ok
+test book_crud_preserves_full_content_cover_and_revision_conflicts ... ok
+test every_user_entity_supports_create_read_update_delete_and_validation ... ok
+test chunked_large_book_import_parses_into_the_same_book ... ok
+
+test result: ok. 8 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests\mysql_handoff.rs (base\target\debug\deps\mysql_handoff-0c356984725cf7b3.exe)
+
+running 1 test
+test mysql_node_account_cookie_and_webhook_settings_survive_rust_handoff ... ignored, requires dedicated isolated account fixture database
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\oauth.rs (base\target\debug\deps\oauth-41fc0923594d9671.exe)
+
+running 6 tests
+test mcp_http_rejects_foreign_and_opaque_origins ... ok
+test full_consent_and_refresh_preserve_scope_without_upgrading_old_read_grants ... ok
+test pkce_consent_rotation_revocation_and_read_only_scope ... ok
+test anonymous_dynamic_registration_never_consumes_persistent_slots ... ok
+test registration_and_authorization_envelopes_cannot_pin_or_tamper_with_state ... ok
+test replay_revokes_grant_even_when_access_store_is_full ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests\oauth_migration.rs (base\target\debug\deps\oauth_migration-11758d82a31e8e95.exe)
+
+running 1 test
+test node_oauth_import_preserves_owner_token_hashes_deadlines_and_replay_history ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\offline_conflicts_network.rs (base\target\debug\deps\offline_conflicts_network-fbe5e905ee9ee103.exe)
+
+running 9 tests
+test committed_write_with_503_receipt_loss_is_recognized_without_duplicate_or_false_conflict ... ok
+test server_deletion_keeps_offline_body_as_new_copy_and_late_edit_requires_another_choice ... ok
+test matching_manual_edit_removes_obsolete_conflict_instead_of_leaving_stale_preview ... ok
+test independent_fields_merge_and_deleted_local_note_can_keep_server_identity ... ok
+test real_two_offline_clients_preserve_conflict_across_restart_and_copy_without_publishing_rejected_operation ... ok
+test concurrent_opaque_ink_attachments_are_verified_and_both_copies_remain_binary ... ok
+test deleted_book_local_choice_copies_learning_graph_and_synchronizes_new_references ... ok
+test large_remote_body_is_hash_checked_before_preview_and_local_choice_still_synchronizes ... ok
+test failed_transport_never_acknowledges_edits_and_late_remote_change_reopens_conflict ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.14s
+
+     Running tests\old_v2.rs (base\target\debug\deps\old_v2-68f4d55de0ced863.exe)
+
+running 1 test
+test old_mysql_v2_and_native_sqlite_exchange_original_operations_and_files ... ignored, requires isolated MySQL/Hono peer driven by native.mysql.test.ts
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\peer_migration.rs (base\target\debug\deps\peer_migration-996e9c5111dbc4ed.exe)
+
+running 1 test
+test legacy_peers_import_once_preserves_private_tokens_and_user_changes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\public_https_restore.rs (base\target\debug\deps\public_https_restore-e8b8eb9c02c49259.exe)
+
+running 1 test
+test restores_operations_and_books_from_public_https_peer ... ignored, requires a separately restored MySQL peer over real HTTPS
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\read_only.rs (base\target\debug\deps\read_only-d41314a96dc91618.exe)
+
+running 2 tests
+test candidate_rejects_every_public_mutation_and_keeps_reads_available ... ok
+test read_only_replication_receives_data_without_sending_operations_or_files ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running tests\replication_network.rs (base\target\debug\deps\replication_network-35403709213a2dba.exe)
+
+running 5 tests
+test missing_external_credentials_are_visible_without_leaking_reference_or_token ... ok
+test bootstrap_reads_snapshot_only_state_without_inventing_original_operations ... ok
+test referenced_files_cross_actual_http_both_directions_and_retry_missing_bytes ... ok
+test externalized_business_write_crosses_http_and_survives_restart ... ok
+test actual_http_two_independent_databases_converge_and_retry_offline ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.15s
+
+     Running tests\security_regressions.rs (base\target\debug\deps\security_regressions-41a2154050691a7d.exe)
+
+running 5 tests
+test reverse_proxy_clients_have_independent_login_limits ... ok
+test snapshot_clock_validation_covers_old_staging_before_publication ... ok
+test anonymous_registration_cannot_exhaust_global_capacity ... ok
+test poisoned_peer_and_local_clocks_are_rejected_without_blocking_writes ... ok
+test restore_keeps_revoked_oauth_token_invalid ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests\sync_entity_contract.rs (base\target\debug\deps\sync_entity_contract-4f24905d3a6877ea.exe)
+
+running 7 tests
+test production_mutation_defaults_aliases_and_retry_are_preserved ... ok
+test production_chunk_import_retains_sync_fields_and_upload_operation_id ... ok
+test production_events_preserve_metadata_and_delivery_identity ... ok
+test production_http_writes_deduplicate_keys_and_conflict_on_reuse ... ok
+test production_rest_webhook_is_atomic_and_keeps_api_event ... ok
+test incomplete_blob_fields_are_unavailable_instead_of_leaking_storage_references ... ok
+test production_contract_preserves_materialized_fields_and_filters ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\sync_v2.rs (base\target\debug\deps\sync_v2-c115bdf03b202349.exe)
+
+running 9 tests
+test node_token_is_workspace_scoped_revocable_and_not_an_owner ... ok
+test owner_can_configure_headless_sync_without_exposing_environment_credentials ... ok
+test actual_http_blob_roundtrip_is_hash_verified ... ok
+test mutations_flatten_fields_and_push_rejects_invalid_known_projection_fields ... ok
+test conditional_sync_rejects_late_writer_and_preserves_duplicate_receipts ... ok
+test history_and_restore_preserve_tombstones_and_original_retry_content ... ok
+test v2_push_retry_changes_and_scoped_cursor_match_contract ... ok
+test mutation_reference_cleanup_and_immutable_reviews_match_old_v2 ... ok
+test mutations_cascade_atomically_and_replay_the_original_receipt ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests\webhooks.rs (base\target\debug\deps\webhooks-3dd2e64867054a57.exe)
+
+running 3 tests
+test replicated_operation_does_not_emit_a_new_business_webhook ... ok
+test queue_survives_restart_and_acknowledges_only_successful_deliveries ... ok
+test rapid_edits_and_delete_keep_committed_snapshots_after_reopen ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.18s
+
+     Running unittests src\lib.rs (base\target\debug\deps\shufang_sqlite-59b2020150732f8c.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\incoming_snapshot.rs (base\target\debug\deps\incoming_snapshot-5c9f7bdd8b81a104.exe)
+
+running 3 tests
+test invalid_pages_and_late_merge_conflicts_roll_back_every_entity_and_watermark ... ok
+test storage_failure_at_final_watermark_rolls_back_then_retries_and_abandon_is_scoped ... ok
+test staging_restart_and_atomic_finish_preserve_local_changes_without_inventing_operations ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\library.rs (base\target\debug\deps\library-c55e522efdf05fdc.exe)
+
+running 6 tests
+test associations_deduplicate_opposite_directions_and_keep_stable_keys ... ok
+test reading_checkpoint_is_idempotent_and_utf16_anchors_are_exact ... ok
+test revisions_progress_review_and_search_are_core_use_cases ... ok
+test local_library_validates_references_and_keeps_cascade_atomic ... ok
+test imported_book_and_original_manifest_roll_back_together_on_storage_failure ... ok
+test review_enrollment_queue_and_study_set_filter_survive_reopen ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests\lossless_replica.rs (base\target\debug\deps\lossless_replica-57c808e5b867615f.exe)
+
+running 1 test
+test lossless_remote_receive_and_checkpoint_survive_restart_and_failed_transaction ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\migrations.rs (base\target\debug\deps\migrations-b9eeb02bafac63b4.exe)
+
+running 4 tests
+test readonly_version_probe_does_not_migrate_or_create_a_missing_database ... ok
+test version_one_upgrades_once_without_losing_old_entities_or_outbox ... ok
+test failed_second_step_keeps_version_one_and_can_retry ... ok
+test version_two_upgrade_failure_rolls_back_and_retries_with_stable_epoch ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests\offline.rs (base\target\debug\deps\offline-3136a3781c0af65a.exe)
+
+running 4 tests
+test interrupted_initialization_rolls_back_and_reopen_succeeds ... ok
+test duplicate_operation_failure_rolls_back_entity_and_clock ... ok
+test offline_save_survives_restart_with_its_outbox ... ok
+test rejects_future_versions_and_migration_checksum_drift ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests\receipts.rs (base\target\debug\deps\receipts-729c8ba2b604a8d0.exe)
+
+running 2 tests
+test expiry_cleanup_preserves_business_and_unknown_historical_caches ... ok
+test event_receipt_commits_with_business_data_and_failed_actions_remain_retryable ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\replication.rs (base\target\debug\deps\replication-95939c044e646059.exe)
+
+running 7 tests
+test transient_snapshots_expire_but_selected_versions_remain ... ok
+test javascript_number_echo_is_duplicate_but_changed_number_is_id_reuse ... ok
+test creation_uses_one_clock_even_when_runtime_advances_and_retries_keep_defaults ... ok
+test receive_old_clock_does_not_rewind_local_clock_or_resurrect_tombstone ... ok
+test partial_or_reordered_receipt_cannot_advance_send_checkpoint ... ok
+test remote_replay_conflict_and_cursor_are_atomic_after_restart ... ok
+test mutation_cascade_storage_failure_rolls_back_root_children_clock_and_journal ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests\transactions.rs (base\target\debug\deps\transactions-4836110c1ed0bd61.exe)
+
+running 2 tests
+test local_values_use_optimistic_revisions_and_never_enter_replication_outbox ... ok
+test batch_and_change_journal_commit_together_or_not_at_all ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests shufang_application
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests shufang_bindings
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests shufang_domain
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests shufang_mysql
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests shufang_native
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests shufang_service
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests shufang_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

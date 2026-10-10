@@ -1,0 +1,8 @@
+{
+  "isolatedRollbackToActualPreviousProductionBinary": true,
+  "snapshotWithOldBinary": 201,
+  "snapshotAfterRestoringHotfix": 201,
+  "entityCountBefore": 1,
+  "entityCountAfterRollback": 1,
+  "entityCountAfterHotfix": 1
+}

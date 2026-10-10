@@ -1,0 +1,300 @@
+����δ����� java.lang.Throwable
+�����ӳٵ�δ����� java.lang.Throwable
+���ڳ�ʼ��jdb...
+> ��system:
+  (java.lang.Thread)37654                                        Signal Catcher                                ����ִ�������ȴ�
+  (java.lang.Thread)37655                                        ADB-JDWP Connection Control Thread            ����ִ�������ȴ�
+  (java.lang.Thread)37656                                        Jit thread pool worker thread 0               ��������
+  (java.lang.Thread)37657                                        FinalizerWatchdogDaemon                       ��������
+  (java.lang.Thread)37658                                        FinalizerDaemon                               ����ִ�������ȴ�
+  (java.lang.Thread)37659                                        ReferenceQueueDaemon                          ����ִ�������ȴ�
+  (java.lang.Thread)37660                                        HeapTaskDaemon                                ����ִ�������ȴ�
+  (java.lang.Thread)37664                                        Profile Saver                                 ��������
+��main:
+  (java.lang.Thread)37653                                        main                                          ��������
+  (java.lang.Thread)37661                                        binder:2487_1                                 ��������
+  (java.lang.Thread)37662                                        binder:2487_2                                 ��������
+  (java.lang.Thread)37663                                        binder:2487_3                                 ��������
+  (java.lang.Thread)37665                                        WM.task-1                                     ����ִ�������ȴ�
+  (android.app.Instrumentation$InstrumentationThread)37666       Instr: androidx.test.runner.AndroidJUnitRunner����ִ�������ȴ�
+  (android.os.HandlerThread)37667                                InstrumentationConnectionThread               ��������
+  (java.lang.Thread)37668                                        WM.task-2                                     ����ִ�������ȴ�
+  (java.lang.Thread)37669                                        WM.task-3                                     ����ִ�������ȴ�
+  (java.lang.Thread)37670                                        WM.task-4                                     ����ִ�������ȴ�
+  (kotlinx.coroutines.scheduling.CoroutineScheduler$Worker)37671 DefaultDispatcher-worker-1                    ����ִ�������ȴ�
+  (kotlinx.coroutines.scheduling.CoroutineScheduler$Worker)37672 DefaultDispatcher-worker-2                    ����ִ�������ȴ�
+  (kotlinx.coroutines.scheduling.CoroutineScheduler$Worker)37673 DefaultDispatcher-worker-3                    ����ִ�������ȴ�
+  (java.lang.Thread)37674                                        RenderThread                                  ��������
+  (android.net.ConnectivityThread)37675                          ConnectivityThread                            ��������
+  (android.os.HandlerThread)37676                                queued-work-looper                            ��������
+  (android.os.HandlerThread)37677                                SurfaceSyncGroupTimer                         ��������
+  (java.lang.Thread)37678                                        hwuiTask0                                     ��������
+  (java.lang.Thread)37679                                        hwuiTask1                                     ��������
+  (android.os.HandlerThread)37680                                Chrome_ProcessLauncherThread                  ��������
+  (java.lang.Thread)37681                                        Chrome_IOThread                               ��������
+  (java.lang.Thread)37682                                        ThreadPoolForeg                               ��������
+  (java.lang.Thread)37683                                        ThreadPoolSingl                               ��������
+  (java.lang.Thread)37684                                        ThreadPoolForeg                               ��������
+  (java.lang.Thread)37685                                        binder:2487_4                                 ��������
+  (lf)37686                                                      CleanupReference                              ����ִ�������ȴ�
+  (java.lang.Thread)37687                                        Chrome_InProcGpuThread                        ��������
+  (java.lang.Thread)37688                                        AudioThread                                   ��������
+  (java.lang.Thread)37689                                        ThreadPoolForeg                               ��������
+  (java.lang.Thread)37690                                        binder:2487_5                                 ��������
+  (java.lang.Thread)37691                                        binder:2487_6                                 ��������
+  (java.lang.Thread)37692                                        binder:2487_7                                 ��������
+> �ѹ��������̡߳�
+> main:
+  [1] android.os.MessageQueue.nativePollOnce (��������)
+  [2] android.os.MessageQueue.next (MessageQueue.java:387)
+  [3] android.os.Looper.loopOnce (Looper.java:189)
+  [4] android.os.Looper.loop (Looper.java:317)
+  [5] android.app.ActivityThread.main (ActivityThread.java:8,971)
+  [6] java.lang.reflect.Method.invoke (��������)
+  [7] com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run (RuntimeInit.java:597)
+  [8] com.android.internal.os.ZygoteInit.main (ZygoteInit.java:919)
+Signal Catcher:
+ADB-JDWP Connection Control Thread:
+Jit thread pool worker thread 0:
+FinalizerWatchdogDaemon:
+  [1] java.lang.Thread.sleep (��������)
+  [2] java.lang.Thread.sleep (Thread.java:451)
+  [3] java.lang.Thread.sleep (Thread.java:356)
+  [4] java.lang.Daemons$FinalizerWatchdogDaemon.sleepForNanos (Daemons.java:534)
+  [5] java.lang.Daemons$FinalizerWatchdogDaemon.waitForProgress (Daemons.java:593)
+  [6] java.lang.Daemons$FinalizerWatchdogDaemon.runInternal (Daemons.java:465)
+  [7] java.lang.Daemons$Daemon.run (Daemons.java:132)
+  [8] java.lang.Thread.run (Thread.java:1,119)
+FinalizerDaemon:
+  [1] java.lang.Object.wait (��������)
+  [2] java.lang.Object.wait (Object.java:405)
+  [3] java.lang.ref.ReferenceQueue.remove (ReferenceQueue.java:207)
+  [4] java.lang.ref.ReferenceQueue.remove (ReferenceQueue.java:228)
+  [5] java.lang.Daemons$FinalizerDaemon.runInternal (Daemons.java:348)
+  [6] java.lang.Daemons$Daemon.run (Daemons.java:132)
+  [7] java.lang.Thread.run (Thread.java:1,119)
+ReferenceQueueDaemon:
+  [1] java.lang.Object.wait (��������)
+  [2] java.lang.Object.wait (Object.java:405)
+  [3] java.lang.Object.wait (Object.java:543)
+  [4] java.lang.Daemons$ReferenceQueueDaemon.runInternal (Daemons.java:260)
+  [5] java.lang.Daemons$Daemon.run (Daemons.java:132)
+  [6] java.lang.Thread.run (Thread.java:1,119)
+HeapTaskDaemon:
+  [1] dalvik.system.VMRuntime.runHeapTasks (��������)
+  [2] java.lang.Daemons$HeapTaskDaemon.runInternal (Daemons.java:764)
+  [3] java.lang.Daemons$Daemon.run (Daemons.java:132)
+  [4] java.lang.Thread.run (Thread.java:1,119)
+binder:2487_1:
+binder:2487_2:
+binder:2487_3:
+Profile Saver:
+WM.task-1:
+  [1] jdk.internal.misc.Unsafe.park (��������)
+  [2] java.util.concurrent.locks.LockSupport.park (LockSupport.java:371)
+  [3] java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionNode.block (AbstractQueuedSynchronizer.java:519)
+  [4] java.util.concurrent.ForkJoinPool.unmanagedBlock (ForkJoinPool.java:3,805)
+  [5] java.util.concurrent.ForkJoinPool.managedBlock (ForkJoinPool.java:3,746)
+  [6] java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await (AbstractQueuedSynchronizer.java:1,707)
+  [7] java.util.concurrent.LinkedBlockingQueue.take (LinkedBlockingQueue.java:435)
+  [8] java.util.concurrent.ThreadPoolExecutor.getTask (ThreadPoolExecutor.java:1,082)
+  [9] java.util.concurrent.ThreadPoolExecutor.runWorker (ThreadPoolExecutor.java:1,142)
+  [10] java.util.concurrent.ThreadPoolExecutor$Worker.run (ThreadPoolExecutor.java:651)
+  [11] java.lang.Thread.run (Thread.java:1,119)
+Instr: androidx.test.runner.AndroidJUnitRunner:
+  [1] jdk.internal.misc.Unsafe.park (��������)
+  [2] java.util.concurrent.locks.LockSupport.park (LockSupport.java:221)
+  [3] java.util.concurrent.FutureTask.awaitDone (FutureTask.java:500)
+  [4] java.util.concurrent.FutureTask.get (FutureTask.java:190)
+  [5] androidx.test.espresso.Espresso.onIdle (Espresso.java:12)
+  [6] androidx.test.espresso.Espresso.onIdle (Espresso.java:1)
+  [7] androidx.compose.ui.test.EspressoLink_androidKt.runEspressoOnIdle (EspressoLink.android.kt:88)
+  [8] androidx.compose.ui.test.EspressoLink.runUntilIdle (EspressoLink.android.kt:82)
+  [9] androidx.compose.ui.test.AndroidComposeUiTestEnvironment.waitForNextChoreographerFrame (ComposeUiTest.android.kt:736)
+  [10] androidx.compose.ui.test.AndroidComposeUiTestEnvironment.waitForIdle (ComposeUiTest.android.kt:719)
+  [11] androidx.compose.ui.test.AndroidComposeUiTestEnvironment.access$waitForIdle (ComposeUiTest.android.kt:481)
+  [12] androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidTestOwner.getRoots (ComposeUiTest.android.kt:988)
+  [13] androidx.compose.ui.test.TestOwnerKt.getAllSemanticsNodes (TestOwner.kt:116)
+  [14] androidx.compose.ui.test.TestOwnerKt.getAllSemanticsNodes$default (TestOwner.kt:109)
+  [15] androidx.compose.ui.test.SemanticsNodeInteractionCollection.fetchSemanticsNodes (SemanticsNodeInteraction.kt:249)
+  [16] androidx.compose.ui.test.SemanticsNodeInteractionCollection.fetchSemanticsNodes$default (SemanticsNodeInteraction.kt:245)
+  [17] org.shufang.android.LibraryUiTest.offlineNavigationAndNativeNoteEditing$lambda$2 (LibraryUiTest.kt:18)
+  [18] org.shufang.android.LibraryUiTest$$ExternalSyntheticLambda1.invoke (D8$$SyntheticClass:0)
+  [19] androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil (ComposeUiTest.android.kt:893)
+  [20] androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil (AndroidComposeTestRule.android.kt:500)
+  [21] org.shufang.android.LibraryUiTest.offlineNavigationAndNativeNoteEditing (LibraryUiTest.kt:18)
+  [22] java.lang.reflect.Method.invoke (��������)
+  [23] org.junit.runners.model.FrameworkMethod$1.runReflectiveCall (FrameworkMethod.java:59)
+  [24] org.junit.internal.runners.model.ReflectiveCallable.run (ReflectiveCallable.java:12)
+  [25] org.junit.runners.model.FrameworkMethod.invokeExplosively (FrameworkMethod.java:56)
+  [26] org.junit.internal.runners.statements.InvokeMethod.evaluate (InvokeMethod.java:17)
+  [27] androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$testWithDisposal$1.evaluate (AndroidComposeTestRule.android.kt:426)
+  [28] org.junit.rules.ExternalResource$1.evaluate (ExternalResource.java:54)
+  [29] androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invokeSuspend (AndroidComposeTestRule.android.kt:448)
+  [30] androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke (null)
+  [31] androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1$evaluate$1.invoke (null)
+  [32] androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1$1$1$1.invokeSuspend (ComposeUiTest.android.kt:689)
+  [33] androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1$1$1$1.invoke (null)
+  [34] androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1$1$1$1.invoke (null)
+  [35] androidx.compose.ui.test.EspressoLink.withStrategy (EspressoLink.android.kt:69)
+  [36] androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1.invokeSuspend (ComposeUiTest.android.kt:686)
+  [37] androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1.invoke (null)
+  [38] androidx.compose.ui.test.AndroidComposeUiTestEnvironment$runTest$1$1.invoke (null)
+  [39] kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt$runTest$2$1$1.invokeSuspend (TestBuilders.kt:317)
+  [40] kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith (ContinuationImpl.kt:34)
+  [41] kotlinx.coroutines.DispatchedTask.run (DispatchedTask.kt:100)
+  [42] kotlinx.coroutines.test.TestDispatcher.processEvent$kotlinx_coroutines_test (TestDispatcher.kt:24)
+  [43] kotlinx.coroutines.test.TestCoroutineScheduler.tryRunNextTaskUnless$kotlinx_coroutines_test (TestCoroutineScheduler.kt:99)
+Ignoring cmd 0/199/1 from the VM
+  [44] kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt$runTest$2$1$workRunner$1.invokeSuspend (TestBuilders.kt:326)
+  [45] kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith (ContinuationImpl.kt:34)
+  [46] kotlinx.coroutines.DispatchedTask.run (DispatchedTask.kt:100)
+  [47] kotlinx.coroutines.EventLoopImplBase.processNextEvent (EventLoop.common.kt:263)
+  [48] kotlinx.coroutines.BlockingCoroutine.joinBlocking (Builders.kt:94)
+  [49] kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking (Builders.kt:70)
+  [50] kotlinx.coroutines.BuildersKt.runBlocking (δ֪)
+  [51] kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default (Builders.kt:48)
+  [52] kotlinx.coroutines.BuildersKt.runBlocking$default (δ֪)
+  [53] kotlinx.coroutines.test.TestBuildersJvmKt.createTestResult (TestBuildersJvm.kt:10)
+  [54] kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0 (TestBuilders.kt:309)
+  [55] kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0 (δ֪)
+  [56] kotlinx.coroutines.test.TestBuildersKt__TestBuildersKt.runTest-8Mi8wO0 (TestBuilders.kt:167)
+  [57] kotlinx.coroutines.test.TestBuildersKt.runTest-8Mi8wO0 (δ֪)
+  [58] androidx.compose.ui.test.AndroidComposeUiTestEnvironment.runTest (ComposeUiTest.android.kt:665)
+  [59] androidx.compose.ui.test.junit4.AndroidComposeTestRule$apply$1.evaluate (AndroidComposeTestRule.android.kt:447)
+  [60] org.junit.runners.ParentRunner$3.evaluate (ParentRunner.java:306)
+  [61] org.junit.runners.BlockJUnit4ClassRunner$1.evaluate (BlockJUnit4ClassRunner.java:100)
+  [62] org.junit.runners.ParentRunner.runLeaf (ParentRunner.java:366)
+  [63] org.junit.runners.BlockJUnit4ClassRunner.runChild (BlockJUnit4ClassRunner.java:103)
+  [64] org.junit.runners.BlockJUnit4ClassRunner.runChild (BlockJUnit4ClassRunner.java:63)
+  [65] org.junit.runners.ParentRunner$4.run (ParentRunner.java:331)
+  [66] org.junit.runners.ParentRunner$1.schedule (ParentRunner.java:79)
+  [67] org.junit.runners.ParentRunner.runChildren (ParentRunner.java:329)
+  [68] org.junit.runners.ParentRunner.access$100 (ParentRunner.java:66)
+  [69] org.junit.runners.ParentRunner$2.evaluate (ParentRunner.java:293)
+  [70] org.junit.runners.ParentRunner$3.evaluate (ParentRunner.java:306)
+  [71] org.junit.runners.ParentRunner.run (ParentRunner.java:413)
+  [72] org.junit.runners.Suite.runChild (Suite.java:128)
+  [73] org.junit.runners.Suite.runChild (Suite.java:27)
+  [74] org.junit.runners.ParentRunner$4.run (ParentRunner.java:331)
+  [75] org.junit.runners.ParentRunner$1.schedule (ParentRunner.java:79)
+  [76] org.junit.runners.ParentRunner.runChildren (ParentRunner.java:329)
+  [77] org.junit.runners.ParentRunner.access$100 (ParentRunner.java:66)
+  [78] org.junit.runners.ParentRunner$2.evaluate (ParentRunner.java:293)
+  [79] org.junit.runners.ParentRunner$3.evaluate (ParentRunner.java:306)
+  [80] org.junit.runners.ParentRunner.run (ParentRunner.java:413)
+  [81] org.junit.runner.JUnitCore.run (JUnitCore.java:137)
+  [82] org.junit.runner.JUnitCore.run (JUnitCore.java:115)
+  [83] androidx.test.internal.runner.TestExecutor.execute (TestExecutor.java:68)
+  [84] androidx.test.internal.runner.TestExecutor.execute (TestExecutor.java:59)
+  [85] androidx.test.runner.AndroidJUnitRunner.onStart (AndroidJUnitRunner.java:467)
+  [86] android.app.Instrumentation$InstrumentationThread.run (Instrumentation.java:2,606)
+InstrumentationConnectionThread:
+  [1] android.os.MessageQueue.nativePollOnce (��������)
+  [2] android.os.MessageQueue.next (MessageQueue.java:387)
+  [3] android.os.Looper.loopOnce (Looper.java:189)
+  [4] android.os.Looper.loop (Looper.java:317)
+  [5] android.os.HandlerThread.run (HandlerThread.java:85)
+WM.task-2:
+  [1] jdk.internal.misc.Unsafe.park (��������)
+  [2] java.util.concurrent.locks.LockSupport.park (LockSupport.java:371)
+  [3] java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionNode.block (AbstractQueuedSynchronizer.java:519)
+  [4] java.util.concurrent.ForkJoinPool.unmanagedBlock (ForkJoinPool.java:3,805)
+  [5] java.util.concurrent.ForkJoinPool.managedBlock (ForkJoinPool.java:3,746)
+  [6] java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await (AbstractQueuedSynchronizer.java:1,707)
+  [7] java.util.concurrent.LinkedBlockingQueue.take (LinkedBlockingQueue.java:435)
+  [8] java.util.concurrent.ThreadPoolExecutor.getTask (ThreadPoolExecutor.java:1,082)
+  [9] java.util.concurrent.ThreadPoolExecutor.runWorker (ThreadPoolExecutor.java:1,142)
+  [10] java.util.concurrent.ThreadPoolExecutor$Worker.run (ThreadPoolExecutor.java:651)
+  [11] java.lang.Thread.run (Thread.java:1,119)
+WM.task-3:
+  [1] jdk.internal.misc.Unsafe.park (��������)
+  [2] java.util.concurrent.locks.LockSupport.park (LockSupport.java:371)
+  [3] java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionNode.block (AbstractQueuedSynchronizer.java:519)
+  [4] java.util.concurrent.ForkJoinPool.unmanagedBlock (ForkJoinPool.java:3,805)
+  [5] java.util.concurrent.ForkJoinPool.managedBlock (ForkJoinPool.java:3,746)
+  [6] java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await (AbstractQueuedSynchronizer.java:1,707)
+  [7] java.util.concurrent.LinkedBlockingQueue.take (LinkedBlockingQueue.java:435)
+  [8] java.util.concurrent.ThreadPoolExecutor.getTask (ThreadPoolExecutor.java:1,082)
+  [9] java.util.concurrent.ThreadPoolExecutor.runWorker (ThreadPoolExecutor.java:1,142)
+  [10] java.util.concurrent.ThreadPoolExecutor$Worker.run (ThreadPoolExecutor.java:651)
+  [11] java.lang.Thread.run (Thread.java:1,119)
+WM.task-4:
+  [1] jdk.internal.misc.Unsafe.park (��������)
+  [2] java.util.concurrent.locks.LockSupport.park (LockSupport.java:371)
+  [3] java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionNode.block (AbstractQueuedSynchronizer.java:519)
+  [4] java.util.concurrent.ForkJoinPool.unmanagedBlock (ForkJoinPool.java:3,805)
+  [5] java.util.concurrent.ForkJoinPool.managedBlock (ForkJoinPool.java:3,746)
+  [6] java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await (AbstractQueuedSynchronizer.java:1,707)
+  [7] java.util.concurrent.LinkedBlockingQueue.take (LinkedBlockingQueue.java:435)
+  [8] java.util.concurrent.ThreadPoolExecutor.getTask (ThreadPoolExecutor.java:1,082)
+  [9] java.util.concurrent.ThreadPoolExecutor.runWorker (ThreadPoolExecutor.java:1,142)
+  [10] java.util.concurrent.ThreadPoolExecutor$Worker.run (ThreadPoolExecutor.java:651)
+  [11] java.lang.Thread.run (Thread.java:1,119)
+DefaultDispatcher-worker-1:
+  [1] jdk.internal.misc.Unsafe.park (��������)
+  [2] java.util.concurrent.locks.LockSupport.parkNanos (LockSupport.java:410)
+  [3] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.park (CoroutineScheduler.kt:855)
+  [4] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.tryPark (CoroutineScheduler.kt:803)
+  [5] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker (CoroutineScheduler.kt:751)
+  [6] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run (CoroutineScheduler.kt:704)
+DefaultDispatcher-worker-2:
+  [1] jdk.internal.misc.Unsafe.park (��������)
+  [2] java.util.concurrent.locks.LockSupport.parkNanos (LockSupport.java:410)
+  [3] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.park (CoroutineScheduler.kt:855)
+  [4] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.tryPark (CoroutineScheduler.kt:803)
+  [5] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker (CoroutineScheduler.kt:751)
+  [6] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run (CoroutineScheduler.kt:704)
+DefaultDispatcher-worker-3:
+  [1] jdk.internal.misc.Unsafe.park (��������)
+  [2] java.util.concurrent.locks.LockSupport.parkNanos (LockSupport.java:410)
+  [3] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.park (CoroutineScheduler.kt:855)
+  [4] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.tryPark (CoroutineScheduler.kt:803)
+  [5] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker (CoroutineScheduler.kt:751)
+  [6] kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run (CoroutineScheduler.kt:704)
+RenderThread:
+ConnectivityThread:
+  [1] android.os.MessageQueue.nativePollOnce (��������)
+  [2] android.os.MessageQueue.next (MessageQueue.java:387)
+  [3] android.os.Looper.loopOnce (Looper.java:189)
+  [4] android.os.Looper.loop (Looper.java:317)
+  [5] android.os.HandlerThread.run (HandlerThread.java:85)
+queued-work-looper:
+  [1] android.os.MessageQueue.nativePollOnce (��������)
+  [2] android.os.MessageQueue.next (MessageQueue.java:387)
+  [3] android.os.Looper.loopOnce (Looper.java:189)
+  [4] android.os.Looper.loop (Looper.java:317)
+  [5] android.os.HandlerThread.run (HandlerThread.java:85)
+SurfaceSyncGroupTimer:
+  [1] android.os.MessageQueue.nativePollOnce (��������)
+  [2] android.os.MessageQueue.next (MessageQueue.java:387)
+  [3] android.os.Looper.loopOnce (Looper.java:189)
+  [4] android.os.Looper.loop (Looper.java:317)
+  [5] android.os.HandlerThread.run (HandlerThread.java:85)
+hwuiTask0:
+hwuiTask1:
+Chrome_ProcessLauncherThread:
+  [1] android.os.MessageQueue.nativePollOnce (��������)
+  [2] android.os.MessageQueue.next (MessageQueue.java:387)
+  [3] android.os.Looper.loopOnce (Looper.java:189)
+  [4] android.os.Looper.loop (Looper.java:317)
+  [5] android.os.HandlerThread.run (HandlerThread.java:85)
+Chrome_IOThread:
+ThreadPoolForeg:
+ThreadPoolSingl:
+ThreadPoolForeg:
+binder:2487_4:
+CleanupReference:
+  [1] java.lang.Object.wait (��������)
+  [2] java.lang.Object.wait (Object.java:405)
+  [3] java.lang.ref.ReferenceQueue.remove (ReferenceQueue.java:207)
+  [4] java.lang.ref.ReferenceQueue.remove (ReferenceQueue.java:228)
+  [5] lf.run (chromium-TrichromeWebView6432.apk-stable-548115537:3)
+Chrome_InProcGpuThread:
+AudioThread:
+ThreadPoolForeg:
+binder:2487_5:
+binder:2487_6:
+binder:2487_7:
+> �ѻָ������̡߳�
+> 

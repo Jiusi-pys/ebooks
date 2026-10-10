@@ -1,0 +1,34 @@
+npm notice run my-app@0.1.0 prebuild
+npm notice run npm run core:build
+npm notice run my-app@0.1.0 core:build
+npm notice run node scripts/build-core.mjs
+    Finished `release` profile [optimized] target(s) in 0.18s
+npm notice run my-app@0.1.0 build
+npm notice run vite build && esbuild api/boot.ts api/migrate.ts mcp/stdio.ts --platform=node --bundle --format=esm --outdir=dist --banner:js="import { createRequire } from 'module';const require = createRequire(import.meta.url);"
+NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
+vite v7.3.0 building client environment for production...
+transforming...
+[plugin vite:resolve] Module "stream" has been externalized for browser compatibility, imported by "C:/Users/17715/Documents/codes/书籍管理/app/node_modules/sax/lib/sax.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+✓ 2148 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) C:/Users/17715/Documents/codes/书籍管理/app/src/lib/workspaceSync.ts is dynamically imported by C:/Users/17715/Documents/codes/书籍管理/app/src/lib/db.ts but also statically imported by C:/Users/17715/Documents/codes/书籍管理/app/src/components/SyncStatus.tsx, C:/Users/17715/Documents/codes/书籍管理/app/src/hooks/useLibrary.ts, C:/Users/17715/Documents/codes/书籍管理/app/src/lib/events.ts, C:/Users/17715/Documents/codes/书籍管理/app/src/lib/librarySync.ts, C:/Users/17715/Documents/codes/书籍管理/app/src/lib/mirrorSync.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/public/index.html                                          0.92 kB │ gzip:     0.50 kB
+dist/public/assets/cursor-editorTextHighlight-kG3uUOwL.svg      5.40 kB │ gzip:     2.15 kB
+dist/public/assets/index-D2RoFPDz.css                         338.28 kB │ gzip:    59.69 kB
+dist/public/assets/searchPdf-BJghtHHO.js                        0.71 kB │ gzip:     0.51 kB
+dist/public/assets/index-ByLzhBQ4.js                        4,495.96 kB │ gzip: 1,465.63 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 11.67s
+
+  dist\api\boot.js     5.8mb
+  dist\api\migrate.js  1.5mb
+  dist\mcp\stdio.js    1.1mb
+
+Done in 157ms

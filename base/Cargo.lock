@@ -2115,6 +2115,7 @@ dependencies = [
  "shufang-domain",
  "shufang-native",
  "shufang-sqlite",
+ "tempfile",
  "uuid",
 ]
 

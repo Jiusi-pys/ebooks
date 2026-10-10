@@ -1,0 +1,13 @@
+   Compiling shufang-mysql v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\mysql)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.31s
+     Running tests\writer_reconnect.rs (base\target\debug\deps\writer_reconnect-57cb03fcd45445e9.exe)
+
+running 5 tests
+test disconnected_writer_recovers_snapshot_and_mutation_without_duplicate_operations ... ok
+test reconnect_does_not_steal_another_writer_lease ... ok
+test reconnect_rejects_a_replaced_node ... ok
+test reconnect_rejects_a_replaced_workspace_epoch ... ok
+test reconnect_respects_and_releases_the_restore_gate ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+

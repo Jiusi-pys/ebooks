@@ -23,6 +23,21 @@ async fn call(app: &Router, method: &str, path: &str, body: Value) -> (u16, Valu
     (status, serde_json::from_slice(&bytes).unwrap())
 }
 #[tokio::test]
+async fn conditional_sync_rejects_late_writer_and_preserves_duplicate_receipts() {
+    let dir=tempfile::tempdir().unwrap();let ws=Workspace::open(&dir.path().join("library.sqlite"),"w","server").unwrap();
+    let app=router(Host::new(ws.clone(),"owner".into(),"http://127.0.0.1:31417".into()));
+    assert_eq!(call(&app,"GET","/api/v2/capabilities",Value::Null).await.1["conditionalPush"],1);
+    let op=json!({"workspaceId":"w","replicaId":"client","operationId":"guarded","kind":"notes","entityId":"n","clock":"101:0","patch":{"title":"Local","content":"offline"},"unset":[],"deleted":false});
+    let pre=call(&app,"POST","/api/v2/sync/preflight",json!({"operations":[op.clone()]})).await;assert_eq!(pre.0,200);assert!(pre.1["entries"][0]["state"].is_null());
+    ws.core.lock().unwrap().save_entity("notes","n",json!({"title":"Other","content":"late"}),vec![],0).unwrap();
+    let condition=json!({"operations":[op.clone()],"expectedEntities":[{"operationId":"guarded","state":null}]});
+    let reply=call(&app,"POST","/api/v2/sync/push",condition.clone()).await;
+    assert_eq!(reply.0,200);assert_eq!(reply.1["receipts"][0]["error"],"sync_precondition_failed");assert_eq!(ws.core.lock().unwrap().entity("notes","n").unwrap().value["content"],"late");
+    // Legacy clients still work. Then an uncertain retry is recognized before its stale guard.
+    assert_eq!(call(&app,"POST","/api/v2/sync/push",json!({"operations":[op]})).await.0,200);
+    let retry=call(&app,"POST","/api/v2/sync/push",condition).await;assert_eq!(retry.1["receipts"][0]["duplicate"],true);assert_eq!(retry.1["receipts"][0]["persisted"],true);
+}
+#[tokio::test]
 async fn v2_push_retry_changes_and_scoped_cursor_match_contract() {
     let dir = tempfile::tempdir().unwrap();
     let host = Host::new(
@@ -38,7 +53,7 @@ async fn v2_push_retry_changes_and_scoped_cursor_match_contract() {
     let (status, spec) = call(&app, "GET", "/api/v2/openapi.json", Value::Null).await;
     assert_eq!(status, 200);
     assert_eq!(spec["servers"][0]["url"], "/api/v2");
-    assert_eq!(spec["paths"].as_object().unwrap().len(), 18);
+    assert_eq!(spec["paths"].as_object().unwrap().len(), 19);
     assert!(spec["paths"]["/mutations"]["post"].is_object());
     assert!(
         spec["paths"]["/blobs/uploads/{id}/{index}"]["put"]["requestBody"]["content"]

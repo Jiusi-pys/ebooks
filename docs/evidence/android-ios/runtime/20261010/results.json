@@ -1,0 +1,32 @@
+{
+  "unitTests": 23,
+  "unitFailures": 0,
+  "unitErrors": 0,
+  "apkSha256": "0c553a70a0487fea8dbe65874c71d77588dc3f458cd3e587e82b24b9e01cccfe",
+  "sourceManifestSha256": "4aae8a62c2f8a8b1e342b0e58c69d1d23f1b9cd2aaa64a4db37173d8dc89c060",
+  "instrumentation": {
+    "mumu": {
+      "discovered": 36,
+      "executedPassed": 27,
+      "gatedSkipped": 9
+    },
+    "api26": {
+      "discovered": 36,
+      "executedPassed": 27,
+      "gatedSkipped": 9
+    },
+    "api28": {
+      "discovered": 36,
+      "executedPassed": 27,
+      "gatedSkipped": 9
+    }
+  },
+  "pdfWindowProfiles": {
+    "api28-final": 21,
+    "mumu-final": 8
+  },
+  "crossNetwork": "cross-network/20261010-11/results.json",
+  "fullParityComplete": false,
+  "physicalHanvonVerified": false,
+  "offlineSyncConflictQueueComplete": false
+}

@@ -1,0 +1,22 @@
+   Compiling shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.72s
+     Running tests\android_citations.rs (base\target\debug\deps\android_citations-be49faac292537c0.exe)
+
+running 1 test
+test unlink_preserves_enriched_quotes_and_deletes_citation_only_anchors ... FAILED
+
+failures:
+
+---- unlink_preserves_enriched_quotes_and_deletes_citation_only_anchors stdout ----
+
+thread 'unlink_preserves_enriched_quotes_and_deletes_citation_only_anchors' (358452) panicked at crates\native\tests\android_citations.rs:12:89:
+called `Result::unwrap()` on an `Err` value: "unknown_workspace_command"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    unlink_preserves_enriched_quotes_and_deletes_citation_only_anchors
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `-p shufang-native --test android_citations`

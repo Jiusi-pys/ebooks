@@ -33,7 +33,7 @@ impl Runtime for SystemRuntime {
 pub type Session = CoreSession<Storage, SystemRuntime>;
 pub struct Workspace {
     pub root: PathBuf,
-    database: PathBuf,
+    pub(crate) database: PathBuf,
     pub core: Mutex<Session>,
     jobs: Mutex<BTreeMap<String, Arc<Job>>>,
     instance: String,
@@ -203,6 +203,14 @@ impl Workspace {
             expected: u64,
         }
         match command {
+            "enableSyncConflicts"|"syncConflicts"|"syncConflictPreview"|"resolveSyncConflict"=>crate::offline_sync::command(self,command,&args),
+            "downloadState"|"removeDownload"|"enableDownload" => crate::local_download::command(self,command,&args),
+            "exportStudyBackup" => crate::study_backup::export(self,&args),
+            "previewStudyRestore" => crate::study_backup::preview(self,&args),
+            "commitStudyRestore" => crate::study_backup::commit(self,&args),
+            "cancelStudyRestore" => crate::study_backup::cancel(self,&args),
+            "putAttachment" => crate::attachments::put(self,&args),
+            "attachmentResource" => crate::attachments::resource(self,&args),
             "getReplica"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.replica_entity(string(&args,"kind")?,string(&args,"id")?)?).map_err(|e|e.to_string()),
             "mutateReplica"=>{
                 let mut core=self.core.lock().map_err(|_|"core_lock_failed")?;
@@ -217,6 +225,38 @@ impl Workspace {
             "removeSyncPeer" => crate::sync_config::remove(self, &args),
             "requestSync" => crate::sync_config::request(self),
             "syncStatus" => crate::sync_config::status(self),
+            "syncProgress" => {
+                let id=string(&args,"id")?;let url=string(&args,"url")?;
+                if !shufang_domain::sync::valid_identifier(id) {return Err("invalid_peer".into());}
+                crate::sync_config::validate_url(url)?;
+                let identity=format!("{:x}",Sha256::digest(json!([id,url,args["epoch"]]).to_string().as_bytes()));
+                let core=self.core.lock().map_err(|_|"core_lock_failed")?;
+                let (_,position)=core.sync_checkpoint(&format!("sync:send:{identity}"))?;
+                let after=position.as_str().unwrap_or("0").parse().map_err(|_|"invalid_sync_checkpoint")?;
+                let pending=core.replication_operations(after,100)?.len();
+                let mut sources=Vec::new();let mut cursor=String::new();
+                loop {let page=core.replication_entities(Some("sources"),&cursor)?;let more=page.len()==100;if let Some(last)=page.last(){cursor=format!("{}:{}",last.kind,last.id);}sources.extend(page);if !more {break;}}
+                let originals=sources.iter().filter(|r|!r.deleted).count();
+                drop(core);
+                let mut missing=0;for source in sources.iter().filter(|r|!r.deleted){if self.book_file(&source.id).is_err(){missing+=1;}}
+                Ok(json!({"pendingMetadata":pending,"pendingAtLeast":pending==100,"originals":originals,"missingOriginals":missing}))
+            },
+            "syncOnce" => {
+                let peer:crate::replication::Peer=serde_json::from_value(args.clone()).map_err(|_|"invalid_peer")?;
+                let workspace=self.clone();
+                self.start("sync",move|job| {
+                    job.check()?;
+                    let runtime=tokio::runtime::Runtime::new().map_err(|_|"runtime_failed")?;
+                    runtime.block_on(async {
+                        let host=crate::transport_host::SyncHost::new(workspace.clone(),false);
+                        tokio::select! {
+                            result=crate::replication::tick_peer(&host,&peer)=>result,
+                            _=async {loop {tokio::time::sleep(std::time::Duration::from_millis(100)).await;if job.check().is_err(){break;}}}=>Err("cancelled".into())
+                        }
+                    })?;
+                    Ok(json!({"completed":true}))
+                })
+            },
             "deleteLegacyNote" => { self.core.lock().map_err(|_|"core_lock_failed")?.delete_legacy_note(string(&args,"id")?,number(&args,"expected")?)?;Ok(Value::Null) },
             "lookupMetadata" => { let query=string(&args,"query")?.to_owned();self.start("metadata",move|job|crate::metadata::lookup(&query,&job)) },
             "epubRendition" => crate::books::epub_rendition(&self.book_file(string(&args,"id")?)?),
@@ -231,18 +271,56 @@ impl Workspace {
             "deleteVersion"=>self.delete_version(string(&args,"id")?),
             "restoreVersion"=>self.restore_version(string(&args,"id")?, &args),
             "restoreVersionEntity"=>self.restore_version_entity(&args),
-            "checkpoint"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.checkpoint(string(&args,"id")?,string(&args,"session")?,args["progress"].clone(),number(&args,"activeSeconds")?)?).map_err(|e|e.to_string()),
+            "checkpoint"=>{
+                let mut record=self.core.lock().map_err(|_|"core_lock_failed")?.checkpoint(string(&args,"id")?,string(&args,"session")?,args["progress"].clone(),number(&args,"activeSeconds")?)?;
+                if args["summary"]==true {record.value.as_object_mut().ok_or("invalid_book")?.remove("chapters");}
+                serde_json::to_value(record).map_err(|e|e.to_string())
+            },
             "bookResource"=>Ok(json!({"path":self.book_file(string(&args,"id")?)?})),
             "serviceToken"=>Ok(json!({"token":self.service_token()?})),
             "list"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.entities(string(&args,"kind")?)?).map_err(|e|e.to_string()),
+            "listPage" => {
+                let limit=args["limit"].as_u64().unwrap_or(50);
+                if limit==0 || limit>200 { return Err("invalid_page_limit".into()); }
+                let offset=args["offset"].as_u64().unwrap_or(0);
+                let start=usize::try_from(offset).map_err(|_|"invalid_page_offset")?;
+                let (items,total)=self.core.lock().map_err(|_|"core_lock_failed")?.entities_page(string(&args,"kind")?,start,limit as usize,&["chapters"],crate::android_search::preview)?;
+                let end=start.saturating_add(items.len()).min(total);
+                let next=if end<total {Some(end)}else{None};
+                Ok(json!({"items":items,"total":total,"nextOffset":next}))
+            },
+            "importParsed" => self.import_parsed(&args),
+            "saveFromFile" => {
+                let path=PathBuf::from(string(&args,"path")?);
+                let file=std::fs::File::open(&path).map_err(|e|e.to_string())?;
+                if file.metadata().map_err(|e|e.to_string())?.len()>8*1024*1024 {return Err("edit_size_limit".into());}
+                let request:Value=serde_json::from_reader(file).map_err(|e|e.to_string())?;
+                let saved=self.execute("save",request)?;
+                let dir=self.root.join("projections");std::fs::create_dir_all(&dir).map_err(|e|e.to_string())?;
+                let mut file=tempfile::NamedTempFile::new_in(&dir).map_err(|e|e.to_string())?;
+                serde_json::to_writer(&mut file,&saved).map_err(|e|e.to_string())?;
+                let (_,path)=file.keep().map_err(|e|e.to_string())?;
+                Ok(json!({"path":path}))
+            },
+            "mergeInto" => crate::android_merge::merge(self,&args),
+            "exportEntity" => {
+                let record=self.core.lock().map_err(|_|"core_lock_failed")?.entity(string(&args,"kind")?,string(&args,"id")?)?;
+                let dir=self.root.join("projections");std::fs::create_dir_all(&dir).map_err(|e|e.to_string())?;
+                let mut file=tempfile::NamedTempFile::new_in(&dir).map_err(|e|e.to_string())?;
+                serde_json::to_writer(&mut file,&record).map_err(|e|e.to_string())?;
+                let (_,path)=file.keep().map_err(|e|e.to_string())?;
+                Ok(json!({"path":path}))
+            },
             "get"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.entity(string(&args,"kind")?,string(&args,"id")?)?).map_err(|e|e.to_string()),
             "save"=>{let a:Save=serde_json::from_value(args).map_err(|e|e.to_string())?;serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.save_entity(&a.kind,&a.id,a.patch,a.unset,a.expected)?).map_err(|e|e.to_string())},
             "delete"=>{let a:Target=serde_json::from_value(args).map_err(|e|e.to_string())?;self.core.lock().map_err(|_|"core_lock_failed")?.delete_entity(&a.kind,&a.id,a.expected)?;Ok(Value::Null)},
             "search"=>Ok(self.core.lock().map_err(|_|"core_lock_failed")?.search(string(&args,"query")?)?.into()),
+            "searchPage"=>crate::android_search::search(self,&args),
             "reviewQueue"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.review_queue(args["studySet"].as_str())?).map_err(|e|e.to_string()),
             "setReview"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.set_review(string(&args,"id")?,args["enabled"].as_bool().ok_or("invalid_enabled")?,number(&args,"expected")?)?).map_err(|e|e.to_string()),
             "review"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.review(string(&args,"id")?,u8::try_from(number(&args,"rating")?).map_err(|_|"invalid_rating")?,number(&args,"expected")?)?).map_err(|e|e.to_string()),
             "cite"=>{self.core.lock().map_err(|_|"core_lock_failed")?.link_citation(string(&args,"highlight")?,string(&args,"note")?,number(&args,"highlightRevision")?,number(&args,"noteRevision")?)?;Ok(Value::Null)},
+            "uncite"=>{self.core.lock().map_err(|_|"core_lock_failed")?.unlink_citation(string(&args,"highlight")?,number(&args,"highlightRevision")?,number(&args,"noteRevision")?)?;Ok(Value::Null)},
             "changes"=>serde_json::to_value(self.core.lock().map_err(|_|"core_lock_failed")?.changes(args["after"].as_u64().unwrap_or(0),1000)?).map_err(|e|e.to_string()),
             "import"=>{let source=PathBuf::from(string(&args,"path")?);let mode=args["readerMode"].as_str().unwrap_or("original").to_owned();let workspace=self.clone();self.start("import",move|job|workspace.import(&source,&mode,&job))},
             "job"=>self.job_state(string(&args,"id")?),
@@ -657,6 +735,20 @@ impl Workspace {
         Ok(value["state"].take())
     }
     pub fn import(&self, source: &Path, mode: &str, job: &Job) -> Result<Value> {
+        self.import_with_parsed(source, mode, job, None)
+    }
+    fn import_parsed(&self,args:&Value)->Result<Value> {
+        let source=PathBuf::from(string(args,"path")?);
+        let parsed=PathBuf::from(string(args,"parsedPath")?);
+        if !parsed.is_absolute() { return Err("absolute_path_required".into()); }
+        let file=std::fs::File::open(parsed).map_err(|e|e.to_string())?;
+        if file.metadata().map_err(|e|e.to_string())?.len()>shufang_application::MAX_BLOB_SIZE { return Err("parsed_book_size_limit".into()); }
+        let book:Value=serde_json::from_reader(file).map_err(|_|"invalid_parsed_book")?;
+        if !book["title"].is_string() || !book["author"].is_string() || !book["chapters"].is_array() || !book["progress"].is_object() { return Err("invalid_parsed_book".into()); }
+        let job=Job {state:Mutex::new(JobState{id:String::new(),kind:"import".into(),status:"running".into(),progress:0.0,result:Value::Null,error:None}),cancelled:AtomicBool::new(false)};
+        self.import_with_parsed(&source,args["readerMode"].as_str().unwrap_or("reflow"),&job,Some(book))
+    }
+    fn import_with_parsed(&self, source: &Path, mode: &str, job: &Job, parsed:Option<Value>) -> Result<Value> {
         if !source.is_absolute() || !["original", "reflow"].contains(&mode) {
             return Err("invalid_import".into());
         }
@@ -707,9 +799,10 @@ impl Workspace {
                 .map_err(|e| e.to_string())?;
         }
         job.progress(0.25);
-        let mut book = crate::books::parse(&destination)?;
+        let supplied=parsed.is_some();
+        let mut book = match parsed {Some(value)=>value,None=>crate::books::parse(&destination)?};
         job.check()?;
-        if ["txt", "pdf"].contains(&extension.as_str()) {
+        if !supplied && ["txt", "pdf"].contains(&extension.as_str()) {
             book["title"] = source
                 .file_stem()
                 .and_then(|v| v.to_str())
@@ -720,9 +813,11 @@ impl Workspace {
             }
         }
         book["sourceFile"] = relative.into();
+        book["format"]=if extension=="azw" {"mobi"} else {&extension}.into();
         book["contentHash"] = hash.clone().into();
         if extension == "pdf" {
-            book["readerMode"] = mode.into();
+            let has_text=book["chapters"].as_array().is_some_and(|chapters|chapters.iter().any(|c|c["paragraphs"].as_array().is_some_and(|paragraphs|paragraphs.iter().any(|p|p.as_str().is_some_and(|s|!s.trim().is_empty())))));
+            book["readerMode"] = if has_text {mode} else {"original"}.into();
         }
         let manifest = shufang_application::BlobManifest {
             sha256: hash.clone(),
@@ -780,6 +875,7 @@ impl Workspace {
         .map_err(|e| e.to_string())
     }
     pub fn book_file(&self, id: &str) -> Result<PathBuf> {
+        if !crate::local_download::enabled(self,id)?{return Err("download_removed".into());}
         let source = self
             .core
             .lock()

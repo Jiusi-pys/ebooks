@@ -1,0 +1,10 @@
+   Compiling shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.81s
+     Running tests\ai_result.rs (base\target\debug\deps\ai_result-28444b6debcd33ce.exe)
+
+running 2 tests
+test generated_results_are_validated_before_any_record_is_created ... ok
+test ai_chapter_expansion_updates_existing_map_and_rejects_stale_revision ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

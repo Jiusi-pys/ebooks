@@ -1,0 +1,5 @@
+{
+  "oldProductionBinaryStartedAgainstSameTestDatabase": true,
+  "candidateRestored": true,
+  "databaseRolledBack": false
+}

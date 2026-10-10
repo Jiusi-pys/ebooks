@@ -1,0 +1,10 @@
+{
+  "gitBranch": "android",
+  "gitHead": "40f84d9a17b7ca68e3134f2093afba82fb687c11",
+  "mumuVersion": "6.8.2.0",
+  "deliveryApkSha256": "5d6919ecce8bcdca5968523def9f26f2c2813d7188e507f28e3e50d605275557",
+  "acceptanceApkSha256": "32c216d915666d43b3f64581145525437bdf51986bec4b25426035b79e1b37a9",
+  "testApkSha256": "07b8fc43d8cdac56ac609461a05628ce8bd840c50d573d830ff076de72a8694f",
+  "build": "assembleDebugAndroidTest -PshufangAcceptance=true; BUILD SUCCESSFUL; production implementation unchanged",
+  "hostTimestamp": "2026-10-10T09:30:39.5635113+08:00"
+}

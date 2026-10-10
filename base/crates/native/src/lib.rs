@@ -1,5 +1,6 @@
 //! Native filesystem/network adapters. No UI framework or server routing here.
 pub mod ai;
+pub mod attachments;
 pub mod backup;
 pub mod books;
 pub mod credentials;
@@ -9,6 +10,15 @@ pub mod storage;
 pub mod sync_blobs;
 pub mod sync_config;
 pub mod workspace;
+pub mod replication;
+mod replication_files;
+mod incoming_snapshot;
+pub mod transport_host;
+mod android_merge;
+mod android_search;
+mod study_backup;
+mod local_download;
+mod offline_sync;
 
 fn dependency_path(name: &str, variable: &str) -> Result<std::path::PathBuf, String> {
     if let Some(path) = std::env::var_os(variable) {

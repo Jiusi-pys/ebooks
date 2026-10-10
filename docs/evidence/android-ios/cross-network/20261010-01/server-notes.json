@@ -1,0 +1,56 @@
+[
+  {
+    "revision": 1,
+    "value": {
+      "id": "d90e1d23-4678-4a36-8999-f23441dc9f1f",
+      "content": "真实 iOS 核心经网络提交😀",
+      "title": "iOS network business acceptance"
+    }
+  },
+  {
+    "revision": 3,
+    "value": {
+      "id": "pdfink.49b56907fc58240bc00b2b8e1decbb7771e438612c2d6ac7f213f5c39002c1e6.1",
+      "bookId": "48d3702a-7c00-462a-8ed4-0ee6d224836a",
+      "content": "",
+      "createdAt": 1791566998017,
+      "pdfDrawing": {
+        "$attachment": {
+          "size": 450,
+          "name": "drawing.pkdraw",
+          "sha256": "c071ba1be87f973c891ae6672d471fd37fa21e33994e05dbe766ff50ddd27306",
+          "type": "application/octet-stream"
+        }
+      },
+      "pdfPage": 1,
+      "pdfPortableInk": {
+        "$attachment": {
+          "sha256": "b36b4e5cdcea08ed140b1befe4b9516e3f6d0f9f170369b2fca753fe83f3c8af",
+          "size": 23977,
+          "name": "drawing.ink.json",
+          "type": "application/vnd.shufang.ink+json"
+        }
+      },
+      "pdfPreview": {
+        "$attachment": {
+          "sha256": "6b52fd1447598259e40358450a3ad010ce4ad50ad62c1520a56b04d9f5171c1e",
+          "size": 7491,
+          "name": "drawing.png",
+          "type": "image/png"
+        }
+      },
+      "title": "第 1 页手写",
+      "updatedAt": 1791567037051
+    }
+  },
+  {
+    "revision": 1,
+    "value": {
+      "id": "server-seed",
+      "content": "服务端原数据 🚀",
+      "createdAt": 1791566990891,
+      "title": "隔离服务器笔记",
+      "updatedAt": 1791566990891
+    }
+  }
+]

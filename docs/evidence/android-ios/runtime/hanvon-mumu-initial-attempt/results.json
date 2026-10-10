@@ -1,0 +1,103 @@
+[
+  {
+    "profile": "clear7",
+    "kind": "full-suite",
+    "passed": true
+  },
+  {
+    "kind": "ReadingDesignTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "portrait",
+    "profile": "clear7",
+    "font": "1.0"
+  },
+  {
+    "kind": "PdfComparisonTouchTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "portrait",
+    "profile": "clear7",
+    "font": "1.0"
+  },
+  {
+    "kind": "ReadingDesignTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "portrait",
+    "profile": "clear7",
+    "font": "1.3"
+  },
+  {
+    "kind": "PdfComparisonTouchTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "portrait",
+    "profile": "clear7",
+    "font": "1.3"
+  },
+  {
+    "kind": "ReadingDesignTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "portrait",
+    "profile": "clear7",
+    "font": "2.0"
+  },
+  {
+    "kind": "PdfComparisonTouchTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "portrait",
+    "profile": "clear7",
+    "font": "2.0"
+  },
+  {
+    "kind": "ReadingDesignTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "landscape",
+    "profile": "clear7",
+    "font": "1.0"
+  },
+  {
+    "kind": "PdfComparisonTouchTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "landscape",
+    "profile": "clear7",
+    "font": "1.0"
+  },
+  {
+    "kind": "ReadingDesignTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "landscape",
+    "profile": "clear7",
+    "font": "1.3"
+  },
+  {
+    "kind": "PdfComparisonTouchTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "landscape",
+    "profile": "clear7",
+    "font": "1.3"
+  },
+  {
+    "kind": "ReadingDesignTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "landscape",
+    "profile": "clear7",
+    "font": "2.0"
+  },
+  {
+    "kind": "PdfComparisonTouchTest",
+    "density": 300,
+    "passed": true,
+    "orientation": "landscape",
+    "profile": "clear7",
+    "font": "2.0"
+  }
+]

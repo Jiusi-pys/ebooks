@@ -1,0 +1,1 @@
+Immutable source baseline before compatibility 005. Source HEAD 40f84d9 with validated uncommitted Android/iOS changes. These are source backups, not business-data backups. Restore using an independent workspace and the documented upgrade procedure; never overwrite migration ledgers.

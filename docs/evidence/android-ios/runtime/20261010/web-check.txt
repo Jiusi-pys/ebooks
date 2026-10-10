@@ -1,0 +1,7 @@
+npm notice run my-app@0.1.0 precheck
+npm notice run npm run core:build
+npm notice run my-app@0.1.0 core:build
+npm notice run node scripts/build-core.mjs
+    Finished `release` profile [optimized] target(s) in 0.67s
+npm notice run my-app@0.1.0 check
+npm notice run tsc -b

@@ -1,0 +1,6 @@
+{
+  "url": "https://us.jiusi.org/api/auth/status",
+  "httpStatus": 404,
+  "server": "nginx",
+  "bodyBytes": 21
+}

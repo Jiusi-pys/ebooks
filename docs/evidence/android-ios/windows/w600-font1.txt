@@ -1,0 +1,9 @@
+
+org.shufang.android.ReadingDesignTest:.
+
+Time: 3.121
+
+OK (1 test)
+
+
+

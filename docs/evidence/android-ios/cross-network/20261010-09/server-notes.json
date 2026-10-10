@@ -1,0 +1,68 @@
+[
+  {
+    "revision": 2,
+    "value": {
+      "id": "3c7e81f5-93c8-416f-b5b8-2fb8e6f806c9",
+      "content": "真实浏览器修改😀",
+      "createdAt": 1791569987361,
+      "title": "Web network business acceptance",
+      "updatedAt": 1791569987362
+    }
+  },
+  {
+    "revision": 1,
+    "value": {
+      "id": "3e272bd5-3b76-45a3-939d-524af763efcf",
+      "content": "真实 iOS 核心经网络提交😀",
+      "createdAt": 1791569982063.976,
+      "title": "iOS network business acceptance",
+      "updatedAt": 1791569982063.976
+    }
+  },
+  {
+    "revision": 3,
+    "value": {
+      "id": "pdfink.b36c3ca8e7d36cb27acda0e3aabb69dc799a1066609f38f26903c773db2fbb1a.1",
+      "bookId": "df15976f-e7da-4fdd-b2b4-d18375eae585",
+      "content": "",
+      "createdAt": 1791569955806,
+      "pdfDrawing": {
+        "$attachment": {
+          "type": "application/octet-stream",
+          "name": "drawing.pkdraw",
+          "sha256": "fddbdcf5404e8bfd73999a55b803815d8b4918d8198ed9a3fa006637c87f0432",
+          "size": 450
+        }
+      },
+      "pdfPage": 1,
+      "pdfPortableInk": {
+        "$attachment": {
+          "sha256": "9212bafe96a0e71ebecf984eeb40d21e569addd8cf23540c3f9397bea0f336a2",
+          "size": 23977,
+          "name": "drawing.ink.json",
+          "type": "application/vnd.shufang.ink+json"
+        }
+      },
+      "pdfPreview": {
+        "$attachment": {
+          "sha256": "6b52fd1447598259e40358450a3ad010ce4ad50ad62c1520a56b04d9f5171c1e",
+          "size": 7491,
+          "name": "drawing.png",
+          "type": "image/png"
+        }
+      },
+      "title": "第 1 页手写",
+      "updatedAt": 1791569988641
+    }
+  },
+  {
+    "revision": 1,
+    "value": {
+      "id": "server-seed",
+      "content": "服务端原数据 🚀",
+      "createdAt": 1791569948346,
+      "title": "隔离服务器笔记",
+      "updatedAt": 1791569948346
+    }
+  }
+]

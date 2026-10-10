@@ -1,0 +1,10 @@
+{"Status":"exited","Running":false,"Paused":false,"Restarting":false,"OOMKilled":false,"Dead":false,"Pid":0,"ExitCode":1,"Error":"","StartedAt":"2026-10-10T01:11:50.482971882Z","FinishedAt":"2026-10-10T01:11:50.611579492Z"}
+shufang-service: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by shufang-service)
+shufang-service: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by shufang-service)
+shufang-service: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by shufang-service)
+shufang-service: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by shufang-service)
+shufang-service: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by shufang-service)
+shufang-service: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by shufang-service)
+shufang-service: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by shufang-service)
+shufang-service: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by shufang-service)
+shufang-service: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.39' not found (required by shufang-service)

@@ -1,0 +1,12 @@
+.build/
+.parity-harness/
+.network-ink-harness/
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+__pycache__/
+
+# Local validation outputs; summaries are kept in docs/verification.md.
+/docs/evidence/

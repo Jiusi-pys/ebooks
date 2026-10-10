@@ -1,0 +1,126 @@
+   Compiling shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+   Compiling shufang-bindings v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\bindings)
+    Finished `release` profile [optimized] target(s) in 31.71s
+
+Elf file type is DYN (Shared object file)
+Entry point 0x0
+There are 10 program headers, starting at offset 64
+
+Program Headers:
+  Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+  PHDR           0x000040 0x0000000000000040 0x0000000000000040 0x000230 0x000230 R   0x8
+  LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x365700 0x365700 R   0x4000
+  LOAD           0x365700 0x0000000000369700 0x0000000000369700 0x86aa00 0x86aa00 R E 0x4000
+  LOAD           0xbd0100 0x0000000000bd8100 0x0000000000bd8100 0x0a68d8 0x0a6f00 RW  0x4000
+  LOAD           0xc769e0 0x0000000000c829e0 0x0000000000c829e0 0x004960 0x005770 RW  0x4000
+  DYNAMIC        0xc71128 0x0000000000c79128 0x0000000000c79128 0x000180 0x000180 RW  0x8
+  GNU_RELRO      0xbd0100 0x0000000000bd8100 0x0000000000bd8100 0x0a68d8 0x0a6f00 R   0x1
+  GNU_EH_FRAME   0x2799f4 0x00000000002799f4 0x00000000002799f4 0x01d9d4 0x01d9d4 R   0x4
+  GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x0
+  NOTE           0x000270 0x0000000000000270 0x0000000000000270 0x000098 0x000098 R   0x4
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     
+   01     .note.android.ident .dynsym .gnu.version .gnu.version_r .gnu.hash .dynstr .rela.dyn .rela.plt .gcc_except_table .rodata .eh_frame_hdr .eh_frame 
+   02     .text .plt 
+   03     .data.rel.ro .fini_array .dynamic .got .got.plt .relro_padding 
+   04     .data .bss 
+   05     .dynamic 
+   06     .data.rel.ro .fini_array .dynamic .got .got.plt .relro_padding 
+   07     .eh_frame_hdr 
+   08     
+   09     .note.android.ident 
+   None   .comment .shstrtab 
+
+Elf file type is DYN (Shared object file)
+Entry point 0x0
+There are 9 program headers, starting at offset 64
+
+Program Headers:
+  Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+  PHDR           0x000040 0x0000000000000040 0x0000000000000040 0x0001f8 0x0001f8 R   0x8
+  LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x000774 0x000774 R   0x4000
+  LOAD           0x000780 0x0000000000004780 0x0000000000004780 0x000230 0x000230 R E 0x4000
+  LOAD           0x0009b0 0x00000000000089b0 0x00000000000089b0 0x000220 0x000650 RW  0x4000
+  DYNAMIC        0x0009c8 0x00000000000089c8 0x00000000000089c8 0x0001b0 0x0001b0 RW  0x8
+  GNU_RELRO      0x0009b0 0x00000000000089b0 0x00000000000089b0 0x000220 0x000650 R   0x1
+  GNU_EH_FRAME   0x000668 0x0000000000000668 0x0000000000000668 0x000044 0x000044 R   0x4
+  GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x0
+  NOTE           0x000238 0x0000000000000238 0x0000000000000238 0x000098 0x000098 R   0x4
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     
+   01     .note.android.ident .dynsym .gnu.version .gnu.version_r .gnu.hash .dynstr .rela.dyn .rela.plt .rodata .eh_frame_hdr .eh_frame 
+   02     .text .plt 
+   03     .data.rel.ro .fini_array .dynamic .got.plt .relro_padding 
+   04     .dynamic 
+   05     .data.rel.ro .fini_array .dynamic .got.plt .relro_padding 
+   06     .eh_frame_hdr 
+   07     
+   08     .note.android.ident 
+   None   .comment .shstrtab 
+   Compiling shufang-native v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\native)
+   Compiling shufang-bindings v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\bindings)
+    Finished `release` profile [optimized] target(s) in 30.92s
+
+Elf file type is DYN (Shared object file)
+Entry point 0x0
+There are 10 program headers, starting at offset 64
+
+Program Headers:
+  Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+  PHDR           0x000040 0x0000000000000040 0x0000000000000040 0x000230 0x000230 R   0x8
+  LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x34b268 0x34b268 R   0x4000
+  LOAD           0x34b280 0x000000000034f280 0x000000000034f280 0x7411e0 0x7411e0 R E 0x4000
+  LOAD           0xa8c460 0x0000000000a94460 0x0000000000a94460 0x0a1690 0x0a1ba0 RW  0x4000
+  LOAD           0xb2daf0 0x0000000000b39af0 0x0000000000b39af0 0x004900 0x0056f0 RW  0x4000
+  DYNAMIC        0xb2cd28 0x0000000000b34d28 0x0000000000b34d28 0x000180 0x000180 RW  0x8
+  GNU_RELRO      0xa8c460 0x0000000000a94460 0x0000000000a94460 0x0a1690 0x0a1ba0 R   0x1
+  GNU_EH_FRAME   0x252290 0x0000000000252290 0x0000000000252290 0x01d22c 0x01d22c R   0x4
+  GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x0
+  NOTE           0x000270 0x0000000000000270 0x0000000000000270 0x000098 0x000098 R   0x4
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     
+   01     .note.android.ident .dynsym .gnu.version .gnu.version_r .gnu.hash .dynstr .rela.dyn .rela.plt .gcc_except_table .rodata .eh_frame_hdr .eh_frame 
+   02     .text .plt 
+   03     .data.rel.ro .fini_array .dynamic .got .got.plt .relro_padding 
+   04     .data .bss 
+   05     .dynamic 
+   06     .data.rel.ro .fini_array .dynamic .got .got.plt .relro_padding 
+   07     .eh_frame_hdr 
+   08     
+   09     .note.android.ident 
+   None   .comment .shstrtab 
+
+Elf file type is DYN (Shared object file)
+Entry point 0x0
+There are 9 program headers, starting at offset 64
+
+Program Headers:
+  Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+  PHDR           0x000040 0x0000000000000040 0x0000000000000040 0x0001f8 0x0001f8 R   0x8
+  LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x000780 0x000780 R   0x4000
+  LOAD           0x000780 0x0000000000004780 0x0000000000004780 0x000290 0x000290 R E 0x4000
+  LOAD           0x000a10 0x0000000000008a10 0x0000000000008a10 0x000220 0x0005f0 RW  0x4000
+  DYNAMIC        0x000a28 0x0000000000008a28 0x0000000000008a28 0x0001b0 0x0001b0 RW  0x8
+  GNU_RELRO      0x000a10 0x0000000000008a10 0x0000000000008a10 0x000220 0x0005f0 R   0x1
+  GNU_EH_FRAME   0x000668 0x0000000000000668 0x0000000000000668 0x000044 0x000044 R   0x4
+  GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x0
+  NOTE           0x000238 0x0000000000000238 0x0000000000000238 0x000098 0x000098 R   0x4
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     
+   01     .note.android.ident .dynsym .gnu.version .gnu.version_r .gnu.hash .dynstr .rela.dyn .rela.plt .rodata .eh_frame_hdr .eh_frame 
+   02     .text .plt 
+   03     .data.rel.ro .fini_array .dynamic .got.plt .relro_padding 
+   04     .dynamic 
+   05     .data.rel.ro .fini_array .dynamic .got.plt .relro_padding 
+   06     .eh_frame_hdr 
+   07     
+   08     .note.android.ident 
+   None   .comment .shstrtab 

@@ -1,0 +1,15 @@
+{
+  "database": {
+    "sha256": "65e0e7a0acfd07445564519d4dc7149ab251c12ee403f78ee713567d0ae82986",
+    "bytes": 77766211
+  },
+  "runtime": {
+    "sha256": "b3e74db6259ed0ba9f65c29c80f0279819608e1d41b10204b6b0d6810c593260",
+    "bytes": 31501257
+  },
+  "retainedVersionArchives": 5,
+  "versionArchivesLocation": "/opt/shufang/runtime-rust/versions (retained independently)",
+  "oldImage": "sha256:9e65280b5b86d6d3e065c2efe4b7d074f2cca93b31d818a655e7a6064fbee06f",
+  "time": "2026-10-10T01:10:12.803143+00:00",
+  "schemaChanged": false
+}

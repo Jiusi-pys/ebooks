@@ -1,0 +1,9 @@
+npm notice run my-app@0.1.0 precheck
+npm notice run npm run core:build
+npm notice run my-app@0.1.0 core:build
+npm notice run node scripts/build-core.mjs
+   Compiling shufang-application v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\application)
+   Compiling shufang-bindings v0.1.0 (C:\Users\17715\Documents\codes\书籍管理\base\crates\bindings)
+    Finished `release` profile [optimized] target(s) in 4.42s
+npm notice run my-app@0.1.0 check
+npm notice run tsc -b

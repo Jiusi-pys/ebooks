@@ -1,0 +1,422 @@
+[
+  {
+    "widthDp": 320,
+    "passed": true,
+    "fontScale": "1.0",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.9825940267607254
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.9825940267607254
+      },
+      "viewCount": 2,
+      "widthDp": 320,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1
+    }
+  },
+  {
+    "widthDp": 360,
+    "passed": true,
+    "fontScale": "1.0",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.9153033057294823
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.9153033057294823
+      },
+      "viewCount": 2,
+      "widthDp": 360,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1
+    }
+  },
+  {
+    "widthDp": 412,
+    "passed": true,
+    "fontScale": "1.0",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.8689524916460846
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.8689524916460846
+      },
+      "viewCount": 2,
+      "widthDp": 412,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1
+    }
+  },
+  {
+    "widthDp": 600,
+    "passed": true,
+    "fontScale": "1.0",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.5252906185607091
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.5252906185607091
+      },
+      "viewCount": 2,
+      "widthDp": 600,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1
+    }
+  },
+  {
+    "widthDp": 720,
+    "passed": true,
+    "fontScale": "1.0",
+    "metrics": {
+      "first": {
+        "page": 3,
+        "fraction": 0.3577241262873544
+      },
+      "second": {
+        "page": 3,
+        "fraction": 0.3569649229111964
+      },
+      "viewCount": 2,
+      "widthDp": 720,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1
+    }
+  },
+  {
+    "widthDp": 840,
+    "passed": true,
+    "fontScale": "1.0",
+    "metrics": {
+      "first": {
+        "page": 3,
+        "fraction": 0.9197979970897886
+      },
+      "second": {
+        "page": 3,
+        "fraction": 0.9195219123505977
+      },
+      "viewCount": 2,
+      "widthDp": 840,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1
+    }
+  },
+  {
+    "widthDp": 1024,
+    "passed": true,
+    "fontScale": "1.0",
+    "metrics": {
+      "first": {
+        "page": 3,
+        "fraction": 0.00783735189710018
+      },
+      "second": {
+        "page": 3,
+        "fraction": 0.006624953993375046
+      },
+      "viewCount": 2,
+      "widthDp": 1024,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1
+    }
+  },
+  {
+    "widthDp": 320,
+    "passed": true,
+    "fontScale": "1.3",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.7862975884675842
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.7862975884675842
+      },
+      "viewCount": 2,
+      "widthDp": 320,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1.3
+    }
+  },
+  {
+    "widthDp": 360,
+    "passed": true,
+    "fontScale": "1.3",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.6761596983774322
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.6761596983774322
+      },
+      "viewCount": 2,
+      "widthDp": 360,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1.3
+    }
+  },
+  {
+    "widthDp": 412,
+    "passed": true,
+    "fontScale": "1.3",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.6476536394014238
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.6476536394014238
+      },
+      "viewCount": 2,
+      "widthDp": 412,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1.3
+    }
+  },
+  {
+    "widthDp": 600,
+    "passed": true,
+    "fontScale": "1.3",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.6696084911162086
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.6696084911162086
+      },
+      "viewCount": 2,
+      "widthDp": 600,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1.3
+    }
+  },
+  {
+    "widthDp": 720,
+    "passed": true,
+    "fontScale": "1.3",
+    "metrics": {
+      "first": {
+        "page": 3,
+        "fraction": 0.2194158365693061
+      },
+      "second": {
+        "page": 3,
+        "fraction": 0.21908032047397832
+      },
+      "viewCount": 2,
+      "widthDp": 720,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1.3
+    }
+  },
+  {
+    "widthDp": 840,
+    "passed": true,
+    "fontScale": "1.3",
+    "metrics": {
+      "first": {
+        "page": 3,
+        "fraction": 0.8814516819310109
+      },
+      "second": {
+        "page": 3,
+        "fraction": 0.8812749003984064
+      },
+      "viewCount": 2,
+      "widthDp": 840,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1.3
+    }
+  },
+  {
+    "widthDp": 1024,
+    "passed": true,
+    "fontScale": "1.3",
+    "metrics": {
+      "first": {
+        "page": 3,
+        "fraction": 0.02111474805218754
+      },
+      "second": {
+        "page": 3,
+        "fraction": 0.019874861980125138
+      },
+      "viewCount": 2,
+      "widthDp": 1024,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 1.3
+    }
+  },
+  {
+    "widthDp": 320,
+    "passed": true,
+    "fontScale": "2.0",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.7323160679369705
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.7323160679369705
+      },
+      "viewCount": 2,
+      "widthDp": 320,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 2
+    }
+  },
+  {
+    "widthDp": 360,
+    "passed": true,
+    "fontScale": "2.0",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.8312798761193025
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.8312798761193025
+      },
+      "viewCount": 2,
+      "widthDp": 360,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 2
+    }
+  },
+  {
+    "widthDp": 412,
+    "passed": true,
+    "fontScale": "2.0",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.5862850501234926
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.5862850501234926
+      },
+      "viewCount": 2,
+      "widthDp": 412,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 2
+    }
+  },
+  {
+    "widthDp": 600,
+    "passed": true,
+    "fontScale": "2.0",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.4867229112398429
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.4867229112398429
+      },
+      "viewCount": 2,
+      "widthDp": 600,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 2
+    }
+  },
+  {
+    "widthDp": 720,
+    "passed": true,
+    "fontScale": "2.0",
+    "metrics": {
+      "first": {
+        "page": 3,
+        "fraction": 0.19348303224717203
+      },
+      "second": {
+        "page": 3,
+        "fraction": 0.19322695751699992
+      },
+      "viewCount": 2,
+      "widthDp": 720,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 2
+    }
+  },
+  {
+    "widthDp": 840,
+    "passed": true,
+    "fontScale": "2.0",
+    "metrics": {
+      "first": {
+        "page": 3,
+        "fraction": 0.07800507860423977
+      },
+      "second": {
+        "page": 3,
+        "fraction": 0.07626636311895275
+      },
+      "viewCount": 2,
+      "widthDp": 840,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 2
+    }
+  },
+  {
+    "widthDp": 1024,
+    "passed": true,
+    "fontScale": "2.0",
+    "metrics": {
+      "first": {
+        "page": 2,
+        "fraction": 0.9680051634318381
+      },
+      "second": {
+        "page": 2,
+        "fraction": 0.9668752300331248
+      },
+      "viewCount": 2,
+      "widthDp": 1024,
+      "heightDp": 1256,
+      "densityDpi": 160,
+      "fontScale": 2
+    }
+  }
+]

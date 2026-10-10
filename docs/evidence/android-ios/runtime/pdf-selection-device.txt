@@ -1,0 +1,8 @@
+
+org.shufang.android.ReaderBridgeTest:..
+
+Time: 0.803
+
+OK (2 tests)
+
+

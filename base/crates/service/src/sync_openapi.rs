@@ -5,6 +5,7 @@ pub fn document() -> Value {
     let mut paths = serde_json::Map::new();
     for (method, path, summary) in [
         ("get", "/capabilities", "Protocol and transfer limits"),
+        ("post", "/sync/preflight", "Read current entity versions and immutable-operation acceptance without writes"),
         (
             "post",
             "/sync/push",

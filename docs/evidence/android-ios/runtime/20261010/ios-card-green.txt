@@ -1,0 +1,48 @@
+Test Suite 'Selected tests' started at 2026-10-09 14:08:33.799.
+Test Suite 'ShufangCorePackageTests.xctest' started at 2026-10-09 14:08:33.799.
+Test Suite 'StudyCardCompatibilityTests' started at 2026-10-09 14:08:33.799.
+Test Case '-[ShufangCoreTests.StudyCardCompatibilityTests testPdfCardAcceptsAbsentTextChapterMetadata]' started.
+Test Case '-[ShufangCoreTests.StudyCardCompatibilityTests testPdfCardAcceptsAbsentTextChapterMetadata]' passed (0.001 seconds).
+Test Suite 'StudyCardCompatibilityTests' passed at 2026-10-09 14:08:33.800.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'ShufangCorePackageTests.xctest' passed at 2026-10-09 14:08:33.800.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'Selected tests' passed at 2026-10-09 14:08:33.800.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
+[0/1] Planning build
+Building for debugging...
+[0/3] Write sources
+[1/3] Write swift-version--58304C5D6DBC2206.txt
+[3/5] Compiling ShufangCore StudyModels.swift
+[4/5] Emitting module ShufangCore
+[5/11] Compiling ShufangCore StudyRestore.swift
+[6/11] Compiling ShufangCore StudyTree.swift
+[7/11] Compiling ShufangCore StudyBackup.swift
+[8/11] Compiling ShufangCore StudyStore.swift
+[9/11] Compiling ShufangCore PDFGeometry.swift
+[10/11] Compiling ShufangCore StudyTextSelection.swift
+[11/28] Compiling ShufangCoreTests StudySyncIntegrationTests.swift
+[12/28] Compiling ShufangCoreTests StudyBackupSelectionTests.swift
+[13/28] Compiling ShufangCoreTests StudyCardCompatibilityTests.swift
+[14/28] Compiling ShufangCoreTests ReviewParityFixtureTests.swift
+[15/28] Compiling ShufangCoreTests StudyBackupArchiveTests.swift
+[16/28] Compiling ShufangCoreTests ReaderNavigationTests.swift
+[17/28] Compiling ShufangCoreTests ReadingSyncTests.swift
+[18/28] Compiling ShufangCoreTests PDFGeometryTests.swift
+[19/28] Compiling ShufangCoreTests PortableInkTests.swift
+[20/28] Compiling ShufangCoreTests StudyInteractionTests.swift
+[21/28] Compiling ShufangCoreTests StudyRestoreTests.swift
+[22/28] Compiling ShufangCoreTests StudyStoreTests.swift
+[23/29] Compiling ShufangCoreTests AccountRouteTests.swift
+[24/29] Compiling ShufangCoreTests BookFootnoteTests.swift
+[25/29] Compiling ShufangCoreTests CoreTests.swift
+[26/29] Compiling ShufangCoreTests HTTPIntegrationTests.swift
+[27/29] Emitting module ShufangCoreTests
+[28/29] Compiling ShufangCoreTests StudyZipTests.swift
+[28/30] Write Objects.LinkFileList
+[29/30] Linking ShufangCorePackageTests
+Build complete! (2.02s)

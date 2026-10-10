@@ -1,0 +1,12 @@
+{
+  "baseline": "3cbda7f69e1d02f5d9b5c81e7644712b19054c8f",
+  "schemaChanged": false,
+  "mysqlWriterRecoveryPreserved": true,
+  "files": {
+    "base/crates/mysql/src/lib.rs": "154498d0684a0c8333cdb0434fbda74122a43c8f4949739915897eebe4bcd005",
+    "base/crates/service/src/sync_v2.rs": "b28cdc8798d4ad2f132ea4d619cd3d10800c9bc5b92f5f84d740f58f3511380b",
+    "base/crates/service/src/sync_openapi.rs": "d5bf7577172ab2ec8d4b0a7aa34d19260869623f4e8c010ffe3d1f4f27727c90",
+    "base/crates/service/tests/sync_v2.rs": "a917a1e8e70df5a732abeea952658e32998d1dd02a52b3c17c348a8183bb296c",
+    "base/crates/application/src/replication.rs": "72b72d1c8005fa35cac6603c043e677ab3bb3e9f49b17fa4b892af23ac9b55d5"
+  }
+}
