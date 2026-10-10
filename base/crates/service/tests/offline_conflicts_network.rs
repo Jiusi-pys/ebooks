@@ -594,15 +594,141 @@ async fn concurrent_opaque_ink_attachments_are_verified_and_both_copies_remain_b
 
 #[tokio::test]
 async fn deleted_book_local_choice_copies_learning_graph_and_synchronizes_new_references() {
-    let s=tempfile::tempdir().unwrap();let a=tempfile::tempdir().unwrap();let server=Workspace::open(&s.path().join("library.sqlite"),"w","server").unwrap();
-    for (kind,id,patch)in [("books","book",json!({"title":"Book","author":"A","format":"txt","chapters":[{"id":"chapter","title":"One","paragraphs":["body"]}],"progress":{"chapterId":"chapter","ratio":0}})),("notes","note",json!({"title":"Note","content":"Local analysis"})),("highlights","card",json!({"bookId":"book","chapterId":"chapter","chapterTitle":"One","text":"body","noteId":"note"})),("studySets","set",json!({"name":"Study","bookIds":["book"]}))] {server.execute("save",json!({"kind":kind,"id":id,"expected":0,"patch":patch})).unwrap();}
-    let original=s.path().join("original.txt");std::fs::write(&original,b"original body").unwrap();
-    let reference=server.execute("putAttachment",json!({"path":original,"name":"original.txt","type":"text/plain"})).unwrap();
-    let source:shufang_application::BlobManifest=serde_json::from_value(reference["$attachment"].clone()).unwrap();
-    server.core.lock().unwrap().attach_book_source("book",&source).unwrap();
-    let (peer,task)=start(server.clone()).await;let local=Workspace::open(&a.path().join("library.sqlite"),"w","a").unwrap();local.execute("enableSyncConflicts",json!({})).unwrap();sync(&local,&peer).await.unwrap();
-    let revision=local.core.lock().unwrap().entity("books","book").unwrap().revision;local.execute("save",json!({"kind":"books","id":"book","expected":revision,"patch":{"title":"Offline book"}})).unwrap();let revision=server.core.lock().unwrap().entity("books","book").unwrap().revision;server.execute("delete",json!({"kind":"books","id":"book","expected":revision})).unwrap();assert_eq!(sync(&local,&peer).await.unwrap_err(),"sync_conflicts_pending");
-    let preview=local.core.lock().unwrap().sync_conflicts().unwrap().into_iter().find(|p|p["kind"]=="books").unwrap();let result=local.execute("resolveSyncConflict",json!({"id":preview["id"],"fingerprint":preview["fingerprint"],"choice":"local"})).unwrap();
-    let remaining=local.core.lock().unwrap().sync_conflicts().unwrap();for p in remaining{local.execute("resolveSyncConflict",json!({"id":p["id"],"fingerprint":p["fingerprint"],"choice":"remote"})).unwrap();}
-    sync(&local,&peer).await.unwrap();let book=result["copyId"].as_str().unwrap();let core=server.core.lock().unwrap();assert_eq!(core.entity("books",book).unwrap().value["title"],"Offline book");assert_eq!(core.book_source(book).unwrap(),source);let card=core.entities("highlights").unwrap().into_iter().find(|r|r.value["bookId"]==book).unwrap();let note=core.entity("notes",card.value["noteId"].as_str().unwrap()).unwrap();assert!(note.value["content"].as_str().unwrap().contains("Local analysis"));assert!(core.entities("studySets").unwrap().iter().any(|r|r.value["bookIds"][0]==book));drop(core);assert_eq!(std::fs::read(local.book_file(book).unwrap()).unwrap(),b"original body");assert_eq!(std::fs::read(server.book_file(book).unwrap()).unwrap(),b"original body");task.abort();
+    let s = tempfile::tempdir().unwrap();
+    let a = tempfile::tempdir().unwrap();
+    let server = Workspace::open(&s.path().join("library.sqlite"), "w", "server").unwrap();
+    for (kind, id, patch) in [
+        (
+            "books",
+            "book",
+            json!({"title":"Book","author":"A","format":"txt","chapters":[{"id":"chapter","title":"One","paragraphs":["body"]}],"progress":{"chapterId":"chapter","ratio":0}}),
+        ),
+        (
+            "notes",
+            "note",
+            json!({"title":"Note","content":"Local analysis"}),
+        ),
+        (
+            "highlights",
+            "card",
+            json!({"bookId":"book","chapterId":"chapter","chapterTitle":"One","text":"body","noteId":"note"}),
+        ),
+        (
+            "studySets",
+            "set",
+            json!({"name":"Study","bookIds":["book"]}),
+        ),
+    ] {
+        server
+            .execute(
+                "save",
+                json!({"kind":kind,"id":id,"expected":0,"patch":patch}),
+            )
+            .unwrap();
+    }
+    let original = s.path().join("original.txt");
+    std::fs::write(&original, b"original body").unwrap();
+    let reference = server
+        .execute(
+            "putAttachment",
+            json!({"path":original,"name":"original.txt","type":"text/plain"}),
+        )
+        .unwrap();
+    let source: shufang_application::BlobManifest =
+        serde_json::from_value(reference["$attachment"].clone()).unwrap();
+    server
+        .core
+        .lock()
+        .unwrap()
+        .attach_book_source("book", &source)
+        .unwrap();
+    let (peer, task) = start(server.clone()).await;
+    let local = Workspace::open(&a.path().join("library.sqlite"), "w", "a").unwrap();
+    local.execute("enableSyncConflicts", json!({})).unwrap();
+    sync(&local, &peer).await.unwrap();
+    let revision = local
+        .core
+        .lock()
+        .unwrap()
+        .entity("books", "book")
+        .unwrap()
+        .revision;
+    local.execute("save",json!({"kind":"books","id":"book","expected":revision,"patch":{"title":"Offline book"}})).unwrap();
+    let revision = server
+        .core
+        .lock()
+        .unwrap()
+        .entity("books", "book")
+        .unwrap()
+        .revision;
+    server
+        .execute(
+            "delete",
+            json!({"kind":"books","id":"book","expected":revision}),
+        )
+        .unwrap();
+    assert_eq!(
+        sync(&local, &peer).await.unwrap_err(),
+        "sync_conflicts_pending"
+    );
+    let preview = local
+        .core
+        .lock()
+        .unwrap()
+        .sync_conflicts()
+        .unwrap()
+        .into_iter()
+        .find(|p| p["kind"] == "books")
+        .unwrap();
+    let result = local
+        .execute(
+            "resolveSyncConflict",
+            json!({"id":preview["id"],"fingerprint":preview["fingerprint"],"choice":"local"}),
+        )
+        .unwrap();
+    let remaining = local.core.lock().unwrap().sync_conflicts().unwrap();
+    for p in remaining {
+        local
+            .execute(
+                "resolveSyncConflict",
+                json!({"id":p["id"],"fingerprint":p["fingerprint"],"choice":"remote"}),
+            )
+            .unwrap();
+    }
+    sync(&local, &peer).await.unwrap();
+    let book = result["copyId"].as_str().unwrap();
+    let core = server.core.lock().unwrap();
+    assert_eq!(
+        core.entity("books", book).unwrap().value["title"],
+        "Offline book"
+    );
+    assert_eq!(core.book_source(book).unwrap(), source);
+    let card = core
+        .entities("highlights")
+        .unwrap()
+        .into_iter()
+        .find(|r| r.value["bookId"] == book)
+        .unwrap();
+    let note = core
+        .entity("notes", card.value["noteId"].as_str().unwrap())
+        .unwrap();
+    assert!(note.value["content"]
+        .as_str()
+        .unwrap()
+        .contains("Local analysis"));
+    assert!(core
+        .entities("studySets")
+        .unwrap()
+        .iter()
+        .any(|r| r.value["bookIds"][0] == book));
+    drop(core);
+    assert_eq!(
+        std::fs::read(local.book_file(book).unwrap()).unwrap(),
+        b"original body"
+    );
+    assert_eq!(
+        std::fs::read(server.book_file(book).unwrap()).unwrap(),
+        b"original body"
+    );
+    task.abort();
 }

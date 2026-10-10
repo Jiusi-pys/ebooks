@@ -8,7 +8,12 @@ pub struct SyncHost {
 }
 impl SyncHost {
     pub fn new(workspace: Arc<Workspace>, read_only: bool) -> Arc<Self> {
-        Arc::new(Self { workspace, read_only })
+        Arc::new(Self {
+            workspace,
+            read_only,
+        })
     }
-    pub fn is_read_only(&self) -> bool { self.read_only }
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
+    }
 }

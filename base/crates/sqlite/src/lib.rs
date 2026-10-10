@@ -281,8 +281,15 @@ impl Repository for SqliteRepository {
     ) -> Result<()> {
         self.commit_local_batch(expected_clock, commits, locals, false, None)
     }
-    fn commit_sync_resolution(&mut self, clock:&str, commits:&[Commit], locals:&[shufang_application::LocalCommit], id:&str, fingerprint:&str)->Result<()> {
-        self.commit_local_batch(clock,commits,locals,false,Some((id,fingerprint)))
+    fn commit_sync_resolution(
+        &mut self,
+        clock: &str,
+        commits: &[Commit],
+        locals: &[shufang_application::LocalCommit],
+        id: &str,
+        fingerprint: &str,
+    ) -> Result<()> {
+        self.commit_local_batch(clock, commits, locals, false, Some((id, fingerprint)))
     }
     fn changes(&self, after: u64, limit: u32) -> Result<Vec<Change>> {
         let mut query = self.connection.prepare("SELECT sequence,kind,entity_id,revision,deleted FROM change_log WHERE sequence>? ORDER BY sequence LIMIT ?").map_err(failure)?;
@@ -375,9 +382,11 @@ impl SqliteRepository {
         commits: &[Commit],
         locals: &[shufang_application::LocalCommit],
         shared_clock: bool,
-        resolution: Option<(&str,&str)>,
+        resolution: Option<(&str, &str)>,
     ) -> Result<()> {
-        if (commits.is_empty() && locals.is_empty()) || commits.len() > 10_000 || locals.len() > if resolution.is_some(){20_002}else{100}
+        if (commits.is_empty() && locals.is_empty())
+            || commits.len() > 10_000
+            || locals.len() > if resolution.is_some() { 20_002 } else { 100 }
         {
             return Err("invalid_batch".into());
         }
@@ -393,14 +402,31 @@ impl SqliteRepository {
         if clock != expected_clock {
             return Err("clock_conflict".into());
         }
-        let preview = if let Some((id,fingerprint))=resolution {
-            let raw:String=tx.query_row("SELECT value_json FROM local_values WHERE key='sync:conflicts'",[],|r|r.get(0)).map_err(failure)?;
-            let index:serde_json::Value=serde_json::from_str(&raw).map_err(failure)?;
-            let preview=index.get(id).filter(|p|p["fingerprint"]==fingerprint).ok_or("sync_conflict_preview_changed")?.clone();
-            let first=commits.first().ok_or("invalid_sync_resolution")?;
-            if preview["kind"]!=first.state.kind||preview["entityId"]!=first.state.id||preview["localRevision"]!=first.expected{return Err("sync_conflict_preview_changed".into())}
+        let preview = if let Some((id, fingerprint)) = resolution {
+            let raw: String = tx
+                .query_row(
+                    "SELECT value_json FROM local_values WHERE key='sync:conflicts'",
+                    [],
+                    |r| r.get(0),
+                )
+                .map_err(failure)?;
+            let index: serde_json::Value = serde_json::from_str(&raw).map_err(failure)?;
+            let preview = index
+                .get(id)
+                .filter(|p| p["fingerprint"] == fingerprint)
+                .ok_or("sync_conflict_preview_changed")?
+                .clone();
+            let first = commits.first().ok_or("invalid_sync_resolution")?;
+            if preview["kind"] != first.state.kind
+                || preview["entityId"] != first.state.id
+                || preview["localRevision"] != first.expected
+            {
+                return Err("sync_conflict_preview_changed".into());
+            }
             Some(preview)
-        }else{None};
+        } else {
+            None
+        };
         for commit in commits {
             let Commit {
                 expected,
@@ -426,10 +452,17 @@ impl SqliteRepository {
                 .map(|r| serde_json::from_str(&r.1))
                 .transpose()
                 .map_err(failure)?;
-            let baseline:Option<EntityState>=if let Some(p)=preview.as_ref().filter(|p|p["entityId"]==state.id&&p["kind"]==state.kind) {
-                if serde_json::to_value(&prior).map_err(failure)?!=p["localState"] {return Err("sync_conflict_preview_changed".into())}
+            let baseline: Option<EntityState> = if let Some(p) = preview
+                .as_ref()
+                .filter(|p| p["entityId"] == state.id && p["kind"] == state.kind)
+            {
+                if serde_json::to_value(&prior).map_err(failure)? != p["localState"] {
+                    return Err("sync_conflict_preview_changed".into());
+                }
                 serde_json::from_value(p["remoteState"].clone()).map_err(failure)?
-            }else{prior.clone()};
+            } else {
+                prior.clone()
+            };
             if shufang_domain::sync::apply_operation(baseline.as_ref(), op)? != *state {
                 return Err("operation_state_mismatch".into());
             }

@@ -50,17 +50,27 @@ enum Command {
 pub fn execute(value: Value) -> Result<Value, String> {
     static SESSIONS: OnceLock<Mutex<BTreeMap<String, Arc<Workspace>>>> = OnceLock::new();
     let command: Command = serde_json::from_value(value).map_err(|_| "invalid_command")?;
-    if let Command::ConfigureVault {key}=command {
-        #[cfg(target_os="android")]
+    if let Command::ConfigureVault { key } = command {
+        #[cfg(target_os = "android")]
         {
-            if key.len()!=64 || !key.bytes().all(|b|b.is_ascii_hexdigit()) {return Err("invalid_credential_key".into());}
-            static KEY:OnceLock<String>=OnceLock::new();
-            let prior=KEY.get_or_init(|| {std::env::set_var("SHUFANG_CREDENTIAL_KEY",&key);key.clone()});
-            if prior!=&key {return Err("credential_key_already_initialized".into());}
+            if key.len() != 64 || !key.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return Err("invalid_credential_key".into());
+            }
+            static KEY: OnceLock<String> = OnceLock::new();
+            let prior = KEY.get_or_init(|| {
+                std::env::set_var("SHUFANG_CREDENTIAL_KEY", &key);
+                key.clone()
+            });
+            if prior != &key {
+                return Err("credential_key_already_initialized".into());
+            }
             return Ok(Value::Null);
         }
-        #[cfg(not(target_os="android"))]
-        {let _=key;return Err("android_command_required".into());}
+        #[cfg(not(target_os = "android"))]
+        {
+            let _ = key;
+            return Err("android_command_required".into());
+        }
     }
     if let Command::DatabaseVersion { database } = command {
         if !database.is_absolute() {

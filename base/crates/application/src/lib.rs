@@ -5,13 +5,13 @@ mod field_storage;
 pub mod folder_deletion;
 pub mod incoming_snapshot;
 mod library;
+mod offline_conflicts;
+mod offline_copy;
 mod outline;
 pub mod record_drafts;
 pub mod recovery;
 pub mod replica;
 mod replication;
-mod offline_conflicts;
-mod offline_copy;
 pub mod sync_receipts;
 pub use blobs::{BlobManifest, CHUNK_SIZE, MAX_BLOB_SIZE};
 pub use library::Record;
@@ -57,7 +57,16 @@ pub struct Change {
 pub trait Repository {
     /// Explicitly discard an unreceived local projection using a persisted preview.
     /// Adapters must validate the preview inside the same transaction as the decision.
-    fn commit_sync_resolution(&mut self, _clock:&str, _commits:&[Commit], _locals:&[LocalCommit], _id:&str, _fingerprint:&str)->Result<()> { Err("sync_resolution_adapter_unavailable".into()) }
+    fn commit_sync_resolution(
+        &mut self,
+        _clock: &str,
+        _commits: &[Commit],
+        _locals: &[LocalCommit],
+        _id: &str,
+        _fingerprint: &str,
+    ) -> Result<()> {
+        Err("sync_resolution_adapter_unavailable".into())
+    }
     fn load(&self, kind: &str, id: &str) -> Result<Option<StoredEntity>>;
     fn list(&self, kind: &str) -> Result<Vec<StoredEntity>>;
     fn clock(&self) -> Result<String>;

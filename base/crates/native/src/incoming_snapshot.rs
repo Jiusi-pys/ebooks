@@ -154,7 +154,11 @@ pub async fn restore(
         snapshot.next = next;
     }
     let mut core = host.workspace.core.lock().map_err(|_| "core_lock_failed")?;
-    if core.sync_conflicts_enabled()?&&core.has_unsent_local_edits(&format!("sync:send:{identity}"))? {return Err("sync_local_edits_pending".into())}
+    if core.sync_conflicts_enabled()?
+        && core.has_unsent_local_edits(&format!("sync:send:{identity}"))?
+    {
+        return Err("sync_local_edits_pending".into());
+    }
     core.finish_incoming_snapshot(
         identity,
         &snapshot.id,

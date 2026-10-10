@@ -1,151 +1,304 @@
 use serde_json::json;
-use shufang_native::workspace::Workspace;
 use sha2::{Digest, Sha256};
+use shufang_native::workspace::Workspace;
 
 #[test]
 fn merging_ink_copies_opaque_attachments_and_keeps_the_mapped_page_identity() {
     let local = tempfile::tempdir().unwrap();
     let remote = tempfile::tempdir().unwrap();
     let source = Workspace::open(&local.path().join("library.sqlite"), "offline", "phone").unwrap();
-    let target = Workspace::open(&remote.path().join("library.sqlite"), "remote", "replica").unwrap();
+    let target =
+        Workspace::open(&remote.path().join("library.sqlite"), "remote", "replica").unwrap();
     let original = local.path().join("original.txt");
     let parsed = local.path().join("parsed.json");
     std::fs::write(&original, "手写来源").unwrap();
     std::fs::write(&parsed, json!({"title":"书籍","author":"作者","format":"txt","chapters":[{"id":"c","title":"章节","paragraphs":["手写来源"]}],"progress":{"chapterId":"c","ratio":0}}).to_string()).unwrap();
-    let book = source.execute("importParsed", json!({"path":original,"parsedPath":parsed})).unwrap();
+    let book = source
+        .execute("importParsed", json!({"path":original,"parsedPath":parsed}))
+        .unwrap();
     let book_id = book["value"]["id"].as_str().unwrap();
     let ink_id = format!("pdfink.{:x}.1", Sha256::digest(book_id.as_bytes()));
     let binary = local.path().join("ink.bin");
     let bytes = [0, 255, 1, 0, 254];
     std::fs::write(&binary, bytes).unwrap();
-    let reference = source.execute("putAttachment", json!({"path":binary,"name":"drawing.bin","type":"application/octet-stream"})).unwrap();
+    let reference = source
+        .execute(
+            "putAttachment",
+            json!({"path":binary,"name":"drawing.bin","type":"application/octet-stream"}),
+        )
+        .unwrap();
     source.execute("save", json!({"kind":"notes","id":ink_id,"expected":0,"patch":{"title":"页面手写","content":"","bookId":book_id,"pdfPage":1,"pdfPortableInk":reference}})).unwrap();
     let before = source.execute("changes", json!({"after":0})).unwrap();
     let args = json!({"destination":remote.path(),"workspace":"remote","replica":"replica","batch":"ink-batch"});
-    let resource=source.execute("attachmentResource",json!({"reference":reference})).unwrap();
-    let resource=std::path::PathBuf::from(resource["path"].as_str().unwrap());
-    let paused=resource.with_extension("paused");
-    std::fs::rename(&resource,&paused).unwrap();
-    assert!(source.execute("mergeInto",args.clone()).is_err());
-    assert!(target.execute("list",json!({"kind":"notes"})).unwrap().as_array().unwrap().is_empty());
-    std::fs::rename(&paused,&resource).unwrap();
-    std::fs::write(&resource,[5,4,3,2,1]).unwrap();
-    assert!(source.execute("mergeInto",args.clone()).is_err());
-    assert!(target.execute("list",json!({"kind":"notes"})).unwrap().as_array().unwrap().is_empty());
-    std::fs::write(&resource,bytes).unwrap();
+    let resource = source
+        .execute("attachmentResource", json!({"reference":reference}))
+        .unwrap();
+    let resource = std::path::PathBuf::from(resource["path"].as_str().unwrap());
+    let paused = resource.with_extension("paused");
+    std::fs::rename(&resource, &paused).unwrap();
+    assert!(source.execute("mergeInto", args.clone()).is_err());
+    assert!(target
+        .execute("list", json!({"kind":"notes"}))
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
+    std::fs::rename(&paused, &resource).unwrap();
+    std::fs::write(&resource, [5, 4, 3, 2, 1]).unwrap();
+    assert!(source.execute("mergeInto", args.clone()).is_err());
+    assert!(target
+        .execute("list", json!({"kind":"notes"}))
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .is_empty());
+    std::fs::write(&resource, bytes).unwrap();
     source.execute("mergeInto", args.clone()).unwrap();
     source.execute("mergeInto", args).unwrap();
     let books = target.execute("list", json!({"kind":"books"})).unwrap();
     let notes = target.execute("list", json!({"kind":"notes"})).unwrap();
     assert_eq!(notes.as_array().unwrap().len(), 1);
     let note = &notes[0]["value"];
-    let path = target.execute("attachmentResource", json!({"reference":note["pdfPortableInk"]})).unwrap();
-    assert_eq!(std::fs::read(path["path"].as_str().unwrap()).unwrap(), bytes);
+    let path = target
+        .execute(
+            "attachmentResource",
+            json!({"reference":note["pdfPortableInk"]}),
+        )
+        .unwrap();
+    assert_eq!(
+        std::fs::read(path["path"].as_str().unwrap()).unwrap(),
+        bytes
+    );
     let mapped = books[0]["value"]["id"].as_str().unwrap();
-    assert_eq!(note["id"], format!("pdfink.{:x}.1", Sha256::digest(mapped.as_bytes())));
+    assert_eq!(
+        note["id"],
+        format!("pdfink.{:x}.1", Sha256::digest(mapped.as_bytes()))
+    );
     assert_eq!(note["bookId"], mapped);
-    assert_eq!(source.execute("changes", json!({"after":0})).unwrap(), before);
-    let plan=std::fs::read_dir(local.path().join("merge-plans")).unwrap().next().unwrap().unwrap().path();
-    let current=std::fs::read(&plan).unwrap();
-    let mut legacy:serde_json::Value=serde_json::from_slice(&current).unwrap();
+    assert_eq!(
+        source.execute("changes", json!({"after":0})).unwrap(),
+        before
+    );
+    let plan = std::fs::read_dir(local.path().join("merge-plans"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let current = std::fs::read(&plan).unwrap();
+    let mut legacy: serde_json::Value = serde_json::from_slice(&current).unwrap();
     legacy.as_object_mut().unwrap().remove("mappingVersion");
-    std::fs::write(&plan,legacy.to_string()).unwrap();
-    let target_before=target.execute("changes",json!({"after":0})).unwrap();
+    std::fs::write(&plan, legacy.to_string()).unwrap();
+    let target_before = target.execute("changes", json!({"after":0})).unwrap();
     assert_eq!(source.execute("mergeInto",json!({"destination":remote.path(),"workspace":"remote","replica":"replica","batch":"ink-batch"})).unwrap_err(),"merge_plan_upgrade_requires_clean_staging");
-    assert_eq!(target.execute("changes",json!({"after":0})).unwrap(),target_before);
-    assert_eq!(std::fs::read(&plan).unwrap(),legacy.to_string().as_bytes());
-    std::fs::write(plan,current).unwrap();
+    assert_eq!(
+        target.execute("changes", json!({"after":0})).unwrap(),
+        target_before
+    );
+    assert_eq!(std::fs::read(&plan).unwrap(), legacy.to_string().as_bytes());
+    std::fs::write(plan, current).unwrap();
 }
 
 #[test]
 fn unknown_plan_version_rejects_before_new_business_operations() {
-    let local=tempfile::tempdir().unwrap();let remote=tempfile::tempdir().unwrap();
-    let source=Workspace::open(&local.path().join("library.sqlite"),"offline","phone").unwrap();
-    let target=Workspace::open(&remote.path().join("library.sqlite"),"remote","replica").unwrap();
+    let local = tempfile::tempdir().unwrap();
+    let remote = tempfile::tempdir().unwrap();
+    let source = Workspace::open(&local.path().join("library.sqlite"), "offline", "phone").unwrap();
+    let target =
+        Workspace::open(&remote.path().join("library.sqlite"), "remote", "replica").unwrap();
     source.execute("save",json!({"kind":"notes","id":"note","expected":0,"patch":{"title":"版本测试","content":"正文"}})).unwrap();
-    let args=json!({"destination":remote.path(),"workspace":"remote","replica":"replica","batch":"version-batch"});
-    source.execute("mergeInto",args.clone()).unwrap();
-    let plan=std::fs::read_dir(local.path().join("merge-plans")).unwrap().next().unwrap().unwrap().path();
-    let original=std::fs::read(&plan).unwrap();
-    let mut value:serde_json::Value=serde_json::from_slice(&original).unwrap();
-    value["mappingVersion"]=99.into();std::fs::write(&plan,value.to_string()).unwrap();
-    let before=target.execute("changes",json!({"after":0})).unwrap();
-    assert_eq!(source.execute("mergeInto",args.clone()).unwrap_err(),"unsupported_merge_plan_version");
-    assert_eq!(target.execute("changes",json!({"after":0})).unwrap(),before);
-    std::fs::write(&plan,&original).unwrap();source.execute("mergeInto",args).unwrap();
-    assert_eq!(target.execute("changes",json!({"after":0})).unwrap(),before);
+    let args = json!({"destination":remote.path(),"workspace":"remote","replica":"replica","batch":"version-batch"});
+    source.execute("mergeInto", args.clone()).unwrap();
+    let plan = std::fs::read_dir(local.path().join("merge-plans"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let original = std::fs::read(&plan).unwrap();
+    let mut value: serde_json::Value = serde_json::from_slice(&original).unwrap();
+    value["mappingVersion"] = 99.into();
+    std::fs::write(&plan, value.to_string()).unwrap();
+    let before = target.execute("changes", json!({"after":0})).unwrap();
+    assert_eq!(
+        source.execute("mergeInto", args.clone()).unwrap_err(),
+        "unsupported_merge_plan_version"
+    );
+    assert_eq!(
+        target.execute("changes", json!({"after":0})).unwrap(),
+        before
+    );
+    std::fs::write(&plan, &original).unwrap();
+    source.execute("mergeInto", args).unwrap();
+    assert_eq!(
+        target.execute("changes", json!({"after":0})).unwrap(),
+        before
+    );
 }
 
 #[test]
 fn merging_two_workspaces_keeps_references_and_retries_without_duplicates() {
-    let source_dir=tempfile::tempdir().unwrap();let target_dir=tempfile::tempdir().unwrap();
-    let source=Workspace::open(&source_dir.path().join("library.sqlite"),"offline","phone").unwrap();
-    let target=Workspace::open(&target_dir.path().join("library.sqlite"),"remote","replica").unwrap();
+    let source_dir = tempfile::tempdir().unwrap();
+    let target_dir = tempfile::tempdir().unwrap();
+    let source = Workspace::open(
+        &source_dir.path().join("library.sqlite"),
+        "offline",
+        "phone",
+    )
+    .unwrap();
+    let target = Workspace::open(
+        &target_dir.path().join("library.sqlite"),
+        "remote",
+        "replica",
+    )
+    .unwrap();
     source.execute("save",json!({"kind":"notes","id":"collision","expected":0,"patch":{"title":"离线笔记","content":"正文 🚀"}})).unwrap();
     target.execute("save",json!({"kind":"notes","id":"collision","expected":0,"patch":{"title":"远端笔记","content":"原数据"}})).unwrap();
-    source.execute("save",json!({"kind":"folders","id":"folder","expected":0,"patch":{"name":"本地分类"}})).unwrap();
-    target.execute("save",json!({"kind":"folders","id":"folder","expected":0,"patch":{"name":"远端分类"}})).unwrap();
-    let file=source_dir.path().join("original.txt");let parsed=source_dir.path().join("parsed.json");
-    std::fs::write(&file,"正文 🚀").unwrap();
+    source
+        .execute(
+            "save",
+            json!({"kind":"folders","id":"folder","expected":0,"patch":{"name":"本地分类"}}),
+        )
+        .unwrap();
+    target
+        .execute(
+            "save",
+            json!({"kind":"folders","id":"folder","expected":0,"patch":{"name":"远端分类"}}),
+        )
+        .unwrap();
+    let file = source_dir.path().join("original.txt");
+    let parsed = source_dir.path().join("parsed.json");
+    std::fs::write(&file, "正文 🚀").unwrap();
     std::fs::write(&parsed,json!({"title":"离线书籍","author":"作者","format":"txt","coverTone":0,"chapters":[{"id":"chapter","title":"章节","paragraphs":["正文 🚀"]}],"progress":{"chapterId":"chapter","ratio":0}}).to_string()).unwrap();
-    let book=source.execute("importParsed",json!({"path":file,"parsedPath":parsed})).unwrap();
-    let book_id=book["value"]["id"].as_str().unwrap();
+    let book = source
+        .execute("importParsed", json!({"path":file,"parsedPath":parsed}))
+        .unwrap();
+    let book_id = book["value"]["id"].as_str().unwrap();
     source.execute("save",json!({"kind":"books","id":book_id,"expected":book["revision"],"patch":{"folderId":"folder"}})).unwrap();
-    let anchor=json!({"kind":"text","bookId":book_id,"chapterId":"chapter","chapterTitle":"章节","paraIndex":0,"start":0,"end":2,"text":"正文"});
-    let highlight=source.execute("save",json!({"kind":"highlights","id":"highlight","expected":0,"patch":anchor})).unwrap();
+    let anchor = json!({"kind":"text","bookId":book_id,"chapterId":"chapter","chapterTitle":"章节","paraIndex":0,"start":0,"end":2,"text":"正文"});
+    let highlight = source
+        .execute(
+            "save",
+            json!({"kind":"highlights","id":"highlight","expected":0,"patch":anchor}),
+        )
+        .unwrap();
     source.execute("cite",json!({"highlight":"highlight","note":"collision","highlightRevision":highlight["revision"],"noteRevision":1})).unwrap();
-    let quoted=source.execute("get",json!({"kind":"highlights","id":"highlight"})).unwrap();
-    source.execute("review",json!({"id":"highlight","rating":3,"expected":quoted["revision"]})).unwrap();
-    let review=source.execute("list",json!({"kind":"reviews"})).unwrap();
+    let quoted = source
+        .execute("get", json!({"kind":"highlights","id":"highlight"}))
+        .unwrap();
+    source
+        .execute(
+            "review",
+            json!({"id":"highlight","rating":3,"expected":quoted["revision"]}),
+        )
+        .unwrap();
+    let review = source.execute("list", json!({"kind":"reviews"})).unwrap();
     source.execute("save",json!({"kind":"studySets","id":"set","expected":0,"patch":{"name":"学习集","bookIds":[book_id]}})).unwrap();
     source.execute("save",json!({"kind":"mindMaps","id":"mind","expected":0,"patch":{"title":"脑图","bookId":book_id,"root":{"id":"root","text":"节点","sourceHighlightId":"highlight","children":[]}}})).unwrap();
-    let other=json!({"kind":"text","bookId":book_id,"chapterId":"chapter","chapterTitle":"章节","paraIndex":0,"start":3,"end":5,"text":"🚀"});
+    let other = json!({"kind":"text","bookId":book_id,"chapterId":"chapter","chapterTitle":"章节","paraIndex":0,"start":3,"end":5,"text":"🚀"});
     source.execute("save",json!({"kind":"associations","id":"association","expected":0,"patch":{"source":anchor,"target":other,"direction":"bidirectional","label":"关联"}})).unwrap();
     source.execute("save",json!({"kind":"preferences","id":"shufang:search-engine","expected":0,"patch":{"value":"bing"}})).unwrap();
     target.execute("save",json!({"kind":"preferences","id":"shufang:search-engine","expected":0,"patch":{"value":"google"}})).unwrap();
-    let before=source.execute("changes",json!({"after":0})).unwrap();
-    let args=json!({"destination":target_dir.path(),"workspace":"remote","replica":"replica","batch":"confirmed-batch"});
+    let before = source.execute("changes", json!({"after":0})).unwrap();
+    let args = json!({"destination":target_dir.path(),"workspace":"remote","replica":"replica","batch":"confirmed-batch"});
     // Fail after the first entities were committed, then retry from the pinned plan.
-    let resource=source.execute("bookResource",json!({"id":book_id})).unwrap();
-    let resource=std::path::PathBuf::from(resource["path"].as_str().unwrap());
-    let paused=resource.with_extension("paused");std::fs::rename(&resource,&paused).unwrap();
-    assert!(source.execute("mergeInto",args.clone()).is_err());
-    std::fs::rename(paused,&resource).unwrap();
-    let first=source.execute("mergeInto",args.clone()).unwrap();
-    assert_eq!(first["completed"],true);
-    let second=source.execute("mergeInto",args).unwrap();
-    assert_eq!(second["completed"],true);
-    let notes=target.execute("list",json!({"kind":"notes"})).unwrap();
-    assert_eq!(notes.as_array().unwrap().len(),2);
-    let note=notes.as_array().unwrap().iter().find(|n|n["value"]["title"]=="离线笔记").unwrap();
-    assert!(note["value"]["content"].as_str().unwrap().starts_with("正文 🚀"));
-    let books=target.execute("list",json!({"kind":"books"})).unwrap();let book=&books[0]["value"];
-    assert_ne!(book["id"],book_id);assert_ne!(book["folderId"],"folder");
-    let quotes=target.execute("list",json!({"kind":"highlights"})).unwrap();let quote=&quotes[0]["value"];
-    assert_eq!(quote["bookId"],book["id"]);assert_eq!(quote["noteId"],note["value"]["id"]);
-    let events=target.execute("list",json!({"kind":"reviews"})).unwrap();
-    assert_eq!(events.as_array().unwrap().len(),1);
-    assert_eq!(events[0]["value"]["highlightId"],quote["id"]);
-    for field in ["state","event","createdAt","deviceId"]{assert_eq!(events[0]["value"][field],review[0]["value"][field]);}
-    assert!(note["value"]["content"].as_str().unwrap().contains(&quote["id"].as_str().unwrap().replace('-',"%2D")));
-    let set=target.execute("list",json!({"kind":"studySets"})).unwrap();assert_eq!(set[0]["value"]["bookIds"][0],book["id"]);
-    let mind=target.execute("list",json!({"kind":"mindMaps"})).unwrap();assert_eq!(mind[0]["value"]["root"]["sourceHighlightId"],quote["id"]);
-    let associations=target.execute("list",json!({"kind":"associations"})).unwrap();assert_eq!(associations[0]["value"]["source"]["bookId"],book["id"]);
-    let original=target.execute("bookResource",json!({"id":book["id"]})).unwrap();assert_eq!(std::fs::read(original["path"].as_str().unwrap()).unwrap(),"正文 🚀".as_bytes());
-    assert_eq!(source.execute("changes",json!({"after":0})).unwrap(),before);
-    let prefs=target.execute("list",json!({"kind":"preferences"})).unwrap();
-    assert_eq!(prefs.as_array().unwrap().len(),1);
-    assert_eq!(prefs[0]["value"]["id"],"shufang:search-engine");
-    assert_eq!(prefs[0]["value"]["value"],"bing");
-    assert_eq!(source.execute("list",json!({"kind":"notes"})).unwrap().as_array().unwrap().len(),1);
-    let plan=std::fs::read_dir(source_dir.path().join("merge-plans")).unwrap().next().unwrap().unwrap().path();
-    let original=std::fs::read(&plan).unwrap();
-    let mut legacy:serde_json::Value=serde_json::from_slice(&original).unwrap();
+    let resource = source
+        .execute("bookResource", json!({"id":book_id}))
+        .unwrap();
+    let resource = std::path::PathBuf::from(resource["path"].as_str().unwrap());
+    let paused = resource.with_extension("paused");
+    std::fs::rename(&resource, &paused).unwrap();
+    assert!(source.execute("mergeInto", args.clone()).is_err());
+    std::fs::rename(paused, &resource).unwrap();
+    let first = source.execute("mergeInto", args.clone()).unwrap();
+    assert_eq!(first["completed"], true);
+    let second = source.execute("mergeInto", args).unwrap();
+    assert_eq!(second["completed"], true);
+    let notes = target.execute("list", json!({"kind":"notes"})).unwrap();
+    assert_eq!(notes.as_array().unwrap().len(), 2);
+    let note = notes
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["value"]["title"] == "离线笔记")
+        .unwrap();
+    assert!(note["value"]["content"]
+        .as_str()
+        .unwrap()
+        .starts_with("正文 🚀"));
+    let books = target.execute("list", json!({"kind":"books"})).unwrap();
+    let book = &books[0]["value"];
+    assert_ne!(book["id"], book_id);
+    assert_ne!(book["folderId"], "folder");
+    let quotes = target
+        .execute("list", json!({"kind":"highlights"}))
+        .unwrap();
+    let quote = &quotes[0]["value"];
+    assert_eq!(quote["bookId"], book["id"]);
+    assert_eq!(quote["noteId"], note["value"]["id"]);
+    let events = target.execute("list", json!({"kind":"reviews"})).unwrap();
+    assert_eq!(events.as_array().unwrap().len(), 1);
+    assert_eq!(events[0]["value"]["highlightId"], quote["id"]);
+    for field in ["state", "event", "createdAt", "deviceId"] {
+        assert_eq!(events[0]["value"][field], review[0]["value"][field]);
+    }
+    assert!(note["value"]["content"]
+        .as_str()
+        .unwrap()
+        .contains(&quote["id"].as_str().unwrap().replace('-', "%2D")));
+    let set = target.execute("list", json!({"kind":"studySets"})).unwrap();
+    assert_eq!(set[0]["value"]["bookIds"][0], book["id"]);
+    let mind = target.execute("list", json!({"kind":"mindMaps"})).unwrap();
+    assert_eq!(mind[0]["value"]["root"]["sourceHighlightId"], quote["id"]);
+    let associations = target
+        .execute("list", json!({"kind":"associations"}))
+        .unwrap();
+    assert_eq!(associations[0]["value"]["source"]["bookId"], book["id"]);
+    let original = target
+        .execute("bookResource", json!({"id":book["id"]}))
+        .unwrap();
+    assert_eq!(
+        std::fs::read(original["path"].as_str().unwrap()).unwrap(),
+        "正文 🚀".as_bytes()
+    );
+    assert_eq!(
+        source.execute("changes", json!({"after":0})).unwrap(),
+        before
+    );
+    let prefs = target
+        .execute("list", json!({"kind":"preferences"}))
+        .unwrap();
+    assert_eq!(prefs.as_array().unwrap().len(), 1);
+    assert_eq!(prefs[0]["value"]["id"], "shufang:search-engine");
+    assert_eq!(prefs[0]["value"]["value"], "bing");
+    assert_eq!(
+        source
+            .execute("list", json!({"kind":"notes"}))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let plan = std::fs::read_dir(source_dir.path().join("merge-plans"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let original = std::fs::read(&plan).unwrap();
+    let mut legacy: serde_json::Value = serde_json::from_slice(&original).unwrap();
     legacy.as_object_mut().unwrap().remove("mappingVersion");
-    legacy["entities"].as_array_mut().unwrap().retain(|record|record["kind"]!="reviews");
-    std::fs::write(&plan,legacy.to_string()).unwrap();
-    let target_before=target.execute("changes",json!({"after":0})).unwrap();
+    legacy["entities"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|record| record["kind"] != "reviews");
+    std::fs::write(&plan, legacy.to_string()).unwrap();
+    let target_before = target.execute("changes", json!({"after":0})).unwrap();
     assert_eq!(source.execute("mergeInto",json!({"destination":target_dir.path(),"workspace":"remote","replica":"replica","batch":"confirmed-batch"})).unwrap_err(),"merge_plan_upgrade_requires_clean_staging");
-    assert_eq!(target.execute("changes",json!({"after":0})).unwrap(),target_before);
-    std::fs::write(plan,original).unwrap();
+    assert_eq!(
+        target.execute("changes", json!({"after":0})).unwrap(),
+        target_before
+    );
+    std::fs::write(plan, original).unwrap();
 }

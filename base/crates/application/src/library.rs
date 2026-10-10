@@ -29,50 +29,103 @@ pub struct Record {
 }
 
 impl<R: Repository, T: Runtime> CoreSession<R, T> {
-    pub fn study_clock(&self) -> Result<String> { self.repository.clock() }
+    pub fn study_clock(&self) -> Result<String> {
+        self.repository.clock()
+    }
 
     /// Validates references against the whole staged batch before a single commit.
     /// Restore does not impersonate old replicas or overwrite immutable events.
-    pub fn restore_study_records(&mut self, expected_clock: &str, records: Vec<(String,String,Value)>) -> Result<()> {
-        let staged=self.prepare_study_records(expected_clock,records)?;
-        self.commit_values(expected_clock,staged.into_iter().map(|(key,value)|(key,Some(value))).collect())
+    pub fn restore_study_records(
+        &mut self,
+        expected_clock: &str,
+        records: Vec<(String, String, Value)>,
+    ) -> Result<()> {
+        let staged = self.prepare_study_records(expected_clock, records)?;
+        self.commit_values(
+            expected_clock,
+            staged
+                .into_iter()
+                .map(|(key, value)| (key, Some(value)))
+                .collect(),
+        )
     }
-    pub fn validate_study_records(&self, expected_clock: &str, records: Vec<(String,String,Value)>) -> Result<()> {
-        self.prepare_study_records(expected_clock,records).map(|_|())
+    pub fn validate_study_records(
+        &self,
+        expected_clock: &str,
+        records: Vec<(String, String, Value)>,
+    ) -> Result<()> {
+        self.prepare_study_records(expected_clock, records)
+            .map(|_| ())
     }
-    fn prepare_study_records(&self, expected_clock: &str, records: Vec<(String,String,Value)>) -> Result<BTreeMap<(String,String),Value>> {
-        if self.repository.clock()? != expected_clock {return Err("restore_preview_changed".into());}
-        if records.len()>10000 {return Err("study_too_large".into());}
-        let mut staged=BTreeMap::new();
-        for (kind,id,mut value) in records {
-            if !shufang_domain::sync::valid_identifier(&id) || !value.is_object() {return Err("invalid_record".into());}
-            if !KINDS.contains(&kind.as_str()) && !["sources","reviews"].contains(&kind.as_str()) {return Err("invalid_kind".into());}
-            if let Some(prior)=self.repository.load(&kind,&id)? {
-                if prior.state.deleted {return Err("entity_deleted".into());}
-                if kind=="reviews" {return Err("review_identity_exists".into());}
-                if kind=="sources" {
-                    let old=self.materialize_state(&prior.state)?.ok_or("source_deleted")?;
-                    if old["sha256"]!=value["sha256"] || old["size"]!=value["size"] {return Err("source_identity_reused".into());}
+    fn prepare_study_records(
+        &self,
+        expected_clock: &str,
+        records: Vec<(String, String, Value)>,
+    ) -> Result<BTreeMap<(String, String), Value>> {
+        if self.repository.clock()? != expected_clock {
+            return Err("restore_preview_changed".into());
+        }
+        if records.len() > 10000 {
+            return Err("study_too_large".into());
+        }
+        let mut staged = BTreeMap::new();
+        for (kind, id, mut value) in records {
+            if !shufang_domain::sync::valid_identifier(&id) || !value.is_object() {
+                return Err("invalid_record".into());
+            }
+            if !KINDS.contains(&kind.as_str()) && !["sources", "reviews"].contains(&kind.as_str()) {
+                return Err("invalid_kind".into());
+            }
+            if let Some(prior) = self.repository.load(&kind, &id)? {
+                if prior.state.deleted {
+                    return Err("entity_deleted".into());
+                }
+                if kind == "reviews" {
+                    return Err("review_identity_exists".into());
+                }
+                if kind == "sources" {
+                    let old = self
+                        .materialize_state(&prior.state)?
+                        .ok_or("source_deleted")?;
+                    if old["sha256"] != value["sha256"] || old["size"] != value["size"] {
+                        return Err("source_identity_reused".into());
+                    }
                 }
             }
-            value["id"]=id.clone().into();
-            if value.get("createdAt").is_none(){value["createdAt"]=self.runtime.now().into();}
-            if staged.insert((kind,id),value).is_some(){return Err("duplicate_record".into());}
+            value["id"] = id.clone().into();
+            if value.get("createdAt").is_none() {
+                value["createdAt"] = self.runtime.now().into();
+            }
+            if staged.insert((kind, id), value).is_some() {
+                return Err("duplicate_record".into());
+            }
         }
-        let lookup=|kind:&str,id:&str| -> Result<Record> {
-            if let Some(value)=staged.get(&(kind.into(),id.into())){return Ok(Record{revision:0,value:value.clone(),pending_fields:vec![]});}
-            self.entity(kind,id)
+        let lookup = |kind: &str, id: &str| -> Result<Record> {
+            if let Some(value) = staged.get(&(kind.into(), id.into())) {
+                return Ok(Record {
+                    revision: 0,
+                    value: value.clone(),
+                    pending_fields: vec![],
+                });
+            }
+            self.entity(kind, id)
         };
-        for ((kind,_),value) in &staged {
-            if kind=="sources" {
-                let source:crate::BlobManifest=serde_json::from_value(value.clone()).map_err(|_|"invalid_source")?;source.validate()?;
-                lookup("books",text(value,"id")?)?;
-            } else if kind=="reviews" {
-                lookup("highlights",text(value,"highlightId")?)?;
+        for ((kind, _), value) in &staged {
+            if kind == "sources" {
+                let source: crate::BlobManifest =
+                    serde_json::from_value(value.clone()).map_err(|_| "invalid_source")?;
+                source.validate()?;
+                lookup("books", text(value, "id")?)?;
+            } else if kind == "reviews" {
+                lookup("highlights", text(value, "highlightId")?)?;
                 validate_review_event(value)?;
             } else {
-                self.validate_with(kind,value,&lookup)?;
-                if kind=="notes" {if let Some(book)=value.get("bookId").and_then(Value::as_str){lookup("books",book)?;}}
+                self.validate_with(kind, value, &lookup)?;
+                if kind == "notes" {
+                    if let Some(book) = value.get("bookId").and_then(Value::as_str) {
+                        lookup("books", book)?;
+                    }
+                }
             }
         }
         Ok(staged)
@@ -155,22 +208,47 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
     }
     /// Page projections before hydrating large omitted fields. Full reads remain
     /// available through `entity`; this method never writes business data.
-    pub fn entities_page<F>(&self, kind: &str, offset: usize, limit: usize, omit: &[&str], mut project: F) -> Result<(Vec<Record>, usize)>
-    where F: FnMut(&mut Value) {
+    pub fn entities_page<F>(
+        &self,
+        kind: &str,
+        offset: usize,
+        limit: usize,
+        omit: &[&str],
+        mut project: F,
+    ) -> Result<(Vec<Record>, usize)>
+    where
+        F: FnMut(&mut Value),
+    {
         valid_read_kind(kind)?;
-        if limit == 0 || limit > 200 { return Err("invalid_page_limit".into()); }
-        let mut rows=self.repository.list(kind)?;
-        rows.retain(|row| !row.state.deleted);
-        rows.sort_by(|a,b|a.state.id.cmp(&b.state.id));
-        let total=rows.len();let mut records=Vec::new();
-        for mut row in rows.into_iter().skip(offset).take(limit) {
-            let chapters=row.state.fields.get("chapters").and_then(|f|f.value.as_ref()).and_then(Value::as_array).map(Vec::len);
-            for field in omit {row.state.fields.remove(*field);}
-            let mut record=self.metadata_record(&row)?;
-            if kind=="books" && omit.contains(&"chapters") {record.value["chapterCount"]=chapters.map(|n|Value::from(n as u64)).unwrap_or(Value::Null);}
-            project(&mut record.value);records.push(record);
+        if limit == 0 || limit > 200 {
+            return Err("invalid_page_limit".into());
         }
-        Ok((records,total))
+        let mut rows = self.repository.list(kind)?;
+        rows.retain(|row| !row.state.deleted);
+        rows.sort_by(|a, b| a.state.id.cmp(&b.state.id));
+        let total = rows.len();
+        let mut records = Vec::new();
+        for mut row in rows.into_iter().skip(offset).take(limit) {
+            let chapters = row
+                .state
+                .fields
+                .get("chapters")
+                .and_then(|f| f.value.as_ref())
+                .and_then(Value::as_array)
+                .map(Vec::len);
+            for field in omit {
+                row.state.fields.remove(*field);
+            }
+            let mut record = self.metadata_record(&row)?;
+            if kind == "books" && omit.contains(&"chapters") {
+                record.value["chapterCount"] = chapters
+                    .map(|n| Value::from(n as u64))
+                    .unwrap_or(Value::Null);
+            }
+            project(&mut record.value);
+            records.push(record);
+        }
+        Ok((records, total))
     }
     pub fn entity(&self, kind: &str, id: &str) -> Result<Record> {
         valid_read_kind(kind)?;
@@ -441,12 +519,24 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
                         .collect()
                 })
                 .unwrap_or_default();
-            let patch = full_patch.into_iter().filter(|(key,value)|prior.as_ref().and_then(|r|r.state.fields.get(key)).is_none_or(|f|f.removed||f.value.as_ref()!=Some(value))).collect();
+            let patch = full_patch
+                .into_iter()
+                .filter(|(key, value)| {
+                    prior
+                        .as_ref()
+                        .and_then(|r| r.state.fields.get(key))
+                        .is_none_or(|f| f.removed || f.value.as_ref() != Some(value))
+                })
+                .collect();
             next = next_clock(&next, self.runtime.now())?;
             let operation = Operation {
                 workspace_id: self.workspace.clone(),
                 replica_id: self.replica.clone(),
-                operation_id: if kind=="reviews" {id.clone()}else{self.runtime.new_id()},
+                operation_id: if kind == "reviews" {
+                    id.clone()
+                } else {
+                    self.runtime.new_id()
+                },
                 kind,
                 entity_id: id,
                 clock: next.clone(),
@@ -455,7 +545,11 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
                 deleted: value.is_none(),
             };
             let state = apply_operation(prior.as_ref().map(|r| &r.state), &operation)?;
-            if let Some(edit)=self.capture_sync_edit(prior.as_ref().map(|r|&r.state),&operation)? {edits.push(edit);}
+            if let Some(edit) =
+                self.capture_sync_edit(prior.as_ref().map(|r| &r.state), &operation)?
+            {
+                edits.push(edit);
+            }
             commits.push(Commit {
                 expected,
                 state,
@@ -619,24 +713,48 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
         self.commit_values(&clock, changes)
     }
 
-    pub fn unlink_citation(&mut self, highlight: &str, highlight_revision: u64, note_revision: u64) -> Result<()> {
+    pub fn unlink_citation(
+        &mut self,
+        highlight: &str,
+        highlight_revision: u64,
+        note_revision: u64,
+    ) -> Result<()> {
         let clock = self.repository.clock()?;
         let mut h = self.entity("highlights", highlight)?;
-        if h.revision != highlight_revision { return Err("revision_conflict".into()); }
-        let Some(note_id) = h.value["noteId"].as_str().map(str::to_owned) else { return Ok(()); };
+        if h.revision != highlight_revision {
+            return Err("revision_conflict".into());
+        }
+        let Some(note_id) = h.value["noteId"].as_str().map(str::to_owned) else {
+            return Ok(());
+        };
         let mut n = self.entity("notes", &note_id)?;
-        if n.revision != note_revision { return Err("revision_conflict".into()); }
+        if n.revision != note_revision {
+            return Err("revision_conflict".into());
+        }
         let b = self.entity("books", text(&h.value, "bookId")?)?;
-        n.value["content"] = replace_block(text(&n.value, "content")?, &citation(&h.value, text(&b.value, "title")?), "").trim().into();
+        n.value["content"] = replace_block(
+            text(&n.value, "content")?,
+            &citation(&h.value, text(&b.value, "title")?),
+            "",
+        )
+        .trim()
+        .into();
         let only = h.value["style"]["kind"] == "none"
-            && ["note", "name"].iter().all(|key| h.value[key].as_str().is_none_or(str::is_empty))
-            && ["aiQa", "tags", "cloze"].iter().all(|key| h.value[key].as_array().is_none_or(Vec::is_empty))
+            && ["note", "name"]
+                .iter()
+                .all(|key| h.value[key].as_str().is_none_or(str::is_empty))
+            && ["aiQa", "tags", "cloze"]
+                .iter()
+                .all(|key| h.value[key].as_array().is_none_or(Vec::is_empty))
             && h.value["review"].is_null();
         h.value.as_object_mut().unwrap().remove("noteId");
         h.value.as_object_mut().unwrap().remove("citation");
         let mut changes = BTreeMap::new();
         changes.insert(("notes".into(), note_id), Some(n.value));
-        changes.insert(("highlights".into(), highlight.into()), if only { None } else { Some(h.value) });
+        changes.insert(
+            ("highlights".into(), highlight.into()),
+            if only { None } else { Some(h.value) },
+        );
         self.commit_values(&clock, changes)
     }
 
@@ -731,27 +849,40 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
         s["due"] = due.into();
         s["lastRating"] = rating.into();
         s["lastReviewedAt"] = now.into();
-        if h.revision != expected { return Err("revision_conflict".into()); }
-        let event_id=self.runtime.new_id();
-        let event=json!({"id":event_id,"highlightId":id,"event":"review","state":s,"createdAt":now,"deviceId":self.replica});
-        let mut value=h.value;value["review"]=s;
-        self.commit_values(&self.repository.clock()?,BTreeMap::from([
-            (("highlights".into(),id.into()),Some(value)),
-            (("reviews".into(),event_id),Some(event)),
-        ]))?;
-        self.entity("highlights",id)
+        if h.revision != expected {
+            return Err("revision_conflict".into());
+        }
+        let event_id = self.runtime.new_id();
+        let event = json!({"id":event_id,"highlightId":id,"event":"review","state":s,"createdAt":now,"deviceId":self.replica});
+        let mut value = h.value;
+        value["review"] = s;
+        self.commit_values(
+            &self.repository.clock()?,
+            BTreeMap::from([
+                (("highlights".into(), id.into()), Some(value)),
+                (("reviews".into(), event_id), Some(event)),
+            ]),
+        )?;
+        self.entity("highlights", id)
     }
 
     /// Import an immutable historical event without grading the card again.
     /// Used by confirmed workspace imports; ordinary saves cannot write reviews.
     pub fn import_review_event(&mut self, id: &str, mut event: Value) -> Result<Record> {
-        if !shufang_domain::sync::valid_identifier(id) {return Err("invalid_review_id".into());}
-        self.entity("highlights",text(&event,"highlightId")?)?;
+        if !shufang_domain::sync::valid_identifier(id) {
+            return Err("invalid_review_id".into());
+        }
+        self.entity("highlights", text(&event, "highlightId")?)?;
         validate_review_event(&event)?;
-        if self.repository.load("reviews",id)?.is_some(){return Err("review_identity_exists".into());}
-        event["id"]=id.into();
-        self.commit_values(&self.repository.clock()?,BTreeMap::from([(("reviews".into(),id.into()),Some(event))]))?;
-        self.entity("reviews",id)
+        if self.repository.load("reviews", id)?.is_some() {
+            return Err("review_identity_exists".into());
+        }
+        event["id"] = id.into();
+        self.commit_values(
+            &self.repository.clock()?,
+            BTreeMap::from([(("reviews".into(), id.into()), Some(event))]),
+        )?;
+        self.entity("reviews", id)
     }
 
     /// A session identifier and total active time make repeated heartbeats idempotent.
@@ -844,7 +975,12 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
     fn validate(&self, kind: &str, v: &Value) -> Result<()> {
         self.validate_with(kind, v, &|kind, id| self.entity(kind, id))
     }
-    fn validate_with(&self, kind: &str, v: &Value, lookup: &dyn Fn(&str, &str) -> Result<Record>) -> Result<()> {
+    fn validate_with(
+        &self,
+        kind: &str,
+        v: &Value,
+        lookup: &dyn Fn(&str, &str) -> Result<Record>,
+    ) -> Result<()> {
         let title = |key: &str| -> Result<()> {
             let s = text(v, key)?;
             if s.trim().is_empty() || s.chars().count() > 1000 {
@@ -962,22 +1098,35 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
         }
         Ok(())
     }
-    fn validate_book_reference_with(&self, v: &Value, lookup: &dyn Fn(&str, &str) -> Result<Record>) -> Result<()> {
-        if let Some(ranges) = v.get("sourceRanges").filter(|value|!value.is_null()) {
-            let ranges=ranges.as_array().ok_or("invalid_source_ranges")?;
-            if ranges.is_empty() || ranges.len()>1000 {return Err("invalid_source_ranges".into());}
+    fn validate_book_reference_with(
+        &self,
+        v: &Value,
+        lookup: &dyn Fn(&str, &str) -> Result<Record>,
+    ) -> Result<()> {
+        if let Some(ranges) = v.get("sourceRanges").filter(|value| !value.is_null()) {
+            let ranges = ranges.as_array().ok_or("invalid_source_ranges")?;
+            if ranges.is_empty() || ranges.len() > 1000 {
+                return Err("invalid_source_ranges".into());
+            }
             for range in ranges {
-                if range.get("sourceRanges").is_some() || range["bookId"]!=v["bookId"] {return Err("invalid_source_ranges".into());}
+                if range.get("sourceRanges").is_some() || range["bookId"] != v["bookId"] {
+                    return Err("invalid_source_ranges".into());
+                }
                 self.validate_book_reference_with(range, lookup)?;
             }
-            let first=&ranges[0];
-            for field in ["chapterId","paraIndex","start","end","pdfAnchor"] {
-                if v.get(field).is_some() && v[field]!=first[field] {return Err("invalid_source_ranges".into());}
+            let first = &ranges[0];
+            for field in ["chapterId", "paraIndex", "start", "end", "pdfAnchor"] {
+                if v.get(field).is_some() && v[field] != first[field] {
+                    return Err("invalid_source_ranges".into());
+                }
             }
             return Ok(());
         }
         let book = lookup("books", text(v, "bookId")?)?;
-        let level = v["citation"]["level"].as_str().or_else(||v["citationLevel"].as_str()).unwrap_or("content");
+        let level = v["citation"]["level"]
+            .as_str()
+            .or_else(|| v["citationLevel"].as_str())
+            .unwrap_or("content");
         if !["book", "chapter", "content"].contains(&level) {
             return Err("invalid_citation_level".into());
         }
@@ -998,19 +1147,25 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
         if level == "content"
             && !has_anchor
             && v["chapterId"].as_str().is_none_or(str::is_empty)
-            && (v.get("citationLevel").is_some() || v["citation"].get("level").is_some() || v["text"] == book.value["title"])
+            && (v.get("citationLevel").is_some()
+                || v["citation"].get("level").is_some()
+                || v["text"] == book.value["title"])
         {
             return Ok(());
         }
         if let Some(anchor) = v.get("pdfAnchor") {
             let page = anchor["page"].as_u64().ok_or("invalid_pdf_anchor")?;
-            let chapters = book.value["chapters"].as_array().ok_or("invalid_chapters")?;
+            let chapters = book.value["chapters"]
+                .as_array()
+                .ok_or("invalid_chapters")?;
             let page_count = book.value["pageCount"].as_u64();
             let chapter_id = v["chapterId"].as_str().unwrap_or("");
             let invalid_chapter = if page_count.is_some() {
                 !chapter_id.is_empty() && !chapters.iter().any(|c| c["id"] == chapter_id)
             } else {
-                page > chapters.len() as u64 || page == 0 || chapters[(page - 1) as usize]["id"] != v["chapterId"]
+                page > chapters.len() as u64
+                    || page == 0
+                    || chapters[(page - 1) as usize]["id"] != v["chapterId"]
             };
             if book.value["format"] != "pdf"
                 || page == 0
@@ -1069,7 +1224,11 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
     }
 }
 fn valid_read_kind(kind: &str) -> Result<()> {
-    if shufang_domain::sync::ENTITY_KINDS.contains(&kind) {Ok(())} else {Err("invalid_kind".into())}
+    if shufang_domain::sync::ENTITY_KINDS.contains(&kind) {
+        Ok(())
+    } else {
+        Err("invalid_kind".into())
+    }
 }
 fn valid_kind(kind: &str) -> Result<()> {
     if KINDS.contains(&kind) {
@@ -1144,18 +1303,33 @@ fn replace_block(content: &str, block: &str, replacement: &str) -> String {
     output
 }
 
-fn validate_review_event(event:&Value)->Result<()> {
-        let fields=event.as_object().ok_or("invalid_review_event")?;
-        let state=event.get("state").and_then(Value::as_object).ok_or("invalid_review_event")?;
-        let nonnegative=|value:&Value|value.as_f64().is_some_and(|n|n.is_finite()&&(0.0..=9_007_199_254_740_991.0).contains(&n));
-        let whole=|value:&Value|nonnegative(value)&&value.as_f64().is_some_and(|n|n.fract()==0.0);
-        let rating=&event["state"]["lastRating"];
-        if fields.get("event").and_then(Value::as_str)!=Some("review")
-            || !nonnegative(&event["createdAt"])
-            || !whole(rating)||!rating.as_f64().is_some_and(|n|(1.0..=4.0).contains(&n))
-            || ["reps","lapses"].iter().any(|key|!whole(&event["state"][*key]))
-            || ["due","lastReviewedAt"].iter().any(|key|!nonnegative(&event["state"][*key]))
-            || state.get("interval").is_none_or(|n|!nonnegative(n))
-        {return Err("invalid_review_event".into());}
+fn validate_review_event(event: &Value) -> Result<()> {
+    let fields = event.as_object().ok_or("invalid_review_event")?;
+    let state = event
+        .get("state")
+        .and_then(Value::as_object)
+        .ok_or("invalid_review_event")?;
+    let nonnegative = |value: &Value| {
+        value
+            .as_f64()
+            .is_some_and(|n| n.is_finite() && (0.0..=9_007_199_254_740_991.0).contains(&n))
+    };
+    let whole =
+        |value: &Value| nonnegative(value) && value.as_f64().is_some_and(|n| n.fract() == 0.0);
+    let rating = &event["state"]["lastRating"];
+    if fields.get("event").and_then(Value::as_str) != Some("review")
+        || !nonnegative(&event["createdAt"])
+        || !whole(rating)
+        || !rating.as_f64().is_some_and(|n| (1.0..=4.0).contains(&n))
+        || ["reps", "lapses"]
+            .iter()
+            .any(|key| !whole(&event["state"][*key]))
+        || ["due", "lastReviewedAt"]
+            .iter()
+            .any(|key| !nonnegative(&event["state"][*key]))
+        || state.get("interval").is_none_or(|n| !nonnegative(n))
+    {
+        return Err("invalid_review_event".into());
+    }
     Ok(())
 }

@@ -242,8 +242,13 @@ fn deleted_remote_book_keeps_local_learning_dependency_graph_as_new_identities()
     let w = Workspace::open(&dir.path().join("library.sqlite"), "test", "local").unwrap();
     let mut c = w.core.lock().unwrap();
     c.save_entity("books","book",json!({"title":"Book","author":"A","format":"txt","chapters":[{"id":"chapter","title":"One","paragraphs":["original"]}],"progress":{"chapterId":"chapter","ratio":0}}),vec![],0).unwrap();
-    let source=shufang_application::BlobManifest{sha256:"a".repeat(64),size:8,name:"book.txt".into(),content_type:"text/plain".into()};
-    c.attach_book_source("book",&source).unwrap();
+    let source = shufang_application::BlobManifest {
+        sha256: "a".repeat(64),
+        size: 8,
+        name: "book.txt".into(),
+        content_type: "text/plain".into(),
+    };
+    c.attach_book_source("book", &source).unwrap();
     c.save_entity(
         "notes",
         "note",
@@ -296,7 +301,7 @@ fn deleted_remote_book_keeps_local_learning_dependency_graph_as_new_identities()
         .unwrap();
     let book = result["copyId"].as_str().unwrap();
     assert_ne!(book, "book");
-    assert_eq!(c.book_source(book).unwrap(),source);
+    assert_eq!(c.book_source(book).unwrap(), source);
     assert_eq!(
         c.entity("books", book).unwrap().value["title"],
         "Offline title"

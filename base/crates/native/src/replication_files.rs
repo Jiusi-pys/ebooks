@@ -1,4 +1,5 @@
 //! Bounded resumable v2 file transport. Metadata commits independently of bytes.
+use crate::sync_blobs::BlobStore;
 use crate::{
     replication::{json_response, Peer},
     transport_host::SyncHost as Host,
@@ -6,7 +7,6 @@ use crate::{
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use shufang_application::{BlobManifest, CHUNK_SIZE};
-use crate::sync_blobs::BlobStore;
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
@@ -73,7 +73,9 @@ pub async fn transfer(
                 continue;
             }
             if state.kind == "sources" {
-                if !crate::local_download::enabled(&host.workspace,&state.id)?{continue;}
+                if !crate::local_download::enabled(&host.workspace, &state.id)? {
+                    continue;
+                }
                 if let Some(value) = shufang_domain::sync::materialize(state)? {
                     let m = manifest(value)?;
                     seen.insert(m.sha256.clone(), m);
@@ -245,7 +247,7 @@ async fn upload(
     if committed.sha256 != m.sha256 || committed.size != m.size {
         return Err("invalid_peer_file_acknowledgement".into());
     }
-    crate::local_download::acknowledge(&host.workspace,m)?;
+    crate::local_download::acknowledge(&host.workspace, m)?;
     Ok(())
 }
 pub(crate) async fn download(
@@ -303,7 +305,7 @@ pub(crate) async fn download(
         store.put(&id, index, &bytes, &format!("{:x}", Sha256::digest(&bytes)))?;
     }
     store.commit(&id)?;
-    crate::local_download::acknowledge(&host.workspace,m)?;
-    crate::local_download::cleanup(&host.workspace,m)?;
+    crate::local_download::acknowledge(&host.workspace, m)?;
+    crate::local_download::cleanup(&host.workspace, m)?;
     Ok(())
 }

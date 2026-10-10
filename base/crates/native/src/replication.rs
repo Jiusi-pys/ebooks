@@ -17,12 +17,22 @@ pub struct Peer {
     pub cookie: Option<String>,
 }
 fn validate(peer: &Peer) -> Result<(), String> {
-    if !shufang_domain::sync::valid_identifier(&peer.id) || (peer.token.is_empty() && peer.cookie.is_none()) || (peer.cookie.is_some() && !peer.token.is_empty()) {
+    if !shufang_domain::sync::valid_identifier(&peer.id)
+        || (peer.token.is_empty() && peer.cookie.is_none())
+        || (peer.cookie.is_some() && !peer.token.is_empty())
+    {
         return Err("invalid_peer".into());
     }
-    if let Some(cookie)=&peer.cookie {
-        if cookie.is_empty() || cookie.len()>8192 || reqwest::header::HeaderValue::from_str(cookie).is_err() {return Err("invalid_peer_credential".into());}
-    } else if reqwest::header::HeaderValue::from_str(&format!("Bearer {}",peer.token)).is_err() {return Err("invalid_peer_credential".into());}
+    if let Some(cookie) = &peer.cookie {
+        if cookie.is_empty()
+            || cookie.len() > 8192
+            || reqwest::header::HeaderValue::from_str(cookie).is_err()
+        {
+            return Err("invalid_peer_credential".into());
+        }
+    } else if reqwest::header::HeaderValue::from_str(&format!("Bearer {}", peer.token)).is_err() {
+        return Err("invalid_peer_credential".into());
+    }
     crate::sync_config::validate_url(&peer.url)
 }
 
@@ -48,9 +58,23 @@ pub async fn json_response(response: reqwest::Response) -> Result<Value, String>
     serde_json::from_slice(&bytes).map_err(|_| "invalid_sync_response".into())
 }
 pub async fn tick_peer(host: &Arc<Host>, peer: &Peer) -> Result<(), String> {
-    let guarded=host.workspace.core.lock().map_err(|_|"core_lock_failed")?.sync_conflicts_enabled()?;
-    let _fence=if guarded{Some(crate::offline_sync::fence(&host.workspace)?)}else{None};
-    for _ in 0..8 {match tick_peer_attempt(host,peer).await {Err(e) if e=="sync_local_edits_pending"=>continue,result=>return result}}
+    let guarded = host
+        .workspace
+        .core
+        .lock()
+        .map_err(|_| "core_lock_failed")?
+        .sync_conflicts_enabled()?;
+    let _fence = if guarded {
+        Some(crate::offline_sync::fence(&host.workspace)?)
+    } else {
+        None
+    };
+    for _ in 0..8 {
+        match tick_peer_attempt(host, peer).await {
+            Err(e) if e == "sync_local_edits_pending" => continue,
+            result => return result,
+        }
+    }
     Err("sync_local_edits_pending".into())
 }
 async fn tick_peer_attempt(host: &Arc<Host>, peer: &Peer) -> Result<(), String> {
@@ -99,16 +123,27 @@ async fn tick_peer_attempt(host: &Arc<Host>, peer: &Peer) -> Result<(), String> 
     );
     let send_key = format!("sync:send:{identity}");
     let receive_key = format!("sync:receive:{identity}");
-    let guarded=host.workspace.core.lock().map_err(|_|"core_lock_failed")?.sync_conflicts_enabled()?;
-    if guarded&&!host.is_read_only(){
-        if cap["conditionalPush"]!=1{return Err("sync_conflict_guard_unavailable".into())}
-        crate::offline_sync::send_guarded(host,peer,&client,&workspace,&identity).await?;
+    let guarded = host
+        .workspace
+        .core
+        .lock()
+        .map_err(|_| "core_lock_failed")?
+        .sync_conflicts_enabled()?;
+    if guarded && !host.is_read_only() {
+        if cap["conditionalPush"] != 1 {
+            return Err("sync_conflict_guard_unavailable".into());
+        }
+        crate::offline_sync::send_guarded(host, peer, &client, &workspace, &identity).await?;
     }
     crate::incoming_snapshot::restore(host, peer, &client, &workspace, &identity, epoch, false)
         .await?;
     pull_history(host, peer, &client, &workspace, &identity).await?;
     let mut recovered = false;
-    for _ in 0..if host.is_read_only()||guarded { 0 } else { 100 } {
+    for _ in 0..if host.is_read_only() || guarded {
+        0
+    } else {
+        100
+    } {
         let (expected, mut rows) = {
             let c = host.workspace.core.lock().map_err(|_| "core_lock_failed")?;
             let (revision, position) = c.sync_checkpoint(&send_key)?;
@@ -191,9 +226,11 @@ async fn tick_peer_attempt(host: &Arc<Host>, peer: &Peer) -> Result<(), String> 
             return Err("sync_cursor_stalled".into());
         }
         {
-        let mut core=host.workspace.core.lock().map_err(|_|"core_lock_failed")?;
-        if guarded&&core.has_unsent_local_edits(&send_key)?{return Err("sync_local_edits_pending".into())}
-        core.receive_operations(
+            let mut core = host.workspace.core.lock().map_err(|_| "core_lock_failed")?;
+            if guarded && core.has_unsent_local_edits(&send_key)? {
+                return Err("sync_local_edits_pending".into());
+            }
+            core.receive_operations(
                 &operations,
                 Some(LocalCommit {
                     key: receive_key.clone(),
@@ -265,7 +302,11 @@ async fn pull_history(
             return Err("sync_cursor_stalled".into());
         }
         let mut core = host.workspace.core.lock().map_err(|_| "core_lock_failed")?;
-        if core.sync_conflicts_enabled()?&&core.has_unsent_local_edits(&format!("sync:send:{identity}"))?{return Err("sync_local_edits_pending".into())}
+        if core.sync_conflicts_enabled()?
+            && core.has_unsent_local_edits(&format!("sync:send:{identity}"))?
+        {
+            return Err("sync_local_edits_pending".into());
+        }
         core.receive_operations(
             &operations,
             Some(LocalCommit {
@@ -285,11 +326,19 @@ async fn pull_history(
 
 impl Peer {
     pub fn headers(&self) -> reqwest::header::HeaderMap {
-        let mut headers=reqwest::header::HeaderMap::new();
-        if let Some(cookie)=&self.cookie {
-            if let Ok(value)=reqwest::header::HeaderValue::from_str(cookie) {headers.insert(reqwest::header::COOKIE,value);}
-            if let Ok(value)=reqwest::header::HeaderValue::from_str(&self.url) {headers.insert(reqwest::header::ORIGIN,value);}
-        } else if let Ok(value)=reqwest::header::HeaderValue::from_str(&format!("Bearer {}",self.token)) {headers.insert(reqwest::header::AUTHORIZATION,value);}
+        let mut headers = reqwest::header::HeaderMap::new();
+        if let Some(cookie) = &self.cookie {
+            if let Ok(value) = reqwest::header::HeaderValue::from_str(cookie) {
+                headers.insert(reqwest::header::COOKIE, value);
+            }
+            if let Ok(value) = reqwest::header::HeaderValue::from_str(&self.url) {
+                headers.insert(reqwest::header::ORIGIN, value);
+            }
+        } else if let Ok(value) =
+            reqwest::header::HeaderValue::from_str(&format!("Bearer {}", self.token))
+        {
+            headers.insert(reqwest::header::AUTHORIZATION, value);
+        }
         headers
     }
 }

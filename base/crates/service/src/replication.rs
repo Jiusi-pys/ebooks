@@ -7,19 +7,31 @@ use std::sync::Arc;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Peer {
-    pub id:String,
-    pub url:String,
+    pub id: String,
+    pub url: String,
     #[serde(skip_serializing)]
-    pub token:String,
+    pub token: String,
 }
-fn validate(peer:&Peer)->Result<(),String> {
-    if !shufang_domain::sync::valid_identifier(&peer.id) || peer.token.is_empty() {return Err("invalid_peer".into());}
+fn validate(peer: &Peer) -> Result<(), String> {
+    if !shufang_domain::sync::valid_identifier(&peer.id) || peer.token.is_empty() {
+        return Err("invalid_peer".into());
+    }
     shufang_native::sync_config::validate_url(&peer.url)
 }
-pub async fn tick_peer(host:&Arc<Host>,peer:&Peer)->Result<(),String> {
+pub async fn tick_peer(host: &Arc<Host>, peer: &Peer) -> Result<(), String> {
     validate(peer)?;
-    let shared=shufang_native::transport_host::SyncHost::new(host.workspace.clone(),host.is_read_only());
-    shufang_native::replication::tick_peer(&shared,&shufang_native::replication::Peer{id:peer.id.clone(),url:peer.url.clone(),token:peer.token.clone(),cookie:None}).await
+    let shared =
+        shufang_native::transport_host::SyncHost::new(host.workspace.clone(), host.is_read_only());
+    shufang_native::replication::tick_peer(
+        &shared,
+        &shufang_native::replication::Peer {
+            id: peer.id.clone(),
+            url: peer.url.clone(),
+            token: peer.token.clone(),
+            cookie: None,
+        },
+    )
+    .await
 }
 pub async fn run(host: Arc<Host>) {
     let mut schedule = std::collections::BTreeMap::<String, (u32, tokio::time::Instant)>::new();

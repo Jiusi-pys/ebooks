@@ -105,7 +105,7 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
                 let linked = match kind.as_str() {
                     "folders" => contains(value, "parentId", "folders", &selected),
                     "books" => contains(value, "folderId", "folders", &selected),
-                    "sources" => selected.contains(&key("books",id)),
+                    "sources" => selected.contains(&key("books", id)),
                     "highlights" => {
                         contains(value, "bookId", "books", &selected)
                             || value["sourceRanges"].as_array().is_some_and(|ranges| {
@@ -155,9 +155,11 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
             .map(|k| (k.clone(), self.runtime.new_id()))
             .collect();
         ids.insert(key(kind, id), new_id.into());
-        for (kind,id,_) in &records {
-            if kind=="sources" && selected.contains(&key(kind,id)) {
-                if let Some(book)=ids.get(&key("books",id)).cloned() {ids.insert(key(kind,id),book);}
+        for (kind, id, _) in &records {
+            if kind == "sources" && selected.contains(&key(kind, id)) {
+                if let Some(book) = ids.get(&key("books", id)).cloned() {
+                    ids.insert(key(kind, id), book);
+                }
             }
         }
         // PDF ink identities are derived from the new book identity, not random IDs.
@@ -210,7 +212,8 @@ impl<R: Repository, T: Runtime> CoreSession<R, T> {
                                 format!("shufang://{kind}/"),
                                 format!("shufang://{}/", kind.trim_end_matches('s')),
                             ] {
-                                text = replace_link(&text,
+                                text = replace_link(
+                                    &text,
                                     &format!("{prefix}{}", encoded(old)),
                                     &format!("{prefix}{}", encoded(new)),
                                 );
@@ -271,6 +274,13 @@ mod tests {
     use super::replace_link;
     #[test]
     fn references_do_not_rewrite_ids_with_a_shared_prefix() {
-        assert_eq!(replace_link("[A](shufang://notes/n) [B](shufang://notes/n2) shufang://notes/n#p", "shufang://notes/n", "shufang://notes/copy"), "[A](shufang://notes/copy) [B](shufang://notes/n2) shufang://notes/copy#p");
+        assert_eq!(
+            replace_link(
+                "[A](shufang://notes/n) [B](shufang://notes/n2) shufang://notes/n#p",
+                "shufang://notes/n",
+                "shufang://notes/copy"
+            ),
+            "[A](shufang://notes/copy) [B](shufang://notes/n2) shufang://notes/copy#p"
+        );
     }
 }

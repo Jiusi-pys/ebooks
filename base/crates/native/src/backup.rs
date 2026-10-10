@@ -43,7 +43,9 @@ fn create_archive(
     let mut paths = vec![(database_name.to_owned(), snapshot.to_path_buf())];
     // Original resources are content addressed and never modified or collected during backup.
     for folder in ["files", "credentials", "auth"] {
-        if cfg!(target_os="android") && ["credentials","auth"].contains(&folder) {continue;}
+        if cfg!(target_os = "android") && ["credentials", "auth"].contains(&folder) {
+            continue;
+        }
         let directory = root.join(folder);
         if directory.exists() {
             for entry in std::fs::read_dir(directory).map_err(|e| e.to_string())? {

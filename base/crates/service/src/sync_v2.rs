@@ -240,22 +240,37 @@ async fn push(State(h): State<Arc<Host>>, Json(input): Json<Value>) -> Api {
         .as_array()
         .filter(|a| a.len() <= 100)
         .ok_or_else(|| error("invalid_batch".into()))?;
-    let conditions=if let Some(value)=input.get("expectedEntities") {Some(value.as_array().filter(|a|a.len()==operations.len()).ok_or_else(||error("invalid_sync_conditions".into()))?)}else{None};
+    let conditions = if let Some(value) = input.get("expectedEntities") {
+        Some(
+            value
+                .as_array()
+                .filter(|a| a.len() == operations.len())
+                .ok_or_else(|| error("invalid_sync_conditions".into()))?,
+        )
+    } else {
+        None
+    };
     let mut receipts = Vec::new();
     let mut core = h
         .workspace
         .core
         .lock()
         .map_err(|_| error("core_lock_failed".into()))?;
-    for (index,raw) in operations.iter().enumerate() {
+    for (index, raw) in operations.iter().enumerate() {
         let result = serde_json::from_value::<Operation>(raw.clone())
             .map_err(|_| "validation_failed".to_owned())
             .and_then(|op| {
-                if let Some(conditions)=conditions {
-                    let condition=&conditions[index];
-                    if condition["operationId"]!=op.operation_id||condition.get("state").is_none(){return Err("invalid_sync_conditions".into())}
-                    let state:Option<shufang_domain::sync::EntityState>=serde_json::from_value(condition["state"].clone()).map_err(|_|"invalid_sync_conditions")?;
-                    core.check_sync_precondition(&op,state.as_ref())?;
+                if let Some(conditions) = conditions {
+                    let condition = &conditions[index];
+                    if condition["operationId"] != op.operation_id
+                        || condition.get("state").is_none()
+                    {
+                        return Err("invalid_sync_conditions".into());
+                    }
+                    let state: Option<shufang_domain::sync::EntityState> =
+                        serde_json::from_value(condition["state"].clone())
+                            .map_err(|_| "invalid_sync_conditions")?;
+                    core.check_sync_precondition(&op, state.as_ref())?;
                 }
                 core.receive_operations(std::slice::from_ref(&op), None)
                     .map(|duplicates| (op, duplicates[0]))
@@ -269,23 +284,41 @@ async fn push(State(h): State<Arc<Host>>, Json(input): Json<Value>) -> Api {
                     .to_string();
                 receipts.push(json!({"operationId":op.operation_id,"persisted":true,"duplicate":duplicate,"seq":sequence}));
             }
-            Err(e) if operations.len() == 1&&conditions.is_none() => return Err(error(e)),
+            Err(e) if operations.len() == 1 && conditions.is_none() => return Err(error(e)),
             Err(e) => receipts
                 .push(json!({"operationId":raw.get("operationId"),"persisted":false,"error":e})),
         }
     }
     Ok(Json(json!({"receipts":receipts})))
 }
-async fn preflight(State(h):State<Arc<Host>>,Json(input):Json<Value>)->Api {
-    let operations=input["operations"].as_array().filter(|a|a.len()<=100).ok_or_else(||error("invalid_batch".into()))?;
-    let core=h.workspace.core.lock().map_err(|_|error("core_lock_failed".into()))?;let workspace=core.replication_head().map_err(error)?.workspace_id;
-    let mut entries=vec![];
+async fn preflight(State(h): State<Arc<Host>>, Json(input): Json<Value>) -> Api {
+    let operations = input["operations"]
+        .as_array()
+        .filter(|a| a.len() <= 100)
+        .ok_or_else(|| error("invalid_batch".into()))?;
+    let core = h
+        .workspace
+        .core
+        .lock()
+        .map_err(|_| error("core_lock_failed".into()))?;
+    let workspace = core.replication_head().map_err(error)?.workspace_id;
+    let mut entries = vec![];
     for raw in operations {
-        let op:Operation=serde_json::from_value(raw.clone()).map_err(|_|error("validation_failed".into()))?;
+        let op: Operation =
+            serde_json::from_value(raw.clone()).map_err(|_| error("validation_failed".into()))?;
         shufang_domain::sync::validate_operation(&op).map_err(error)?;
-        if op.workspace_id!=workspace{return Err(error("workspace_identity_mismatch".into()))}
-        let previous=core.replication_operation(&op.operation_id).map_err(error)?;
-        if previous.as_ref().is_some_and(|old|!shufang_domain::sync::equivalent_operation(old,&op)){return Err(error("operation_id_reused".into()))}
+        if op.workspace_id != workspace {
+            return Err(error("workspace_identity_mismatch".into()));
+        }
+        let previous = core
+            .replication_operation(&op.operation_id)
+            .map_err(error)?;
+        if previous
+            .as_ref()
+            .is_some_and(|old| !shufang_domain::sync::equivalent_operation(old, &op))
+        {
+            return Err(error("operation_id_reused".into()));
+        }
         entries.push(json!({"operationId":op.operation_id,"duplicate":previous.is_some(),"state":core.replication_entity_state(&op.kind,&op.entity_id).map_err(error)?}));
     }
     Ok(Json(json!({"entries":entries})))

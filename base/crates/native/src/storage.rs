@@ -13,11 +13,18 @@ pub enum Storage {
 }
 
 impl Repository for Storage {
-    fn commit_sync_resolution(&mut self, clock:&str, commits:&[Commit], locals:&[LocalCommit], id:&str, fingerprint:&str)->Result<()> {
+    fn commit_sync_resolution(
+        &mut self,
+        clock: &str,
+        commits: &[Commit],
+        locals: &[LocalCommit],
+        id: &str,
+        fingerprint: &str,
+    ) -> Result<()> {
         match self {
-            Self::Sqlite(r)=>r.commit_sync_resolution(clock,commits,locals,id,fingerprint),
-            #[cfg(feature="server-mysql")]
-            Self::Mysql(r)=>r.commit_sync_resolution(clock,commits,locals,id,fingerprint),
+            Self::Sqlite(r) => r.commit_sync_resolution(clock, commits, locals, id, fingerprint),
+            #[cfg(feature = "server-mysql")]
+            Self::Mysql(r) => r.commit_sync_resolution(clock, commits, locals, id, fingerprint),
         }
     }
     fn load(&self, kind: &str, id: &str) -> Result<Option<StoredEntity>> {

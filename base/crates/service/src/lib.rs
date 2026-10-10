@@ -735,8 +735,6 @@ async fn mcp_http(
     }
 }
 
-
-
 async fn sync_configuration(State(host): State<Arc<Host>>) -> ApiResult {
     let config = call(host.clone(), "syncConfig", json!({})).await?.0;
     let status = call(host, "syncStatus", json!({})).await?.0;

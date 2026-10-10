@@ -737,18 +737,49 @@ impl Workspace {
     pub fn import(&self, source: &Path, mode: &str, job: &Job) -> Result<Value> {
         self.import_with_parsed(source, mode, job, None)
     }
-    fn import_parsed(&self,args:&Value)->Result<Value> {
-        let source=PathBuf::from(string(args,"path")?);
-        let parsed=PathBuf::from(string(args,"parsedPath")?);
-        if !parsed.is_absolute() { return Err("absolute_path_required".into()); }
-        let file=std::fs::File::open(parsed).map_err(|e|e.to_string())?;
-        if file.metadata().map_err(|e|e.to_string())?.len()>shufang_application::MAX_BLOB_SIZE { return Err("parsed_book_size_limit".into()); }
-        let book:Value=serde_json::from_reader(file).map_err(|_|"invalid_parsed_book")?;
-        if !book["title"].is_string() || !book["author"].is_string() || !book["chapters"].is_array() || !book["progress"].is_object() { return Err("invalid_parsed_book".into()); }
-        let job=Job {state:Mutex::new(JobState{id:String::new(),kind:"import".into(),status:"running".into(),progress:0.0,result:Value::Null,error:None}),cancelled:AtomicBool::new(false)};
-        self.import_with_parsed(&source,args["readerMode"].as_str().unwrap_or("reflow"),&job,Some(book))
+    fn import_parsed(&self, args: &Value) -> Result<Value> {
+        let source = PathBuf::from(string(args, "path")?);
+        let parsed = PathBuf::from(string(args, "parsedPath")?);
+        if !parsed.is_absolute() {
+            return Err("absolute_path_required".into());
+        }
+        let file = std::fs::File::open(parsed).map_err(|e| e.to_string())?;
+        if file.metadata().map_err(|e| e.to_string())?.len() > shufang_application::MAX_BLOB_SIZE {
+            return Err("parsed_book_size_limit".into());
+        }
+        let book: Value = serde_json::from_reader(file).map_err(|_| "invalid_parsed_book")?;
+        if !book["title"].is_string()
+            || !book["author"].is_string()
+            || !book["chapters"].is_array()
+            || !book["progress"].is_object()
+        {
+            return Err("invalid_parsed_book".into());
+        }
+        let job = Job {
+            state: Mutex::new(JobState {
+                id: String::new(),
+                kind: "import".into(),
+                status: "running".into(),
+                progress: 0.0,
+                result: Value::Null,
+                error: None,
+            }),
+            cancelled: AtomicBool::new(false),
+        };
+        self.import_with_parsed(
+            &source,
+            args["readerMode"].as_str().unwrap_or("reflow"),
+            &job,
+            Some(book),
+        )
     }
-    fn import_with_parsed(&self, source: &Path, mode: &str, job: &Job, parsed:Option<Value>) -> Result<Value> {
+    fn import_with_parsed(
+        &self,
+        source: &Path,
+        mode: &str,
+        job: &Job,
+        parsed: Option<Value>,
+    ) -> Result<Value> {
         if !source.is_absolute() || !["original", "reflow"].contains(&mode) {
             return Err("invalid_import".into());
         }
@@ -799,8 +830,11 @@ impl Workspace {
                 .map_err(|e| e.to_string())?;
         }
         job.progress(0.25);
-        let supplied=parsed.is_some();
-        let mut book = match parsed {Some(value)=>value,None=>crate::books::parse(&destination)?};
+        let supplied = parsed.is_some();
+        let mut book = match parsed {
+            Some(value) => value,
+            None => crate::books::parse(&destination)?,
+        };
         job.check()?;
         if !supplied && ["txt", "pdf"].contains(&extension.as_str()) {
             book["title"] = source
@@ -813,11 +847,24 @@ impl Workspace {
             }
         }
         book["sourceFile"] = relative.into();
-        book["format"]=if extension=="azw" {"mobi"} else {&extension}.into();
+        book["format"] = if extension == "azw" {
+            "mobi"
+        } else {
+            &extension
+        }
+        .into();
         book["contentHash"] = hash.clone().into();
         if extension == "pdf" {
-            let has_text=book["chapters"].as_array().is_some_and(|chapters|chapters.iter().any(|c|c["paragraphs"].as_array().is_some_and(|paragraphs|paragraphs.iter().any(|p|p.as_str().is_some_and(|s|!s.trim().is_empty())))));
-            book["readerMode"] = if has_text {mode} else {"original"}.into();
+            let has_text = book["chapters"].as_array().is_some_and(|chapters| {
+                chapters.iter().any(|c| {
+                    c["paragraphs"].as_array().is_some_and(|paragraphs| {
+                        paragraphs
+                            .iter()
+                            .any(|p| p.as_str().is_some_and(|s| !s.trim().is_empty()))
+                    })
+                })
+            });
+            book["readerMode"] = if has_text { mode } else { "original" }.into();
         }
         let manifest = shufang_application::BlobManifest {
             sha256: hash.clone(),
@@ -875,7 +922,9 @@ impl Workspace {
         .map_err(|e| e.to_string())
     }
     pub fn book_file(&self, id: &str) -> Result<PathBuf> {
-        if !crate::local_download::enabled(self,id)?{return Err("download_removed".into());}
+        if !crate::local_download::enabled(self, id)? {
+            return Err("download_removed".into());
+        }
         let source = self
             .core
             .lock()
