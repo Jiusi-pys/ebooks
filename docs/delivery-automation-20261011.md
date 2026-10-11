@@ -130,7 +130,7 @@ python -m automation.catalog_gate
 python -m unittest discover -s deploy -p 'test_*.py'
 ```
 
-本次结果：自动化 31 项、现有部署 15 项通过。能力目录 8 组引用均存在。
+本次结果：自动化 34 项、现有部署 15 项通过。能力目录 8 组引用均存在。
 app 的 `npm run check`、`npm run lint`、`npm test -- --maxWorkers=4`、
 `npm run build` 均成功；Vitest 为 628 passed / 53 skipped，不能据此宣称
 被跳过的 MySQL/集成场景通过。构建仍报告已有大 bundle、动态/静态混合导入等警告。
@@ -138,3 +138,8 @@ app 的 `npm run check`、`npm run lint`、`npm test -- --maxWorkers=4`、
 SQLite 测试第一次受 Windows 沙箱临时目录 ACL 限制，扩大本地执行权限后通过；
 测试使用临时库与回环 HTTP 服务，没有连接生产数据库。GitHub workflow 尚未
 推送运行；Mac/Android GUI 和真实多端迁移未在本次验证。
+
+补充生命周期回归已先复现再修复：等待任务释放租约后可重新排队且不重置预算；
+只有 implementing 状态可以绑定提交 SHA；非数组风险输入默认高风险。
+纯状态机的合并证据参数仍须由独立 GitHub 验证器提供，本地生命周期测试中的
+合成证据不代表实际 PR 已合并。

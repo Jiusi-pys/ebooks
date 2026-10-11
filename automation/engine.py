@@ -137,7 +137,7 @@ def transition(task, state, *, reason=None, evidence=None):
 def classify(paths):
     """Unknown code is high risk; UI-only allowlist is deliberately narrow."""
     level = "low"
-    if not paths:
+    if not isinstance(paths, list) or not paths:
         return "high"
     for path in paths:
         if not valid_path(path):

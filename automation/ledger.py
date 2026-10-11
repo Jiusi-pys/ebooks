@@ -10,7 +10,7 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-from automation.engine import reconcile, transition
+from automation.engine import reconcile, transition, valid_sha
 
 
 class Ledger:
@@ -94,6 +94,31 @@ class Ledger:
             task = transition(self._owned(db, task_id, token), state, **kwargs)
             self._write(db, task)
             # Lease stays held until the caller confirms its process has stopped.
+            return task
+
+    def requeue(self, task_id):
+        """Coordinator-only retry after the previous worker has relinquished ownership."""
+        with self._transaction() as db:
+            if db.execute("SELECT 1 FROM leases WHERE task=?", (task_id,)).fetchone():
+                raise BlockingIOError("task still has a worker lease")
+            row = db.execute("SELECT body FROM tasks WHERE id=?", (task_id,)).fetchone()
+            if not row:
+                raise ValueError("unknown task")
+            task = transition(json.loads(row[0]), "queued")
+            self._write(db, task)
+            return task
+
+    def record_head(self, task_id, token, sha):
+        """Bind the candidate before verification; subsequent edits require another cycle."""
+        if not valid_sha(sha):
+            raise ValueError("exact candidate commit SHA required")
+        with self._transaction() as db:
+            task = self._owned(db, task_id, token)
+            if task["state"] != "implementing":
+                raise ValueError("candidate can change only during implementation")
+            task["head_sha"] = sha
+            task.pop("evidence", None)
+            self._write(db, task)
             return task
 
     def reserve_call(self, task_id, token):
