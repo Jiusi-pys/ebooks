@@ -886,6 +886,12 @@ pub async fn events(State(h): State<Arc<Host>>, Json(mut event): Json<Value>) ->
     if !data.is_object() {
         return Err(error("invalid_event_data".into()));
     }
+    // Mirror note events have the same payload contract as the Hono endpoint.
+    // Reject invalid input before reading/writing receipts or mutating notes.
+    if h.v1_contract == crate::V1Contract::Mirror && matches!(typ, "note.created" | "note.updated")
+    {
+        data = crate::reader_event::normalize(typ, data).map_err(error)?;
+    }
     if h.v1_contract == crate::V1Contract::SyncEntities && typ.starts_with("book.import.") {
         data = crate::reader_event::upload(typ, data).map_err(error)?;
     }

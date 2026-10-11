@@ -4,6 +4,75 @@ use serde_json::{json, Value};
 use shufang_native::workspace::Workspace;
 use shufang_service::{router, Host};
 use tower::ServiceExt;
+
+async fn assert_note_event_validation(typ: &str) {
+    for timestamp in [
+        None,
+        Some(Value::Null),
+        Some(json!(-1)),
+        Some(json!(0.5)),
+        Some(json!("1")),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let workspace = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();
+        let app = router(Host::new(
+            workspace,
+            "token".into(),
+            "http://localhost".into(),
+        ));
+        if typ == "note.updated" {
+            assert_eq!(
+                request(
+                    &app,
+                    "POST",
+                    "/api/v1/notes",
+                    json!({"extId":"n","title":"Before","content":"original"})
+                )
+                .await
+                .0,
+                201
+            );
+        }
+        let before = request(&app, "GET", "/api/v1/notes/n", Value::Null).await;
+        let mut event = json!({"deliveryId":"validation-delivery-01","type":typ,"data":{"extId":"n","title":"After","content":"changed"}});
+        if let Some(value) = timestamp {
+            event["data"]["updatedAt"] = value;
+        }
+        let rejected = request(&app, "POST", "/api/v1/events", event.clone()).await;
+        assert_eq!(rejected.0, 400, "{typ}: {event}: {rejected:?}");
+        assert_eq!(
+            request(&app, "GET", "/api/v1/notes/n", Value::Null).await,
+            before
+        );
+        // Invalid input must not reserve the delivery ID or mutate the note.
+        event["data"]["updatedAt"] = json!(1);
+        assert_eq!(
+            request(&app, "POST", "/api/v1/events", event.clone())
+                .await
+                .0,
+            200
+        );
+        assert_eq!(
+            request(&app, "POST", "/api/v1/events", event.clone())
+                .await
+                .0,
+            200
+        );
+        event["data"]["title"] = json!("Conflicting replay");
+        assert_eq!(request(&app, "POST", "/api/v1/events", event).await.0, 409);
+    }
+}
+
+#[tokio::test]
+async fn mirror_note_created_rejects_invalid_timestamps_without_side_effects() {
+    assert_note_event_validation("note.created").await;
+}
+
+#[tokio::test]
+async fn mirror_note_updated_rejects_invalid_timestamps_without_side_effects() {
+    assert_note_event_validation("note.updated").await;
+}
+
 #[tokio::test]
 async fn repeated_delete_events_with_distinct_deliveries_are_idempotent() {
     let dir = tempfile::tempdir().unwrap();
@@ -33,7 +102,7 @@ async fn repeated_delete_events_with_distinct_deliveries_are_idempotent() {
             200
         );
     }
-    assert_eq!(request(&app, "POST", "/api/v1/events", json!({"deliveryId":"create-delivery-01","type":"note.created","data":{"extId":"n","title":"Resurrection","content":"text"}})).await.0, 409);
+    assert_eq!(request(&app, "POST", "/api/v1/events", json!({"deliveryId":"create-delivery-01","type":"note.created","data":{"extId":"n","title":"Resurrection","content":"text","updatedAt":1}})).await.0, 409);
 }
 #[tokio::test]
 async fn structured_author_and_chapter_limits_match_old_clients() {
