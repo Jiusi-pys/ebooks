@@ -1,0 +1,49 @@
+name: macOS application
+
+on:
+  pull_request:
+    paths: ["platforms/macos/**", "base/**", ".github/workflows/macos-ci.yml"]
+  push:
+    branches: [main, base]
+    paths: ["platforms/macos/**", "base/**", ".github/workflows/macos-ci.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-app:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macOS, shufang-mac]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install isolated build dependencies
+        run: |
+          rustup toolchain install 1.93.1 --profile minimal
+          rustup override set 1.93.1
+          python3 -m venv .tools/macos-parser-env
+          .tools/macos-parser-env/bin/pip install cmake==3.31.6
+      - name: Build universal app and test real ABI and HTTP
+        run: python3 platforms/macos/scripts/build.py --universal
+      - name: Preserve executable permissions in test package
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent "$HOME/Library/Caches/Shufang/macos-local-build/Shufang.app" .tools/ShufangMac-test.zip
+          cp "$HOME/Library/Caches/Shufang/macos-local-build/build-receipt.json" .tools/macos-build-receipt.json
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: macos-test-${{ github.sha }}
+          path: |
+            .tools/ShufangMac-test.zip
+            .tools/macos-build-receipt.json
+          if-no-files-found: error

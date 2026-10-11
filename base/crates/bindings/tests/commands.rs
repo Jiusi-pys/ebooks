@@ -30,3 +30,13 @@ fn buffer_lifecycle_rejects_stale_handles_and_double_free() {
     assert!(core_buffer_len(output) > 0);
     core_free(output);
 }
+
+#[cfg(target_os = "macos")]
+#[test]
+fn mac_credentials_reject_null_callbacks_without_installing_a_host() {
+    assert_eq!(
+        shufang_bindings::core_install_mac_credentials(None, None),
+        0
+    );
+    assert!(!shufang_native::credentials::macos_host::installed());
+}

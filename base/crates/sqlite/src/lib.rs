@@ -33,6 +33,36 @@ impl SqliteRepository {
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(failure)
     }
+    /// macOS restore activation reads identity using the same SQLite runtime as
+    /// the core. Mixing the system SQLite VFS with a loaded bundled SQLite can
+    /// make read-only WAL opens fail even when the verified database is valid.
+    #[cfg(target_os = "macos")]
+    pub fn mac_workspace_identity(path: &Path) -> Result<(String, String)> {
+        if !path.is_absolute() || !path.is_file() {
+            return Err("invalid_restore_database".into());
+        }
+        let connection =
+            Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .map_err(failure)?;
+        connection
+            .busy_timeout(Duration::from_secs(5))
+            .map_err(failure)?;
+        let read = |key: &str| -> Result<String> {
+            connection
+                .query_row("SELECT value FROM core_meta WHERE key=?", [key], |r| {
+                    r.get(0)
+                })
+                .map_err(failure)
+        };
+        let workspace = read("workspace")?;
+        let replica = read("replica")?;
+        if !shufang_domain::sync::valid_identifier(&workspace)
+            || !shufang_domain::sync::valid_identifier(&replica)
+        {
+            return Err("invalid_restore_identity".into());
+        }
+        Ok((workspace, replica))
+    }
     pub fn snapshot(source: &Path, destination: &Path) -> Result<()> {
         if destination.exists() {
             return Err("backup_destination_exists".into());
