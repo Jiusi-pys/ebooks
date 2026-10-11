@@ -1,0 +1,35 @@
+name: Client follow-up ledger
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: client-followup-ledger
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    # Enable only after the baseline catalog is reviewed. This runs no Codex,
+    # contains no account credentials, and grants no merge/deployment authority.
+    if: github.ref == 'refs/heads/main' && vars.FOLLOWUP_LEDGER_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m automation validate
+      - run: python -m automation.coordinator
+        env:
+          GH_TOKEN: ${{ github.token }}

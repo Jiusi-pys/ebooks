@@ -1,0 +1,22 @@
+name: Apple core
+
+on:
+  push:
+    branches: [main, base]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-core:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # This validates the existing Swift package only. It is NOT iOS simulator,
+      # XCFramework, migration or full macOS application acceptance.
+      - run: swift test --package-path ios

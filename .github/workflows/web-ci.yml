@@ -1,0 +1,41 @@
+name: Web and contracts
+
+on:
+  push:
+    branches: [main, base]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@1.93.1
+        with:
+          targets: wasm32-unknown-unknown
+      - run: npm ci --no-audit --no-fund
+        working-directory: app
+      - run: npm run check
+        working-directory: app
+      - run: npm run lint
+        working-directory: app
+      - run: npm test -- --maxWorkers=4
+        working-directory: app
+      - run: npm run build
+        working-directory: app

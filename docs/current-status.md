@@ -1,3 +1,5 @@
+> 2026-10-11 当前工作树新增能力规范、调度账本与 CI/人工发布入口，见[实施记录](delivery-automation-20261011.md)。尚未推送启用；共享核心全量迁移、自动编程与 macOS 完整应用仍未完成。下文自动部署描述保留其历史范围。
+
 > MCP 85 项用户能力、单条版本恢复及重新授权步骤见[MCP 用户能力](mcp-user-capabilities.md)。
 
 > Android 原生 APP、离线冲突与跨端学习兼容已完成本轮提交前验收；MuMu 按 N10 Pro 二代和原版 Clear7 尺寸验证，实体笔与墨水屏性能仍待真机。见 [Android 验收](evidence/android-ios/hanvon-mumu-acceptance.md)及 [main 整合回归](evidence/android-ios/main-integration.md)。下文日期章节保留历史状态。

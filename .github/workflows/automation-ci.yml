@@ -1,0 +1,32 @@
+name: Automation policy
+
+on:
+  push:
+    branches: [main, base]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s automation/tests -p "test_*.py"
+      - run: python -m unittest discover -s deploy -p "test_*.py"
+      - run: python -m automation validate
+      - run: python -m automation.catalog_gate
+        env:
+          CATALOG_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}

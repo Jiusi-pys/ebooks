@@ -1,0 +1,125 @@
+[
+  {
+    "id": "library.records",
+    "revision": 1,
+    "title": "Library, folders, metadata and deletion",
+    "platforms": ["web", "windows", "android", "ios", "macos"],
+    "references": [
+      "base/crates/application/src/library.rs",
+      "app/contracts/core-library.ts"
+    ],
+    "acceptance": [
+      "Create, edit, move and delete records through the shared core; restart preserves the result.",
+      "Preserve unknown fields and lossless UTF-16 strings across native and WASM round trips.",
+      "A stale revision rejects the complete mutation without partial writes or duplicate outbox operations."
+    ]
+  },
+  {
+    "id": "study.review",
+    "revision": 1,
+    "title": "Study sets, cards, scheduling and review history",
+    "platforms": ["web", "windows", "android", "ios", "macos"],
+    "references": [
+      "base/crates/application/src/lib.rs",
+      "ios/ShufangTests/Fixtures/review-v1.json"
+    ],
+    "acceptance": [
+      "Identical fixtures produce identical scheduling results on native Rust, WASM and each host bridge.",
+      "Card grading and review history commit atomically; retries do not create a second review.",
+      "Restart and offline synchronization preserve grades, timestamps and original operation identities."
+    ]
+  },
+  {
+    "id": "sync.offline",
+    "revision": 1,
+    "title": "Offline writes, synchronization and conflict resolution",
+    "platforms": ["web", "windows", "android", "ios", "macos"],
+    "references": [
+      "base/crates/application/src/offline_conflicts.rs",
+      "base/crates/application/src/sync_receipts.rs"
+    ],
+    "acceptance": [
+      "Concurrent edits on two isolated clients converge or expose an explicit conflict without silent overwrite.",
+      "A request interrupted after submission retains its original operation identity and uncertainty on restart.",
+      "Mixed supported protocol versions preserve tombstones, cursor scope, replica identity and unknown fields."
+    ]
+  },
+  {
+    "id": "reader.documents",
+    "revision": 1,
+    "title": "Document rendering, navigation and reading position",
+    "platforms": ["web", "windows", "android", "ios", "macos"],
+    "references": [
+      "app/src/lib/parseBook.ts",
+      "base/crates/native/src/books.rs",
+      "ios/Shufang/Core/ReaderNavigation.swift"
+    ],
+    "acceptance": [
+      "Supported document fixtures open, navigate and resume reading after restart on each target.",
+      "Citations and outlines return to the correct source location after synchronization.",
+      "Platform-specific renderer or parser limitations are explicit and never reported as passing parity."
+    ]
+  },
+  {
+    "id": "reader.annotations",
+    "revision": 1,
+    "title": "Notes, citations, selections and portable ink",
+    "platforms": ["web", "windows", "android", "ios", "macos"],
+    "references": [
+      "app/contracts/citations.ts",
+      "ios/Shufang/Core/PortableInk.swift"
+    ],
+    "acceptance": [
+      "Create, edit, delete and restore annotations while retaining their document and page coordinate identity.",
+      "Native pencil or pointer input round trips through portable ink fixtures without losing stroke data.",
+      "Restart and cross-client synchronization preserve links from notes to original reading locations."
+    ]
+  },
+  {
+    "id": "data.backup-restore",
+    "revision": 1,
+    "title": "Backups, restore and upgrade preservation",
+    "platforms": ["web", "windows", "android", "ios", "macos"],
+    "references": [
+      "base/crates/application/src/recovery.rs",
+      "ios/Shufang/Core/StudyBackup.swift",
+      "ios/Shufang/Core/StudyRestore.swift"
+    ],
+    "acceptance": [
+      "Restore an isolated backup including referenced attachments and unknown fields without mutating the source archive.",
+      "Upgrade every supported starting version, including multi-version jumps, with data preservation and repeat-run checks.",
+      "Simulated failure before and after migration switch recovers consistently; application rollback is not database rollback."
+    ]
+  },
+  {
+    "id": "account.connection",
+    "revision": 1,
+    "title": "Account, server connection and workspace isolation",
+    "platforms": ["web", "windows", "android", "ios", "macos"],
+    "references": [
+      "ios/Shufang/Core/AccountRoutes.swift",
+      "ios/Shufang/Core/APIClient.swift",
+      "app/src/lib/appAuth.ts"
+    ],
+    "acceptance": [
+      "Login, expiry, logout and reconnect use isolated test credentials and preserve the correct workspace scope.",
+      "Switching server or user never leaks another workspace's data, credentials or synchronization cursor.",
+      "Secrets are stored by the host credential adapter and are absent from logs and build artifacts."
+    ]
+  },
+  {
+    "id": "assistant.ai",
+    "revision": 1,
+    "title": "AI configuration, conversations and cancellation",
+    "platforms": ["web", "windows", "android", "ios", "macos"],
+    "references": [
+      "base/crates/native/src/ai.rs",
+      "app/src/lib/aiConversation.ts"
+    ],
+    "acceptance": [
+      "Shared conversation operations preserve history, references and error states across restart.",
+      "Cancellation and application backgrounding release owned operations without committing partial responses as complete.",
+      "Process-based providers are exposed only on capable desktop/server hosts; mobile capability responses state availability explicitly."
+    ]
+  }
+]
