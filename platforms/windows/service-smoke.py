@@ -144,12 +144,18 @@ def run(directory):
             assert duplicate.returncode != 0 and b"service_already_running" in duplicate.stderr
             mcp = request("/mcp", "POST", dict(jsonrpc="2.0", id=1, method="tools/call", params=dict(name="search_notes", arguments=dict(query="背景"))))
             assert "背景" in mcp["result"]["content"][0]["text"]
+            http_tools = request("/mcp", "POST", dict(jsonrpc="2.0", id=2, method="tools/list"))["result"]["tools"]
             oauth_acceptance(f"http://127.0.0.1:{port}", token)
             request("/admin/stop", "POST")
             assert process.wait(timeout=10) == 0
             result = subprocess.run([str(directory / "shufang-service.exe"), "--workspace", str(root), "--stdio"], input=json.dumps(dict(jsonrpc="2.0", id=1, method="tools/list")) + "\n", capture_output=True, text=True, encoding="utf-8", creationflags=subprocess.CREATE_NO_WINDOW, timeout=10)
             assert result.returncode == 0, result.stderr
-            assert len(json.loads(result.stdout)["result"]["tools"]) == 6
+            stdio_tools = json.loads(result.stdout)["result"]["tools"]
+            assert len(stdio_tools) == 85
+            names = {tool["name"] for tool in stdio_tools}
+            assert len(names) == len(stdio_tools)
+            assert {"list_books", "get_reading_progress", "search_highlights", "get_review_queue", "search_notes", "get_note"} <= names
+            assert sorted(stdio_tools, key=lambda tool: tool["name"]) == sorted(http_tools, key=lambda tool: tool["name"])
             print("PASS: native desktop/service shared SQLite, independent lifetime, authentication, single instance, MCP HTTP/stdio, graceful shutdown")
         finally:
             if session:
