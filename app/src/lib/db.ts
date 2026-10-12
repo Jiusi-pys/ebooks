@@ -2,6 +2,12 @@ import { openDB, type IDBPDatabase } from "idb";
 import { trackDatabase, upgradeSyncDatabase } from "./syncDatabase";
 import { sharedCore } from "@contracts/core-runtime";
 import { hashObjectBytes } from "@contracts/core-field-objects";
+import type { EpubLayout } from "./epubLayout";
+import {
+  createEpubLayoutEntry,
+  epubLayoutKey,
+  notifyEpubLayoutChanged,
+} from "./epubLayoutStore";
 import type {
   Association,
   Book,
@@ -531,9 +537,11 @@ export async function deleteBook(id: string): Promise<Note[]> {
   );
   const bookStore = tx.objectStore("books");
   await tx.objectStore("metadata").delete(`reader-state:${id}`);
+  await tx.objectStore("metadata").delete(epubLayoutKey(id));
   const book = (await bookStore.get(id)) as Book | undefined;
   if (!book) {
     await tx.done;
+    notifyEpubLayoutChanged(id);
     return [];
   }
   const highlightStore = tx.objectStore("highlights");
@@ -629,6 +637,7 @@ export async function deleteBook(id: string): Promise<Note[]> {
     }
   }
   await tx.done;
+  notifyEpubLayoutChanged(id);
   return updatedNotes;
 }
 
@@ -641,8 +650,19 @@ export interface StoredFile {
   /** 新导入使用 Blob 避免导入阶段再次读取整文件；兼容旧 ArrayBuffer。 */
   data: ArrayBuffer | Blob;
 }
+function isStoredBlob(data: StoredFile["data"]): data is Blob {
+  if (typeof Blob === "undefined") return false;
+  try {
+    // The native brand accepts File and cross-realm Blob without trusting a spoofed tag.
+    Blob.prototype.slice.call(data, 0, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function prepareSource(file: StoredFile, bookId = file.id) {
-  const isBlob = Object.prototype.toString.call(file.data) === "[object Blob]";
+  const isBlob = isStoredBlob(file.data);
   const size = isBlob
     ? (file.data as Blob).size
     : (file.data as ArrayBuffer).byteLength;
@@ -669,14 +689,39 @@ async function prepareSource(file: StoredFile, bookId = file.id) {
 }
 
 /** Commit an imported book and its optional source file as one atomic unit. */
-export async function putImportedBook(book: Book, file?: StoredFile) {
+export async function putImportedBook(
+  book: Book,
+  file?: StoredFile,
+  layout?: EpubLayout
+) {
   const source = file ? await prepareSource(file, book.id) : undefined;
+  if (layout && (!source || file?.type !== "epub"))
+    throw new Error("epub_layout_requires_source");
+  const entry =
+    layout && source
+      ? createEpubLayoutEntry(book, source.sha256, layout)
+      : undefined;
   const database = await db();
-  const tx = database.transaction(["books", "files", "sources"], "readwrite");
-  await tx.objectStore("books").put(book);
-  if (file) await tx.objectStore("files").put(file);
-  if (source) await tx.objectStore("sources").put(source);
-  await tx.done;
+  const tx = database.transaction(
+    ["books", "files", "sources", "metadata"],
+    "readwrite"
+  );
+  try {
+    await tx.objectStore("books").put(book);
+    if (file) await tx.objectStore("files").put(file);
+    if (source) await tx.objectStore("sources").put(source);
+    if (entry) await tx.objectStore("metadata").put(entry);
+    await tx.done;
+    if (entry) notifyEpubLayoutChanged(book.id);
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      /* Already finished or aborted. */
+    }
+    await tx.done.catch(() => undefined);
+    throw error;
+  }
 }
 
 /** Merge server data and unsent edits under the same lock as reader writes. */

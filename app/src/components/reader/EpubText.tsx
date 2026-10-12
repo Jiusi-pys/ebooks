@@ -1,6 +1,7 @@
 import { Fragment, useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { EpubFootnote } from "@/types";
+import { EpubImage, type EpubTextImage } from "./EpubImage";
 
 /** Render text as text; note contents never become HTML or navigation links. */
 export function EpubText({
@@ -8,24 +9,63 @@ export function EpubText({
   notes = [],
   offset = 0,
   dismissSignal,
+  images = [],
+  endOfParagraph = true,
 }: {
   text: string;
   notes?: readonly EpubFootnote[];
   offset?: number;
   /** Incremented by the reader when page navigation starts. */
   dismissSignal?: number;
+  /** Offsets remain relative to the original full paragraph. */
+  images?: readonly EpubTextImage[];
+  /** Only the final highlight segment owns images at the right boundary. */
+  endOfParagraph?: boolean;
 }) {
   const [openNote, setOpenNote] = useState<{
     key: string;
     signal: number | undefined;
   } | null>(null);
   const nodes: ReactNode[] = [];
+  const orderedImages = [...images].sort(
+    (a, b) => a.offset - b.offset || a.order - b.order
+  );
+  const renderedImages = new Set<number>();
+  const renderText = (start: number, end: number, includeEnd = false) => {
+    const parts: ReactNode[] = [];
+    let position = start;
+    for (const [index, image] of orderedImages.entries()) {
+      const at = image.offset - offset;
+      if (
+        at < start ||
+        at > end ||
+        (at === end && !includeEnd) ||
+        renderedImages.has(index)
+      )
+        continue;
+      if (at > position) parts.push(text.slice(position, at));
+      parts.push(
+        <EpubImage
+          key={`image:${index}`}
+          asset={image.asset}
+          alt={image.alt}
+          inline
+        />
+      );
+      renderedImages.add(index);
+      position = at;
+    }
+    if (position < end) parts.push(text.slice(position, end));
+    return parts;
+  };
   let cursor = 0;
   for (const note of [...notes].sort((a, b) => a.start - b.start)) {
     const start = Math.max(0, note.start - offset);
     const end = Math.min(text.length, note.end - offset);
     if (start < cursor || end <= start || !note.content) continue;
-    if (start > cursor) nodes.push(text.slice(cursor, start));
+    // A picture at the marker's boundary precedes the marker; it is not part
+    // of the small superscript button or its click target.
+    nodes.push(...renderText(cursor, start, true));
     const label = text.slice(start, end);
     nodes.push(
       <Popover.Root
@@ -48,11 +88,11 @@ export function EpubText({
               type="button"
               aria-label={`查看注释 ${label.trim()}`}
               className="cursor-pointer rounded-sm text-primary focus-visible:outline focus-visible:outline-2"
-              style={{ font: "inherit" }}
+              style={{ font: "inherit", lineHeight: 1 }}
               onMouseDown={event => event.stopPropagation()}
               onClick={event => event.stopPropagation()}
             >
-              {label}
+              {renderText(start, end)}
             </button>
           </Popover.Trigger>
         </sup>
@@ -83,7 +123,7 @@ export function EpubText({
     );
     cursor = end;
   }
-  nodes.push(text.slice(cursor));
+  nodes.push(...renderText(cursor, text.length, endOfParagraph));
   return (
     <>
       {nodes.map((node, index) => (
