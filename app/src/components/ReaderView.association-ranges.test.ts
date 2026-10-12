@@ -42,6 +42,39 @@ function renderRanges(items: TextPassageAnchor[]): string {
 }
 
 describe("Paragraph association ranges", () => {
+  it("preserves inline images once at highlight boundaries and paragraph end", () => {
+    const html = renderToStaticMarkup(
+      createElement(Paragraph, {
+        index: 4,
+        text: "A😀BC",
+        ranges: [],
+        associationRanges: [
+          { anchor: anchor(3, 5), associationIds: ["a"], start: 3, end: 5 },
+        ],
+        images: [3, 5].map((offset, order) => ({
+          offset,
+          order,
+          assetId: "image",
+          alt: `图${order}`,
+          asset: {
+            dataUrl: "data:image/png;base64,AAAA",
+            mediaType: "image/png",
+          },
+        })),
+        epubRole: "caption",
+        recall: false,
+        onSegmentClick: vi.fn(),
+        onAssociationClick: vi.fn(),
+      })
+    );
+    expect(html.match(/<img /g)).toHaveLength(2);
+    expect(html).toContain('data-pi="4"');
+    expect(html).toContain('class="reader-epub-caption"');
+    expect(html).toMatch(
+      /A😀<\/span>.*<img [^>]*alt="图0"[^>]*\/>BC<img [^>]*alt="图1"/
+    );
+  });
+
   it("marks the full passage carrying an AI answer", () => {
     const highlight: Highlight = {
       id: "highlight-qa",
@@ -65,9 +98,7 @@ describe("Paragraph association ranges", () => {
       })
     );
 
-    expect(html).toMatch(
-      /class="[^"]*hl-ai-qa[^"]*"[^>]*>bcdefg<svg/
-    );
+    expect(html).toMatch(/class="[^"]*hl-ai-qa[^"]*"[^>]*>bcdefg<svg/);
   });
 
   it("keeps every anchor key on segments shared by nested associations", () => {

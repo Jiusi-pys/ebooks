@@ -9,6 +9,10 @@ import {
   type EntityState,
 } from "@contracts/sync";
 import { syncStores } from "./syncDatabase";
+import {
+  invalidateEpubLayout,
+  notifyEpubLayoutChanged,
+} from "./epubLayoutStore";
 
 interface Download {
   id: string;
@@ -135,8 +139,10 @@ export async function finishSnapshot(
     ...entityKinds.filter(k => db.objectStoreNames.contains(k)),
     ...syncStores,
     ...(db.objectStoreNames.contains("files") ? ["files"] : []),
+    ...(db.objectStoreNames.contains("metadata") ? ["metadata"] : []),
   ];
   const tx = db.transaction(names, "readwrite");
+  const changedLayouts = new Set<string>();
   try {
     const meta = tx.objectStore("syncMeta");
     const checkpoint = (await meta.get(metadataKey(key))) as
@@ -175,9 +181,15 @@ export async function finishSnapshot(
           await tx.objectStore("files").delete(state.id);
         if (db.objectStoreNames.contains(state.kind)) {
           const data = materialize(state);
-          if (!data) await tx.objectStore(state.kind).delete(state.id);
-          else if (projectable(state.kind, data))
+          if (!data) {
+            await tx.objectStore(state.kind).delete(state.id);
+            if (await invalidateEpubLayout(tx, state.kind, state.id, undefined))
+              changedLayouts.add(state.id);
+          } else if (projectable(state.kind, data)) {
             await tx.objectStore(state.kind).put(data);
+            if (await invalidateEpubLayout(tx, state.kind, state.id, data))
+              changedLayouts.add(state.id);
+          }
         }
         for (const field of Object.values(state.fields)) {
           const [wall, count] = field.version.split(":");
@@ -192,6 +204,7 @@ export async function finishSnapshot(
     await meta.put({ id: key, cursor: checkpoint.cursor, snapshotAt: now });
     await meta.delete(metadataKey(key));
     await tx.done;
+    for (const id of changedLayouts) notifyEpubLayoutChanged(id);
   } catch (error) {
     try {
       tx.abort();

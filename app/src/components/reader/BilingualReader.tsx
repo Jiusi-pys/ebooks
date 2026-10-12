@@ -1,4 +1,6 @@
 import { EpubText } from "./EpubText";
+import { EpubChapterContent } from "./EpubChapterContent";
+import type { EpubLayout } from "@/lib/epubLayout";
 import {
   useCallback,
   useEffect,
@@ -46,6 +48,7 @@ type PaneSide = "source" | "translation";
 export interface BilingualReaderProps {
   /** Bilingual mode is intended for EPUB/MOBI/AZW3/FB2/TXT/reflow books. */
   book: Book;
+  epubLayout?: EpubLayout;
   chapterId?: string;
   theme: ReaderTheme;
   type: TypeSettings;
@@ -97,6 +100,7 @@ function scrollToParagraphAnchor(
 
 export function BilingualReader({
   book,
+  epubLayout,
   chapterId,
   theme,
   type,
@@ -141,6 +145,10 @@ export function BilingualReader({
     translation: 0,
   });
   const progressTimer = useRef<number | null>(null);
+  const sourceReadingRatio = useRef(book.progress.ratio);
+  const sourceLayoutKey = JSON.stringify(
+    epubLayout?.chapters[chapter?.id ?? ""]
+  );
   const onProgressRef = useRef(onProgress);
   const utils = trpc.useUtils();
   const [aiConfig] = useAiConfig();
@@ -244,6 +252,7 @@ export function BilingualReader({
         chapter && book.progress.chapterId === chapter.id
           ? Math.min(1, Math.max(0, book.progress.ratio))
           : 0;
+      sourceReadingRatio.current = ratio;
       if (source) {
         const max = Math.max(0, source.scrollHeight - source.clientHeight);
         source.scrollTo({ top: max * ratio });
@@ -261,6 +270,19 @@ export function BilingualReader({
     // entry positioning effect, or a saved position can trigger another save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter?.id]);
+
+  // Geometry can arrive after chapter entry. An identical cache refresh must
+  // not reset either pane or cancel a pending user-progress save.
+  useEffect(() => {
+    if (!sourceLayoutKey) return;
+    const frame = requestAnimationFrame(() => {
+      const source = sourceScrollRef.current;
+      if (!source) return;
+      const maximum = Math.max(0, source.scrollHeight - source.clientHeight);
+      source.scrollTo({ top: maximum * sourceReadingRatio.current });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [sourceLayoutKey]);
 
   const suppressNextScroll = useCallback((side: PaneSide) => {
     const generation = ++suppressGeneration.current[side];
@@ -318,6 +340,12 @@ export function BilingualReader({
 
   const onPaneScroll = useCallback(
     (side: PaneSide) => {
+      if (side === "source" && sourceScrollRef.current) {
+        const source = sourceScrollRef.current;
+        const maximum = Math.max(0, source.scrollHeight - source.clientHeight);
+        sourceReadingRatio.current =
+          maximum > 0 ? source.scrollTop / maximum : 0;
+      }
       if (suppressScroll.current[side]) {
         suppressScroll.current[side] = false;
         return;
@@ -390,6 +418,7 @@ export function BilingualReader({
           chapterIndex={chapterIndex}
           chapterCount={book.chapters.length}
           paragraphs={chapter.paragraphs}
+          epubLayout={epubLayout}
           scrollRef={sourceScrollRef}
           theme={theme}
           readerStyle={readerStyle}
@@ -515,6 +544,7 @@ function ReadingPane({
   chapterIndex,
   chapterCount,
   paragraphs,
+  epubLayout,
   scrollRef,
   theme,
   readerStyle,
@@ -530,6 +560,7 @@ function ReadingPane({
   chapterIndex: number;
   chapterCount: number;
   paragraphs: readonly string[];
+  epubLayout?: EpubLayout;
   scrollRef: RefObject<HTMLDivElement | null>;
   theme: ReaderTheme;
   readerStyle: React.CSSProperties;
@@ -565,6 +596,7 @@ function ReadingPane({
           chapterIndex={chapterIndex}
           chapterCount={chapterCount}
           paragraphs={paragraphs}
+          epubLayout={epubLayout}
           label={label}
           theme={theme}
           readerStyle={readerStyle}
@@ -586,6 +618,7 @@ function ChapterBody({
   chapterIndex,
   chapterCount,
   paragraphs,
+  epubLayout,
   label,
   theme,
   readerStyle,
@@ -595,6 +628,7 @@ function ChapterBody({
   chapterIndex: number;
   chapterCount: number;
   paragraphs: readonly string[];
+  epubLayout?: EpubLayout;
   label: string;
   theme: ReaderTheme;
   readerStyle: React.CSSProperties;
@@ -615,22 +649,49 @@ function ChapterBody({
         {label} · {chapterIndex + 1} / {chapterCount}
       </div>
       <div className="reader-body" style={readerStyle}>
-        {paragraphs.map((paragraph, index) => (
-          <p
-            key={index}
-            data-bilingual-paragraph={index}
-            className="whitespace-pre-wrap"
-          >
-            <EpubText
-              text={paragraph}
-              notes={
-                paragraphs === chapter.paragraphs
-                  ? chapter.footnotes?.filter(note => note.paraIndex === index)
-                  : undefined
-              }
-            />
-          </p>
-        ))}
+        {paragraphs === chapter.paragraphs ? (
+          <EpubChapterContent
+            chapter={chapter}
+            layout={epubLayout}
+            renderParagraph={(index, context) => (
+              <p
+                key={index}
+                data-bilingual-paragraph={index}
+                className={cn(
+                  "whitespace-pre-wrap",
+                  context.role && `reader-epub-${context.role}`
+                )}
+              >
+                <EpubText
+                  text={chapter.paragraphs[index]}
+                  notes={chapter.footnotes?.filter(
+                    note => note.paraIndex === index
+                  )}
+                  images={context.images}
+                />
+              </p>
+            )}
+          />
+        ) : (
+          paragraphs.map((paragraph, index) => (
+            <p
+              key={index}
+              data-bilingual-paragraph={index}
+              className="whitespace-pre-wrap"
+            >
+              <EpubText
+                text={paragraph}
+                notes={
+                  paragraphs === chapter.paragraphs
+                    ? chapter.footnotes?.filter(
+                        note => note.paraIndex === index
+                      )
+                    : undefined
+                }
+              />
+            </p>
+          ))
+        )}
       </div>
     </article>
   );

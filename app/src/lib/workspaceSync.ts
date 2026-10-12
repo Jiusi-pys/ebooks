@@ -2,6 +2,10 @@ import { applyPreferences, preferenceKeys } from "./syncPreferences";
 import { syncDatabase, type StoredFile } from "./db";
 import { sharedCore } from "@contracts/core-runtime";
 import {
+  invalidateEpubLayout,
+  notifyEpubLayoutChanged,
+} from "./epubLayoutStore";
+import {
   receiveOperations,
   trackDatabase,
   syncStores,
@@ -84,7 +88,16 @@ async function enabled() {
 async function initialize() {
   const db = await syncDatabase();
   const stores = entityKinds.filter(kind => db.objectStoreNames.contains(kind));
-  const tx = db.transaction([...stores, "files", ...syncStores], "readwrite");
+  const tx = db.transaction(
+    [
+      ...stores,
+      "files",
+      ...syncStores,
+      ...(db.objectStoreNames.contains("metadata") ? ["metadata"] : []),
+    ],
+    "readwrite"
+  );
+  const changedLayouts = new Set<string>();
   const meta = tx.objectStore("syncMeta");
   const identity = (await meta.get("identity")) ?? {
     id: "identity",
@@ -105,9 +118,22 @@ async function initialize() {
     for (const row of await tx.objectStore("syncEntities").getAll()) {
       if (!stores.includes(row.state.kind)) continue;
       const data = materialize(row.state);
-      if (data && projectable(row.state.kind, data))
+      if (data && projectable(row.state.kind, data)) {
         await tx.objectStore(row.state.kind).put(data);
-      else await tx.objectStore(row.state.kind).delete(row.state.id);
+        if (await invalidateEpubLayout(tx, row.state.kind, row.state.id, data))
+          changedLayouts.add(row.state.id);
+      } else {
+        await tx.objectStore(row.state.kind).delete(row.state.id);
+        if (
+          await invalidateEpubLayout(
+            tx,
+            row.state.kind,
+            row.state.id,
+            undefined
+          )
+        )
+          changedLayouts.add(row.state.id);
+      }
     }
     await meta.put({ id: "projection-v1", complete: true });
   }
@@ -179,6 +205,7 @@ async function initialize() {
     await meta.put({ id: "seeded-files", complete: true });
   }
   await tx.done;
+  for (const id of changedLayouts) notifyEpubLayoutChanged(id);
 }
 const sha = async (bytes: ArrayBuffer) =>
   Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), b =>
@@ -292,7 +319,15 @@ async function hydratePending() {
     }
     if (!hydrated.size || !db.objectStoreNames.contains(row.state.kind))
       continue;
-    const tx = db.transaction(["syncEntities", row.state.kind], "readwrite");
+    const tx = db.transaction(
+      [
+        "syncEntities",
+        row.state.kind,
+        ...(db.objectStoreNames.contains("metadata") ? ["metadata"] : []),
+      ],
+      "readwrite"
+    );
+    let layoutChanged = false;
     const current = await tx.objectStore("syncEntities").get(row.id);
     if (current) {
       const projection = structuredClone(current.state);
@@ -308,11 +343,18 @@ async function hydratePending() {
       const data = materialize(projection);
       if (data && projectable(current.state.kind, data)) {
         await tx.objectStore(current.state.kind).put(data);
+        layoutChanged = await invalidateEpubLayout(
+          tx,
+          current.state.kind,
+          current.state.id,
+          data
+        );
         changed = true;
       }
     }
     // Hydration updates only the view projection, never same-version sync metadata.
     await tx.done;
+    if (layoutChanged) notifyEpubLayoutChanged(current.state.id);
   }
   return changed;
 }
