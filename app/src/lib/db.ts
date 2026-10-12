@@ -641,8 +641,19 @@ export interface StoredFile {
   /** 新导入使用 Blob 避免导入阶段再次读取整文件；兼容旧 ArrayBuffer。 */
   data: ArrayBuffer | Blob;
 }
+function isStoredBlob(data: StoredFile["data"]): data is Blob {
+  if (typeof Blob === "undefined") return false;
+  try {
+    // Accept File and cross-realm Blob using the native brand, not a spoofable tag.
+    Blob.prototype.slice.call(data, 0, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function prepareSource(file: StoredFile, bookId = file.id) {
-  const isBlob = Object.prototype.toString.call(file.data) === "[object Blob]";
+  const isBlob = isStoredBlob(file.data);
   const size = isBlob
     ? (file.data as Blob).size
     : (file.data as ArrayBuffer).byteLength;
