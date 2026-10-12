@@ -1,7 +1,13 @@
 import JSZip from "jszip";
 import type { BookContributorRole } from "@/types";
 import type { ParsedBook } from "./parseBook";
-import { parseEpubContent, readEpubToc } from "./epubContent";
+import {
+  epubResourcePath,
+  epubTarget,
+  parseEpubContent,
+  readEpubToc,
+} from "./epubContent";
+import { EPUB_IMAGE_LIMITS, readEpubImage } from "./epubLayout";
 import { importedBookMetadata } from "./importMetadata";
 
 const MIB = 1024 * 1024;
@@ -96,6 +102,18 @@ function declaredSize(entry: JSZip.JSZipObject): number | undefined {
 }
 
 export function validateEpubArchive(zip: JSZip): void {
+  for (const entry of Object.values(zip.files)) {
+    const original = (
+      entry as JSZip.JSZipObject & { unsafeOriginalName?: string }
+    ).unsafeOriginalName;
+    if (
+      (original && original !== entry.name) ||
+      entry.name.startsWith("/") ||
+      entry.name.includes("\\") ||
+      entry.name.split("/").some(p => p === "." || p === "..")
+    )
+      throw new Error("EPUB 压缩包资源路径无效");
+  }
   validateEpubEntryLimits(
     Object.values(zip.files).map(entry => ({
       name: entry.name,
@@ -289,23 +307,6 @@ export function extractEpubPackageFields(
   return { title, author, metadata };
 }
 
-function dirname(path: string): string {
-  const i = path.lastIndexOf("/");
-  return i === -1 ? "" : path.slice(0, i + 1);
-}
-
-function resolvePath(base: string, href: string): string {
-  // 去掉锚点与查询
-  const clean = decodeURIComponent(href.split("#")[0]);
-  const parts = (base + clean).split("/");
-  const out: string[] = [];
-  for (const p of parts) {
-    if (p === "..") out.pop();
-    else if (p !== "." && p !== "") out.push(p);
-  }
-  return out.join("/");
-}
-
 async function zipBytes(
   zip: JSZip,
   path: string,
@@ -454,8 +455,6 @@ export async function parseEpub(
     ?.getAttribute("full-path");
   if (!opfPath) throw new Error("找不到 EPUB 主文档");
   if (opfPath.length > 2_048) throw new Error("EPUB 主文档路径过长");
-  const opfDir = dirname(opfPath);
-
   onProgress?.("读取书目信息", 0.12);
   const opf = new DOMParser().parseFromString(
     (await zipText(
@@ -483,7 +482,7 @@ export async function parseEpub(
     const href = it.getAttribute("href");
     if (id && href)
       manifest.set(id, {
-        href: resolvePath(opfDir, href),
+        href: epubResourcePath(opfPath, href),
         props: it.getAttribute("properties") ?? "",
         type: it.getAttribute("media-type") ?? "",
       });
@@ -501,8 +500,10 @@ export async function parseEpub(
 
   // 封面
   let cover: string | undefined;
+  const coverImages = new Set<string>();
   for (const item of manifest.values()) {
     if (item.props.includes("cover-image")) {
+      coverImages.add(item.href);
       cover = await coverDataUrl(zip, item.href, budget);
       break;
     }
@@ -512,7 +513,10 @@ export async function parseEpub(
       .querySelector('metadata > meta[name="cover"]')
       ?.getAttribute("content");
     const item = metaCover ? manifest.get(metaCover) : undefined;
-    if (item) cover = await coverDataUrl(zip, item.href, budget);
+    if (item) {
+      coverImages.add(item.href);
+      cover = await coverDataUrl(zip, item.href, budget);
+    }
   }
 
   // Read each content document once, including notes outside the spine.
@@ -550,14 +554,72 @@ export async function parseEpub(
     contentItems.find(item => item.type === "application/x-dtbncx+xml");
   const navDoc = navigation ? documents.get(navigation.href) : undefined;
   const toc = navigation && navDoc ? readEpubToc(navDoc, navigation.href) : [];
-  const { chapters, outline } = parseEpubContent(documents, spine, toc);
+  const coverPaths = new Set<string>();
+  const coverNodes = new Set<Element>();
+  const coverTarget = (base: string, href: string) => {
+    const target = epubTarget(base, href);
+    if (!target) return;
+    const split = target.indexOf("#");
+    if (split < 0) {
+      coverPaths.add(target);
+      return;
+    }
+    const document = documents.get(target.slice(0, split));
+    const id = target.slice(split + 1);
+    const matches = document
+      ? Array.from(document.querySelectorAll("[id]")).filter(el => el.id === id)
+      : [];
+    if (matches.length === 1) coverNodes.add(matches[0]);
+  };
+  for (const ref of Array.from(opf.querySelectorAll("guide > reference")))
+    if ((ref.getAttribute("type") ?? "").split(/\s+/).includes("cover"))
+      coverTarget(opfPath, ref.getAttribute("href") ?? "");
+  for (const [path, document] of documents)
+    for (const link of Array.from(document.querySelectorAll("nav a[href]")))
+      if (
+        (
+          link.getAttributeNS("http://www.idpf.org/2007/ops", "type") ??
+          link.getAttribute("epub:type") ??
+          ""
+        )
+          .split(/\s+/)
+          .includes("cover")
+      )
+        coverTarget(path, link.getAttribute("href")!);
+  const { chapters, outline, layout, imagePaths } = parseEpubContent(
+    documents,
+    spine,
+    toc,
+    { coverPaths, coverNodes, coverImages }
+  );
   if (chapters.length === 0) throw new Error("未能从 EPUB 中识别出正文");
+  if (imagePaths.size > EPUB_IMAGE_LIMITS.count)
+    throw new Error("EPUB 正文图片超过 2000 张");
+  const manifestPaths = new Set([...manifest.values()].map(item => item.href));
+  let imageBytes = 0;
+  for (const path of imagePaths) {
+    if (!manifestPaths.has(path))
+      throw new Error(`EPUB 图片资源未列入 manifest：${path}`);
+    const bytes = await zipBytes(
+      zip,
+      path,
+      budget,
+      EPUB_IMAGE_LIMITS.imageBytes,
+      "EPUB 图片"
+    );
+    if (!bytes) throw new Error(`EPUB 图片资源缺失：${path}`);
+    imageBytes += bytes.length;
+    if (imageBytes > EPUB_IMAGE_LIMITS.totalBytes)
+      throw new Error("EPUB 正文图片总量超过 32 MiB");
+    layout.assets[path] = await readEpubImage(bytes);
+  }
   return {
     title,
     author,
     cover,
     chapters,
     metadata,
+    epubLayout: layout,
     ...(outline.length ? { outline } : {}),
   };
 }

@@ -33,7 +33,8 @@ pub(crate) fn override_commit_source(
     source: &str,
 ) -> Result<shufang_application::LocalCommit, String> {
     let (expected, mut value) = core.local_value("webhooks")?.unwrap_or((0, initial()));
-    if value.get("overrides").is_none() {
+    // Older ticks could persist null while probing an absent override map.
+    if value["overrides"].is_null() {
         value["overrides"] = json!({});
     }
     if value["overrides"]
@@ -411,8 +412,9 @@ pub async fn tick(h: &Arc<Host>) -> Result<(), String> {
                 break;
             }
             let marker = format!("{}:{}:{}", change.kind, change.id, change.revision);
-            let override_event = state["overrides"]
-                .as_object_mut()
+            let override_event = state
+                .get_mut("overrides")
+                .and_then(Value::as_object_mut)
                 .and_then(|o| o.remove(&marker));
             let (event, data, source) = if let Some(v) = override_event {
                 (

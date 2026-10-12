@@ -12,6 +12,9 @@ use std::{
 enum Command {
     #[serde(rename = "sessionConfigureVault")]
     ConfigureVault { key: String },
+    #[cfg(target_os = "macos")]
+    #[serde(rename = "sessionMacIdentity")]
+    MacIdentity { database: PathBuf },
     #[serde(rename = "sessionDatabaseVersion")]
     DatabaseVersion { database: PathBuf },
     #[serde(rename = "sessionBackupClosed")]
@@ -71,6 +74,12 @@ pub fn execute(value: Value) -> Result<Value, String> {
             let _ = key;
             return Err("android_command_required".into());
         }
+    }
+    #[cfg(target_os = "macos")]
+    if let Command::MacIdentity { database } = command {
+        let (workspace, replica) =
+            shufang_sqlite::SqliteRepository::mac_workspace_identity(&database)?;
+        return Ok(json!({"workspace": workspace, "replica": replica}));
     }
     if let Command::DatabaseVersion { database } = command {
         if !database.is_absolute() {

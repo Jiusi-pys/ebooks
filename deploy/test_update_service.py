@@ -5,7 +5,7 @@ import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from update_service import Jobs, authorized, validate_sha, Rollout, handler_for, verified_prebuilt_image
 
@@ -49,6 +49,21 @@ class UpdateTests(unittest.TestCase):
             job, _ = restored.accept(SHA)
             restored.finish(job['id'], 'succeeded')
             self.assertFalse(Jobs(Path(directory)).accept(SHA)[1])
+
+    def test_job_order_survives_equal_or_backwards_wall_clock(self):
+        for second in [1000.0, 999.0]:
+            with self.subTest(second=second), tempfile.TemporaryDirectory() as directory:
+                jobs = Jobs(Path(directory))
+                with patch('update_service.time.time', return_value=1000.0):
+                    first, _ = jobs.accept(SHA)
+                    jobs.finish(first['id'], 'succeeded')
+                with patch('update_service.time.time', return_value=second):
+                    latest, _ = jobs.accept('b' * 40)
+                    jobs.finish(latest['id'], 'succeeded')
+                self.assertGreater(latest['createdAt'], first['createdAt'])
+                restored = Jobs(Path(directory))
+                self.assertEqual(restored.read()['id'], latest['id'])
+                self.assertEqual(restored.accept('b' * 40), (restored.read(), False))
 
     def test_rollout_restores_previous_on_health_failure(self):
         commands = []

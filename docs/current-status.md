@@ -1,3 +1,7 @@
+> 2026-10-11：此前 US 的 4 项服务集成失败已按 TDD 修复；US 重跑原 53 项及新增 2 项全部通过。本地 check/lint/build、703 项常规 Web 测试、86 项 Linux 服务测试及 15 项部署测试通过。已有 EPUB 前端适配仍保留在本地工作树，本次后端推送不部署生产。见[修复验收](reviews/2026-10-11-us-integration-fixes.md)。
+
+> 2026-10-11 新增能力规范、调度账本与 CI/人工发布入口，见[实施记录](delivery-automation-20261011.md)。源码已推送开发分支，未据此启用生产部署；共享核心全量迁移、自动编程仍未完成。macOS 原生应用已接入通用能力，真实桥接测试通过，窗口全矩阵与正式分发仍未验收，见 [Mac 交付记录](../platforms/macos/DELIVERY.md)。下文自动部署描述保留其历史范围。
+
 > MCP 85 项用户能力、单条版本恢复及重新授权步骤见[MCP 用户能力](mcp-user-capabilities.md)。
 
 > Android 原生 APP、离线冲突与跨端学习兼容已完成本轮提交前验收；MuMu 按 N10 Pro 二代和原版 Clear7 尺寸验证，实体笔与墨水屏性能仍待真机。见 [Android 验收](evidence/android-ios/hanvon-mumu-acceptance.md)及 [main 整合回归](evidence/android-ios/main-integration.md)。下文日期章节保留历史状态。

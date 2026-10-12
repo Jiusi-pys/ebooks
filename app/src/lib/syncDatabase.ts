@@ -2,6 +2,10 @@
 import type { IDBPDatabase } from "idb";
 import { fieldObject } from "@contracts/core-field-objects";
 import {
+  invalidateEpubLayout,
+  notifyEpubLayoutChanged,
+} from "./epubLayoutStore";
+import {
   applyOperation,
   compareClock,
   entityKinds,
@@ -61,6 +65,9 @@ export function trackDatabase(database: IDBPDatabase): IDBPDatabase {
               ...syncStores,
               ...(original.includes("files") ? ["sources"] : []),
               ...(original.includes("highlights") ? ["reviews"] : []),
+              ...(database.objectStoreNames.contains("metadata")
+                ? ["metadata"]
+                : []),
             ]),
           ]
         : names,
@@ -68,6 +75,13 @@ export function trackDatabase(database: IDBPDatabase): IDBPDatabase {
       options
     );
     if (!tracked) return tx;
+    const changedLayouts = new Set<string>();
+    void tx.done.then(
+      () => {
+        for (const id of changedLayouts) notifyEpubLayoutChanged(id);
+      },
+      () => undefined
+    );
     let writes: Promise<unknown> = Promise.resolve();
     async function mutate(name: string, property: string, value: any) {
       const store = tx.objectStore(name);
@@ -78,6 +92,15 @@ export function trackDatabase(database: IDBPDatabase): IDBPDatabase {
           store,
           value
         );
+        if (
+          await invalidateEpubLayout(
+            tx,
+            name,
+            String(id),
+            property === "delete" ? undefined : value
+          )
+        )
+          changedLayouts.add(String(id));
         if (name === "files") {
           if (property !== "delete")
             await tx.objectStore("syncMeta").put({
@@ -224,9 +247,11 @@ export async function receiveOperations(
       ...entityKinds.filter(k => db.objectStoreNames.contains(k)),
       ...syncStores,
       ...(db.objectStoreNames.contains("files") ? ["files"] : []),
+      ...(db.objectStoreNames.contains("metadata") ? ["metadata"] : []),
     ]),
   ];
   const tx = db.transaction(names, "readwrite");
+  const changedLayouts = new Set<string>();
   const identity = await tx.objectStore("syncMeta").get("identity");
   for (const op of operations) {
     const key = `${op.kind}:${op.entityId}`;
@@ -246,9 +271,15 @@ export async function receiveOperations(
     await tx.objectStore("syncEntities").put({ id: key, state });
     if (db.objectStoreNames.contains(op.kind)) {
       const data = materialize(state);
-      if (!data) await tx.objectStore(op.kind).delete(op.entityId);
-      else if (projectable(op.kind, data))
+      if (!data) {
+        await tx.objectStore(op.kind).delete(op.entityId);
+        if (await invalidateEpubLayout(tx, op.kind, op.entityId, undefined))
+          changedLayouts.add(op.entityId);
+      } else if (projectable(op.kind, data)) {
         await tx.objectStore(op.kind).put(data);
+        if (await invalidateEpubLayout(tx, op.kind, op.entityId, data))
+          changedLayouts.add(op.entityId);
+      }
     }
     if (identity && compareClock(op.clock, identity.clock) >= 0)
       identity.clock = nextClock(op.clock);
@@ -259,6 +290,7 @@ export async function receiveOperations(
     .objectStore("syncMeta")
     .put({ ...checkpoint, id: cursorKey, cursor });
   await tx.done;
+  for (const id of changedLayouts) notifyEpubLayoutChanged(id);
 }
 
 export async function receiveSnapshot(
@@ -267,9 +299,14 @@ export async function receiveSnapshot(
   checkpoint: { id: string; snapshotId: string; after: string }
 ) {
   const names = [
-    ...new Set([...states.map(state => state.kind), ...syncStores]),
+    ...new Set([
+      ...states.map(state => state.kind),
+      ...syncStores,
+      ...(db.objectStoreNames.contains("metadata") ? ["metadata"] : []),
+    ]),
   ];
   const tx = db.transaction(names, "readwrite");
+  const changedLayouts = new Set<string>();
   const identity = await tx.objectStore("syncMeta").get("identity");
   for (const incoming of states) {
     const key = `${incoming.kind}:${incoming.id}`;
@@ -277,9 +314,15 @@ export async function receiveSnapshot(
     const state = mergeStates(prior?.state, incoming);
     await tx.objectStore("syncEntities").put({ id: key, state });
     const data = materialize(state);
-    if (!data) await tx.objectStore(state.kind).delete(state.id);
-    else if (projectable(state.kind, data))
+    if (!data) {
+      await tx.objectStore(state.kind).delete(state.id);
+      if (await invalidateEpubLayout(tx, state.kind, state.id, undefined))
+        changedLayouts.add(state.id);
+    } else if (projectable(state.kind, data)) {
       await tx.objectStore(state.kind).put(data);
+      if (await invalidateEpubLayout(tx, state.kind, state.id, data))
+        changedLayouts.add(state.id);
+    }
     for (const field of Object.values(state.fields)) {
       const [wall, count] = field.version.split(":");
       const clock = `${BigInt(wall)}:${BigInt(count)}`;
@@ -290,4 +333,5 @@ export async function receiveSnapshot(
   if (identity) await tx.objectStore("syncMeta").put(identity);
   await tx.objectStore("syncMeta").put(checkpoint);
   await tx.done;
+  for (const id of changedLayouts) notifyEpubLayoutChanged(id);
 }

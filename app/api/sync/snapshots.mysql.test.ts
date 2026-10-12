@@ -5,6 +5,9 @@ import { IncomingSnapshots } from "./snapshots";
 import { applyOperation, makeOperation } from "../../contracts/sync";
 
 const url = process.env.SYNC_TEST_DATABASE_URL;
+// Snapshot persistence uses a wall-clock TIMESTAMP; operation clocks below
+// intentionally retain their small logical values.
+const now = Date.UTC(2026, 0, 1);
 describe.skipIf(!url)("MySQL staged incoming snapshots", () => {
   const workspace = `test-${randomUUID()}`;
   const store = new SyncStore(
@@ -56,7 +59,7 @@ describe.skipIf(!url)("MySQL staged incoming snapshots", () => {
     await snapshots.begin(
       key,
       { id: "remote-snapshot", cursor: "watermark" },
-      1
+      now + 1
     );
     await snapshots.stage(
       key,
@@ -81,7 +84,7 @@ describe.skipIf(!url)("MySQL staged incoming snapshots", () => {
       { after: "next", pages: 1 },
       { cursor: "watermark", entities: [], next: null }
     );
-    await snapshots.finish(key, 100);
+    await snapshots.finish(key, now + 100);
     expect(await store.entity("notes", "remote")).toEqual(remote);
     expect((await store.changes()).operations).toEqual([local]);
     expect(await store.peerCursor(key)).toBe("watermark");
@@ -120,13 +123,17 @@ describe.skipIf(!url)("MySQL staged incoming snapshots", () => {
     );
     const snapshots = new IncomingSnapshots(store);
     const key = "pull:failed:epoch";
-    await snapshots.begin(key, { id: "failed", cursor: "failed-watermark" }, 1);
+    await snapshots.begin(
+      key,
+      { id: "failed", cursor: "failed-watermark" },
+      now + 1
+    );
     await snapshots.stage(
       key,
       { after: "", pages: 0 },
       { cursor: "failed-watermark", entities: [first, remote], next: null }
     );
-    await expect(snapshots.finish(key, 100)).rejects.toThrow(
+    await expect(snapshots.finish(key, now + 100)).rejects.toThrow(
       "field_version_reused"
     );
     expect(await store.entity("notes", "before-collision")).toBeUndefined();
@@ -139,21 +146,25 @@ describe.skipIf(!url)("MySQL staged incoming snapshots", () => {
       "DELETE FROM sync_entities WHERE workspace=? AND entity_id='collision'",
       [workspace]
     );
-    await snapshots.finish(key, 101);
+    await snapshots.finish(key, now + 101);
     expect(await store.entity("notes", "collision")).toEqual(remote);
   });
   it("does not overwrite a receive cursor advanced by another worker", async () => {
     const snapshots = new IncomingSnapshots(store);
     const key = "pull:concurrent:epoch";
     await store.savePeerCursor(key, "before");
-    await snapshots.begin(key, { id: "concurrent", cursor: "snapshot-end" }, 1);
+    await snapshots.begin(
+      key,
+      { id: "concurrent", cursor: "snapshot-end" },
+      now + 1
+    );
     await snapshots.stage(
       key,
       { after: "", pages: 0 },
       { cursor: "snapshot-end", entities: [], next: null }
     );
     await store.savePeerCursor(key, "other-worker");
-    await expect(snapshots.finish(key, 100)).rejects.toThrow(
+    await expect(snapshots.finish(key, now + 100)).rejects.toThrow(
       "snapshot_cursor_conflict"
     );
     expect(await store.peerCursor(key)).toBe("other-worker");

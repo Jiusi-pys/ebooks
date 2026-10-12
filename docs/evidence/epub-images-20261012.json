@@ -1,0 +1,50 @@
+{
+  "deployment": {
+    "phase": "succeeded",
+    "commit": "80a5173afb2867eef738f58a005420648e938adb",
+    "archiveSha256": "cd10f72a09e4285c7c4ded32ff8333786d5caed49c1bff280511543f3698f4dc",
+    "httpsVerifiedFiles": [
+      "assets/cursor-editorTextHighlight-kG3uUOwL.svg",
+      "assets/index-CxUtqsHW.css",
+      "assets/index-DqlbDLiY.js",
+      "assets/searchPdf-BaWAjaaR.js",
+      "favicon.svg",
+      "index.html",
+      "pdf.worker.min.mjs",
+      "sw.js"
+    ],
+    "backendUnchanged": true,
+    "oldAssetsRetained": true,
+    "backupSha256": "a311fde62ab42b8f733ab028d8cfb1c814a29e4f0fecd401768a18612d366fe8",
+    "rollbackIndex": "/opt/shufang/frontend-epub-images-20261012/previous-index.html"
+  },
+  "publicVerification": {
+    "url": "https://us.jiusi.org/",
+    "commit": "80a5173afb2867eef738f58a005420648e938adb",
+    "mainAsset": "assets/index-DqlbDLiY.js",
+    "sha256": "f0cd5831273b5bb8ece9acc13114c8125afcfb788b5ca6fc9929f1d39bc72896",
+    "layoutCachePresent": true,
+    "imageRendererPresent": true,
+    "layoutImportPresent": true
+  },
+  "browser": {
+    "captions": [
+      "图 1 两个系统节点的连接示意来源：自制测试图，保留原文。"
+    ],
+    "images": [
+      {
+        "alt": "测试图：两个系统节点",
+        "complete": true,
+        "displayWidth": 332.8828125,
+        "naturalHeight": 120,
+        "naturalWidth": 360
+      }
+    ]
+  },
+  "tests": {
+    "passed": 707,
+    "skipped": 55,
+    "deployment": 15
+  },
+  "productionBookImport": "not run; isolated fixture import and render validated"
+}

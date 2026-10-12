@@ -116,6 +116,61 @@
   margin-top: var(--reader-paragraph-spacing, 0.4em);
 }
 
+/* EPUB illustrations share the same layout in every reader pane. */
+.reader-epub-figure {
+  margin: 1em 0;
+  max-width: 100%;
+  text-align: center;
+  text-indent: 0;
+  break-inside: avoid;
+}
+.reader-epub-image {
+  display: inline-block;
+  max-width: 100%;
+  max-height: 60vh;
+  width: auto;
+  height: auto;
+  vertical-align: top;
+  object-fit: contain;
+}
+.reader-epub-inline-image {
+  display: inline-block;
+  max-width: 100%;
+  max-height: 60vh;
+  width: auto;
+  height: auto;
+  vertical-align: middle;
+  object-fit: contain;
+}
+.reader-epub-caption-group {
+  margin-top: 0.5em;
+  font-size: 0.85em;
+  text-align: start;
+}
+.reader-body p.reader-epub-caption,
+.reader-body p.reader-epub-credit {
+  text-indent: 0;
+  text-align: start;
+  font-size: 0.85em;
+}
+.reader-epub-caption-group p.reader-epub-caption,
+.reader-epub-caption-group p.reader-epub-credit {
+  font-size: inherit;
+}
+.reader-body p.reader-epub-credit {
+  opacity: 0.8;
+}
+.reader-body p.reader-epub-image-note {
+  display: inline-block;
+  vertical-align: top;
+  text-indent: 0;
+  margin: 0;
+}
+.reader-epub-image-note .reader-epub-inline-image {
+  vertical-align: top;
+  max-width: calc(100% - 2em);
+}
+
 /* 笔记 markdown-lite 渲染 */
 .note-render h1 {
   font-size: 1.5em;

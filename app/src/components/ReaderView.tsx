@@ -85,6 +85,10 @@ import { PdfCanvasViewer, type PdfSelectInfo } from "./reader/PdfCanvasViewer";
 import { PdfSelectionToolbar } from "./reader/PdfSelectionToolbar";
 import { BilingualReader } from "./reader/BilingualReader";
 import { EpubText } from "./reader/EpubText";
+import { EpubChapterContent } from "./reader/EpubChapterContent";
+import type { EpubTextImage } from "./reader/EpubImage";
+import type { EpubParagraphRole } from "@/lib/epubLayout";
+import { useEpubLayout } from "@/hooks/useEpubLayout";
 import { inferTargetLanguage, type BilingualLanguage } from "@/lib/bilingual";
 import { SplitWorkspace } from "./reader/SplitWorkspace";
 import {
@@ -201,6 +205,7 @@ export function ReaderView({
   const book = activeTarget
     ? (lib.books.find(item => item.id === activeTarget.bookId) ?? initialBook)
     : initialBook;
+  const epubLayout = useEpubLayout(book);
   const route: Route = activeTarget
     ? routeForSplitTarget(lib.route, activeTarget)
     : lib.route;
@@ -528,6 +533,7 @@ export function ReaderView({
     });
   }, [book.id, generalType, lib, rememberPageTurnPosition]);
 
+  const layoutPositionRef = useRef({ chapterId: "", ratio: 0 });
   // 首次打开恢复章内进度；只有明确切章时才回到顶部并记录重置。
   useEffect(() => {
     if (!chapter) return;
@@ -538,6 +544,7 @@ export function ReaderView({
       activeChapterRef.current === null && Boolean(route.chapterId)
     );
     const entryRatio = chapterEntryRatioRef.current ?? plan.ratio;
+    layoutPositionRef.current = { chapterId: chapter.id, ratio: entryRatio };
     chapterEntryRatioRef.current = null;
     activeChapterRef.current = chapter.id;
     setSel(null);
@@ -598,6 +605,28 @@ export function ReaderView({
     };
   }, [book.progress.ratio, type.pageTurnMode]);
 
+  // Sidecar loading is asynchronous. Keep the current ratio when images arrive.
+  useEffect(() => {
+    if (!epubLayout || !chapter) return;
+    const position = layoutPositionRef.current;
+    if (position.chapterId !== chapter.id) return;
+    const frame = requestAnimationFrame(() => {
+      const container = scrollRef.current;
+      if (!container) return;
+      const offset = readerScrollOffset(
+        container,
+        type.pageTurnMode,
+        position.ratio
+      );
+      container.scrollTo(
+        isPagedReaderMode(type.pageTurnMode)
+          ? { left: offset, top: 0 }
+          : { left: 0, top: offset }
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [epubLayout, chapter, type.pageTurnMode]);
+
   // 锚点跳转：滚动到书摘段落并闪烁
   useEffect(() => {
     const hid = route.highlightId;
@@ -613,7 +642,7 @@ export function ReaderView({
       window.setTimeout(() => el?.classList.remove("anchor-flash"), 2400);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route.highlightId, chapter?.id, route.outlineNavigationKey]);
+  }, [route.highlightId, chapter?.id, route.outlineNavigationKey, epubLayout]);
 
   // 关联跳转：优先使用独立文段锚点，不要求目标先成为书摘。
   useEffect(() => {
@@ -653,7 +682,13 @@ export function ReaderView({
           target.classList.remove("anchor-flash");
       }, 2400);
     });
-  }, [book.id, chapter?.id, route.passageAnchor, route.outlineNavigationKey]);
+  }, [
+    book.id,
+    chapter?.id,
+    route.passageAnchor,
+    route.outlineNavigationKey,
+    epubLayout,
+  ]);
 
   // 自定义目录：可精确跳到章节内的正文段落。
   useEffect(() => {
@@ -665,7 +700,12 @@ export function ReaderView({
       el?.classList.add("anchor-flash");
       window.setTimeout(() => el?.classList.remove("anchor-flash"), 2400);
     });
-  }, [route.outlineParaIndex, route.outlineNavigationKey, chapterId]);
+  }, [
+    route.outlineParaIndex,
+    route.outlineNavigationKey,
+    chapterId,
+    epubLayout,
+  ]);
 
   // 原版模式：「回到原文」→ 按书摘文字定位 PDF 页
   useEffect(() => {
@@ -753,6 +793,11 @@ export function ReaderView({
   const saveTimer = useRef<number | null>(null);
   const onScroll = useCallback(() => {
     const current = scrollRef.current;
+    if (current && chapter)
+      layoutPositionRef.current = {
+        chapterId: chapter.id,
+        ratio: readerScrollRatio(current, type.pageTurnMode),
+      };
     if (current && isPagedReaderMode(type.pageTurnMode)) {
       const next = horizontalReaderPageState(current);
       setHorizontalPage(previous =>
@@ -895,20 +940,24 @@ export function ReaderView({
     let frame = requestAnimationFrame(() => {
       setHorizontalPage(horizontalReaderPageState(container));
     });
-    const observer = new ResizeObserver(() => {
+    const updatePage = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         setHorizontalPage(horizontalReaderPageState(container));
       });
-    });
+    };
+    const observer = new ResizeObserver(updatePage);
+    container.addEventListener("load", updatePage, true);
     observer.observe(container);
     if (wrapRef.current) observer.observe(wrapRef.current);
     return () => {
       cancelAnimationFrame(frame);
+      container.removeEventListener("load", updatePage, true);
       observer.disconnect();
     };
   }, [
     chapter?.id,
+    epubLayout,
     isOriginal,
     type.columns,
     type.fontId,
@@ -2610,6 +2659,7 @@ export function ReaderView({
               ) : bilingualLanguage ? (
                 <BilingualReader
                   book={book}
+                  epubLayout={epubLayout}
                   chapterId={chapter.id}
                   theme={theme}
                   type={type}
@@ -2692,26 +2742,33 @@ export function ReaderView({
                           fontWeight: type.fontWeight,
                         }}
                       >
-                        {chapter.paragraphs.map((p, i) => (
-                          <Paragraph
-                            key={`${chapter.id}:${i}:${posture === "recall" ? "recall" : "normal"}`}
-                            index={i}
-                            text={p}
-                            dismissSignal={pageNavigationSignal}
-                            footnotes={chapter.footnotes?.filter(
-                              note => note.paraIndex === i
-                            )}
-                            ranges={rangesByPara.get(i) ?? []}
-                            associationRanges={
-                              associationRangesByPara.get(i) ?? []
-                            }
-                            recall={posture === "recall"}
-                            onSegmentClick={(hid, top, left) =>
-                              setHlPopup({ id: hid, top, left })
-                            }
-                            onAssociationClick={openAssociationPopup}
-                          />
-                        ))}
+                        <EpubChapterContent
+                          chapter={chapter}
+                          layout={epubLayout}
+                          dismissSignal={pageNavigationSignal}
+                          renderParagraph={(i, context) => (
+                            <Paragraph
+                              key={`${chapter.id}:${i}:${posture === "recall" ? "recall" : "normal"}`}
+                              index={i}
+                              text={chapter.paragraphs[i]}
+                              images={context.images}
+                              epubRole={context.role}
+                              dismissSignal={pageNavigationSignal}
+                              footnotes={chapter.footnotes?.filter(
+                                note => note.paraIndex === i
+                              )}
+                              ranges={rangesByPara.get(i) ?? []}
+                              associationRanges={
+                                associationRangesByPara.get(i) ?? []
+                              }
+                              recall={posture === "recall"}
+                              onSegmentClick={(hid, top, left) =>
+                                setHlPopup({ id: hid, top, left })
+                              }
+                              onAssociationClick={openAssociationPopup}
+                            />
+                          )}
+                        />
                       </div>
 
                       {/* 章末导航 */}
@@ -3200,6 +3257,8 @@ export function Paragraph({
   text,
   footnotes,
   dismissSignal,
+  images,
+  epubRole,
   ranges,
   associationRanges,
   recall,
@@ -3210,6 +3269,8 @@ export function Paragraph({
   text: string;
   footnotes?: import("@/types").EpubFootnote[];
   dismissSignal?: number;
+  images?: readonly EpubTextImage[];
+  epubRole?: EpubParagraphRole;
   ranges: { h: Highlight; start: number; end: number }[];
   associationRanges: AssociationRange[];
   recall: boolean;
@@ -3263,7 +3324,11 @@ export function Paragraph({
   }, [associationRanges, ranges, text]);
 
   return (
-    <p ref={wrapRef} data-pi={index}>
+    <p
+      ref={wrapRef}
+      data-pi={index}
+      className={epubRole ? `reader-epub-${epubRole}` : undefined}
+    >
       {segments.map(segment => {
         const h = segment.highlight;
         const firstAssociation = segment.associations[0];
@@ -3273,6 +3338,8 @@ export function Paragraph({
               <EpubText
                 text={segment.text}
                 offset={segment.start}
+                images={images}
+                endOfParagraph={segment.end === text.length}
                 notes={footnotes}
                 dismissSignal={dismissSignal}
               />
@@ -3384,6 +3451,8 @@ export function Paragraph({
               <EpubText
                 text={segment.text}
                 offset={segment.start}
+                images={images}
+                endOfParagraph={segment.end === text.length}
                 notes={footnotes}
                 dismissSignal={dismissSignal}
               />

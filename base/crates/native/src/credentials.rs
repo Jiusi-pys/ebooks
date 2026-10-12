@@ -1,8 +1,14 @@
 use std::path::Path;
+#[cfg(target_os = "macos")]
+pub mod macos_host;
 pub fn store(root: &Path, provider: &str, secret: &str) -> Result<(), String> {
     valid(provider)?;
     if secret.len() > 4096 {
         return Err("invalid_secret".into());
+    }
+    #[cfg(target_os = "macos")]
+    if let Some(result) = macos_host::store(root, provider, secret) {
+        return result;
     }
     let bytes = protect(secret.as_bytes(), false, provider)?;
     let directory = root.join("credentials");
@@ -31,6 +37,10 @@ pub fn load(root: &Path, provider: &str) -> Result<String, String> {
         return Ok(secret);
     }
     valid(provider)?;
+    #[cfg(target_os = "macos")]
+    if let Some(result) = macos_host::load(root, provider) {
+        return result;
+    }
     let path = root.join("credentials").join(provider);
     if std::fs::metadata(&path)
         .map_err(|_| "api_key_not_configured")?

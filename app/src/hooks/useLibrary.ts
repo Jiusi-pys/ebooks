@@ -415,7 +415,7 @@ export function useLibrary() {
             data: file,
           };
           // 书目与原始文件同一事务提交，失败时不会遗留孤儿文件。
-          await putImportedBook(book, sourceFile);
+          await putImportedBook(book, sourceFile, parsed.epubLayout);
           try {
             await syncBookMirror(
               {

@@ -9,7 +9,9 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    # The native parser build requires the Visual Studio 17 2022 generator.
+    # Keep the existing job identity used by the release admission checks.
+    runs-on: ${{ matrix.os == 'windows-latest' && 'windows-2022' || matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.93.1

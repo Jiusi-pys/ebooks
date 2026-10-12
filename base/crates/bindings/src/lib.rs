@@ -11,6 +11,21 @@ use std::{
 #[cfg(not(target_arch = "wasm32"))]
 mod native;
 
+/// Optional macOS host callbacks. Existing ABI 1 commands remain unchanged.
+#[cfg(target_os = "macos")]
+#[no_mangle]
+pub extern "C" fn core_install_mac_credentials(
+    store: Option<shufang_native::credentials::macos_host::Store>,
+    load: Option<shufang_native::credentials::macos_host::Load>,
+) -> u32 {
+    match (store, load) {
+        (Some(store), Some(load)) => u32::from(shufang_native::credentials::macos_host::install(
+            store, load,
+        )),
+        _ => 0,
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(
     tag = "command",

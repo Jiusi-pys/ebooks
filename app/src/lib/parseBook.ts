@@ -1,5 +1,6 @@
 import type { BookMetadata, Chapter, OutlineItem } from "@/types";
 import type { ImportBookFormat } from "./bookFormats";
+import type { EpubLayout } from "./epubLayout";
 // Keep every parser eager: an open production tab must not request a removed
 // hashed parser chunk after the app is rebuilt in place.
 import { parseEpub } from "./parseEpub";
@@ -18,6 +19,8 @@ export interface ParsedBook {
   pageCount?: number;
   /** 从书籍文件安全提取并归一化的可编辑书目元数据。 */
   metadata?: BookMetadata;
+  /** Local derived EPUB presentation; never part of Book/Chapter or sync. */
+  epubLayout?: EpubLayout;
 }
 
 export interface ParseBookOptions {

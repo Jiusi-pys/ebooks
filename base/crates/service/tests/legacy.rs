@@ -4,6 +4,138 @@ use serde_json::{json, Value};
 use shufang_native::workspace::Workspace;
 use shufang_service::{router, Host};
 use tower::ServiceExt;
+
+#[tokio::test]
+async fn mirror_events_survive_webhook_ticks_and_legacy_null_overrides() {
+    for legacy_null in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("db");
+        let workspace = Workspace::open(&path, "w", "r").unwrap();
+        workspace.execute("save", json!({"kind":"notes","id":"first","expected":0,"patch":{"title":"First","content":"text"}})).unwrap();
+        let host = Host::new(workspace.clone(), "token".into(), "http://localhost".into());
+        shufang_service::webhooks::tick(&host).await.unwrap();
+        if legacy_null {
+            let mut core = workspace.core.lock().unwrap();
+            let (revision, mut state) = core.local_value("webhooks").unwrap().unwrap();
+            state["overrides"] = Value::Null;
+            core.set_local_value("webhooks", revision, &state).unwrap();
+        }
+        drop(host);
+        drop(workspace);
+        let workspace = Workspace::open(&path, "w", "r").unwrap();
+        let host = Host::new(workspace.clone(), "token".into(), "http://localhost".into());
+        let app = router(host.clone());
+        let event = json!({"deliveryId":"after-tick-delivery-01","type":"note.created","data":{"extId":"after-tick","title":"After","content":"text","updatedAt":1}});
+        let result = request(&app, "POST", "/api/v1/events", event.clone()).await;
+        assert_eq!(result.0, 200, "legacy_null={legacy_null}: {result:?}");
+        shufang_service::webhooks::tick(&host).await.unwrap();
+        let replay = request(&app, "POST", "/api/v1/events", event).await;
+        assert_eq!(replay.0, 200);
+        assert_eq!(replay.1["duplicate"], true);
+        assert_eq!(
+            workspace
+                .execute("get", json!({"kind":"notes","id":"after-tick"}))
+                .unwrap()["revision"],
+            1
+        );
+    }
+}
+
+#[tokio::test]
+async fn mirror_event_rejects_malformed_webhook_overrides_without_mutation() {
+    let dir = tempfile::tempdir().unwrap();
+    let workspace = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();
+    workspace
+        .core
+        .lock()
+        .unwrap()
+        .set_local_value(
+            "webhooks",
+            0,
+            &json!({"subscriptions":{},"deliveries":{},"cursor":0,"overrides":"malformed"}),
+        )
+        .unwrap();
+    let app = router(Host::new(
+        workspace.clone(),
+        "token".into(),
+        "http://localhost".into(),
+    ));
+    let result = request(&app, "POST", "/api/v1/events", json!({"deliveryId":"malformed-delivery-01","type":"note.created","data":{"extId":"n","title":"After","content":"text","updatedAt":1}})).await;
+    assert_eq!(result.0, 400);
+    assert_eq!(result.1["error"], "invalid_webhooks");
+    assert!(workspace
+        .execute("get", json!({"kind":"notes","id":"n"}))
+        .is_err());
+}
+
+async fn assert_note_event_validation(typ: &str) {
+    for timestamp in [
+        None,
+        Some(Value::Null),
+        Some(json!(-1)),
+        Some(json!(0.5)),
+        Some(json!("1")),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let workspace = Workspace::open(&dir.path().join("db"), "w", "r").unwrap();
+        let app = router(Host::new(
+            workspace,
+            "token".into(),
+            "http://localhost".into(),
+        ));
+        if typ == "note.updated" {
+            assert_eq!(
+                request(
+                    &app,
+                    "POST",
+                    "/api/v1/notes",
+                    json!({"extId":"n","title":"Before","content":"original"})
+                )
+                .await
+                .0,
+                201
+            );
+        }
+        let before = request(&app, "GET", "/api/v1/notes/n", Value::Null).await;
+        let mut event = json!({"deliveryId":"validation-delivery-01","type":typ,"data":{"extId":"n","title":"After","content":"changed"}});
+        if let Some(value) = timestamp {
+            event["data"]["updatedAt"] = value;
+        }
+        let rejected = request(&app, "POST", "/api/v1/events", event.clone()).await;
+        assert_eq!(rejected.0, 400, "{typ}: {event}: {rejected:?}");
+        assert_eq!(
+            request(&app, "GET", "/api/v1/notes/n", Value::Null).await,
+            before
+        );
+        // Invalid input must not reserve the delivery ID or mutate the note.
+        event["data"]["updatedAt"] = json!(1);
+        assert_eq!(
+            request(&app, "POST", "/api/v1/events", event.clone())
+                .await
+                .0,
+            200
+        );
+        assert_eq!(
+            request(&app, "POST", "/api/v1/events", event.clone())
+                .await
+                .0,
+            200
+        );
+        event["data"]["title"] = json!("Conflicting replay");
+        assert_eq!(request(&app, "POST", "/api/v1/events", event).await.0, 409);
+    }
+}
+
+#[tokio::test]
+async fn mirror_note_created_rejects_invalid_timestamps_without_side_effects() {
+    assert_note_event_validation("note.created").await;
+}
+
+#[tokio::test]
+async fn mirror_note_updated_rejects_invalid_timestamps_without_side_effects() {
+    assert_note_event_validation("note.updated").await;
+}
+
 #[tokio::test]
 async fn repeated_delete_events_with_distinct_deliveries_are_idempotent() {
     let dir = tempfile::tempdir().unwrap();
@@ -33,7 +165,7 @@ async fn repeated_delete_events_with_distinct_deliveries_are_idempotent() {
             200
         );
     }
-    assert_eq!(request(&app, "POST", "/api/v1/events", json!({"deliveryId":"create-delivery-01","type":"note.created","data":{"extId":"n","title":"Resurrection","content":"text"}})).await.0, 409);
+    assert_eq!(request(&app, "POST", "/api/v1/events", json!({"deliveryId":"create-delivery-01","type":"note.created","data":{"extId":"n","title":"Resurrection","content":"text","updatedAt":1}})).await.0, 409);
 }
 #[tokio::test]
 async fn structured_author_and_chapter_limits_match_old_clients() {

@@ -304,17 +304,64 @@ describe.skipIf(!enabled)("old Hono/MySQL vs native HTTP REST", () => {
     const event = {
       deliveryId: `${prefix}-receipt`,
       type: "note.created",
-      data: { extId: `${prefix}-event`, title: "Event", content: "Text" },
+      data: {
+        extId: `${prefix}-event`,
+        title: "Event",
+        content: "Text",
+        updatedAt: 1,
+      },
     };
-    for (const body of [
-      event,
-      event,
-      { ...event, data: { ...event.data, title: "Conflict" } },
-    ]) {
+    for (const [body, status] of [
+      [event, 200],
+      [event, 200],
+      [{ ...event, data: { ...event.data, title: "Conflict" } }, 409],
+    ] as const) {
       const result = await pair("/events", "POST", body);
-      expect(result.native.status).toBe(result.old.status);
+      expect(result.old.status).toBe(status);
+      expect(result.native.status).toBe(status);
     }
   });
+  it.each(["note.created", "note.updated"])(
+    "%s rejects invalid timestamps without mutations or consuming receipts",
+    async type => {
+      for (const [index, updatedAt] of [
+        undefined,
+        null,
+        -1,
+        0.5,
+        "1",
+      ].entries()) {
+        const id = `${prefix}-${type}-${index}`;
+        if (type === "note.updated") {
+          const created = await pair("/notes", "POST", {
+            extId: id,
+            title: "Before",
+            content: "original",
+          });
+          expect(created.old.status).toBe(201);
+          expect(created.native.status).toBe(201);
+        }
+        const before = await pair(`/notes/${id}`);
+        const event = {
+          deliveryId: `${prefix}-invalid-${type}-${index}`,
+          type,
+          data: { extId: id, title: "After", content: "changed", updatedAt },
+        };
+        const rejected = await pair("/events", "POST", event);
+        expect(rejected.old.status, JSON.stringify(rejected.old)).toBe(400);
+        expect(rejected.native.status, JSON.stringify(rejected.native)).toBe(
+          400
+        );
+        expect(await pair(`/notes/${id}`)).toEqual(before);
+        const valid = { ...event, data: { ...event.data, updatedAt: 1 } };
+        const accepted = await pair("/events", "POST", valid);
+        expect(accepted.old.status, JSON.stringify(accepted.old)).toBe(200);
+        expect(accepted.native.status, JSON.stringify(accepted.native)).toBe(
+          200
+        );
+      }
+    }
+  );
   it("digest miss and due queue", async () => {
     for (const path of ["/digest/missing", "/review/due"]) {
       const result = await pair(path);

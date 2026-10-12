@@ -2,6 +2,8 @@
 
 # Shufang (書房)
 
+The 2026-10-11 US integration fixes passed all 55 MySQL/native integration tests after reproducing the four original failures. See the [TDD and validation record](docs/reviews/2026-10-11-us-integration-fixes.md) for local checks, explicit exclusions, and cleanup evidence. This source update does not deploy production.
+
 [简体中文](README_zh.md)
 
 Shufang is a reading and book-management workspace with a MySQL-backed library inspired by the

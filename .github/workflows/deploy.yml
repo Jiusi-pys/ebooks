@@ -1,12 +1,11 @@
-name: Check and deploy book server
+name: Manually deploy verified book server
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: shufang-production
@@ -21,9 +20,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require authorized human and successful exact-SHA integration
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHUFANG_RELEASE_ACTORS: ${{ vars.SHUFANG_RELEASE_ACTORS }}
+        run: python -m automation.release
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
           cache-dependency-path: app/package-lock.json
       - name: Test deployment supervisor
