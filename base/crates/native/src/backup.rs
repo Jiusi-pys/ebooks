@@ -43,6 +43,11 @@ fn create_archive(
     let mut paths = vec![(database_name.to_owned(), snapshot.to_path_buf())];
     // Original resources are content addressed and never modified or collected during backup.
     for folder in ["files", "credentials", "auth"] {
+        #[cfg(target_os = "macos")]
+        if crate::credentials::macos_host::installed() && ["credentials", "auth"].contains(&folder)
+        {
+            continue;
+        }
         if cfg!(target_os = "android") && ["credentials", "auth"].contains(&folder) {
             continue;
         }
