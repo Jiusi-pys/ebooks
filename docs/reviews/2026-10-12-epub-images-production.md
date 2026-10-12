@@ -13,7 +13,7 @@
 - check、lint、build 通过；完整 Vitest 707 通过、55 按环境跳过，部署测试 15 通过。
 - 隔离 origin `http://127.0.0.1:5194` 使用实际 React ReaderView、parseEpub、
   putImportedBook、useEpubLayout 和 IndexedDB；导入插件生成的真实 EPUB。
-- PNG 图片实际解码为 360×120，显示宽度约 335.86 px；原图注和来源各出现一次。
+- PNG 图片实际解码为 360×120，显示宽度约 332.88 px；原图注和来源各出现一次。
   从存储重开及页面刷新后图片仍正常。该宿主页禁用外部 API，并使用合成书籍。
 - 没有把测试书写入生产账号，未声称已验证用户的具体 EPUB 或生产账号端到端导入。
 
