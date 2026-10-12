@@ -1,6 +1,7 @@
 """Loopback deployment supervisor. Run separately from the application container."""
 import hmac
 import json
+import math
 import os
 import re
 import subprocess
@@ -60,7 +61,11 @@ class Jobs:
             latest = max(self.jobs.values(), key=lambda j: j['createdAt'], default=None)
             if latest and latest['sha'] == sha and latest['state'] == 'succeeded':
                 return dict(latest), False
-            job = dict(id=uuid.uuid4().hex, sha=sha, state='running', createdAt=time.time())
+            created_at = time.time()
+            if latest:
+                # Wall clocks can tie or move backwards; persisted order must not.
+                created_at = max(created_at, math.nextafter(latest['createdAt'], math.inf))
+            job = dict(id=uuid.uuid4().hex, sha=sha, state='running', createdAt=created_at)
             self.persist(job)
             self.jobs[job['id']] = job
             return dict(job), True
