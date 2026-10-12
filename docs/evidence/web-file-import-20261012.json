@@ -1,0 +1,42 @@
+{
+  "deployment": {
+    "phase": "succeeded",
+    "commit": "5d8d65fc8f65364f0643b5c226c3af55f0728aba",
+    "archiveSha256": "f17d78be445cd680c362bc0c9ef7b948da47190bf7c4724477e97cd80cd53dee",
+    "httpsVerifiedFiles": [
+      "assets/cursor-editorTextHighlight-kG3uUOwL.svg",
+      "assets/index-D2RoFPDz.css",
+      "assets/index-uItsmvjZ.js",
+      "assets/searchPdf-DeuzpF5M.js",
+      "favicon.svg",
+      "index.html",
+      "pdf.worker.min.mjs",
+      "sw.js"
+    ],
+    "backendUnchanged": true,
+    "oldAssetsRetained": true,
+    "backupSha256": "1226bc05f6c3211e44abf3982f3e1c655425d1bba862ea5c8a9368f2b00f30f3",
+    "rollbackIndex": "/opt/shufang/frontend-file-import-20261012/previous-index.html"
+  },
+  "publicVerification": {
+    "url": "https://us.jiusi.org/",
+    "commit": "5d8d65fc8f65364f0643b5c226c3af55f0728aba",
+    "mainAsset": "assets/index-uItsmvjZ.js",
+    "sha256": "cb08a2ac23b3a18db0e27158a887d0a28f6acbbbf3e6d6f51711891576a232d1",
+    "oldBlobOnlyCheckAbsent": true,
+    "nativeBlobCheckPresent": true
+  },
+  "browserSmoke": {
+    "result": "PASS",
+    "nativeFile": "[object File]",
+    "sourceBytes": 1931,
+    "chapters": 1,
+    "pairedOperations": 2
+  },
+  "liveBrowser": "Login page rendered; no production book written",
+  "tests": {
+    "passed": 632,
+    "skipped": 55,
+    "deploymentTests": 15
+  }
+}
